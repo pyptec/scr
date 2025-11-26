@@ -1,0 +1,377 @@
+medidores:
+  meatrolME337:
+    slave_id: 1
+    tipo: "i"
+    id_device: 9
+    baudrate: 19200
+    bytesize: 8
+    parity: N
+    stopbits: 1
+    timeout: 1
+    registers:
+      - name: Phase L1 current
+        address: 1000
+        unit: 10
+        alias: AL1
+      - name: Phase L2 current
+        address: 1002
+        unit: 11
+        alias: AL2
+      - name: Phase L3 current
+        address: 1004
+        unit: 12
+        alias: AL3
+      - name: Average value of L1L2L3 three-phase current AvgA1A2A3
+        address: 1006
+        unit: 54
+        alias: AVGcurrent
+      - name: Phase N current
+        address: 1008
+        unit: 55
+        alias: Ncurrent
+      - name: voltage L1
+        address: 1010
+        unit: 7
+        alias: VL1
+      - name: voltage L2
+        address: 1012
+        unit: 8
+        alias: VL2
+      - name: voltage L3
+        address: 1014
+        unit: 9
+        alias: VL3
+      - name: Average value of L1L2L3 three-phase phase voltage
+        address: 1016
+        unit: 56
+        alias: U1-U2 voltage
+      - name: U1-U2 voltage
+        address: 1020
+        unit: 29
+        alias: U12
+      - name: U2-U3 voltage
+        address: 1022
+        unit: 30
+        alias: U12
+      - name: U3-U12 voltage
+        address: 1024
+        unit: 31
+        alias: U12
+      - name: Average value of three-phase line voltage
+        address: 1026
+        unit: 57
+        alias: AVGU12U23U31
+      - name: Phase L1 Active Power
+        address: 1028
+        unit: 58
+        alias: P1
+      - name: Phase L2 Active Power
+        address: 1030
+        unit: 59
+        alias: P2
+      - name: Phase L3 Active Power
+        address: 1032
+        unit: 60
+        alias: P3
+      - name: Total Active power
+        address: 1034
+        unit: 61
+        alias: PTotal 
+      - name: Phase L1 Reactive power
+        address: 1036
+        unit: 62
+        alias: Q1 
+      - name: Phase L2 Reactive power
+        address: 1038
+        unit: 63
+        alias: Q2 
+      - name: Phase L3 Reactive power
+        address: 1040
+        unit: 64
+        alias: Q3 
+      - name: Total Reactive power
+        address: 1042
+        unit: 65
+        alias: QTotal 
+      - name: Phase L1 Apparent power
+        address: 1044
+        unit: 66
+        alias: S1  
+      - name: Phase L2 Apparent power
+        address: 1046
+        unit: 67
+        alias: S2 
+      - name: Phase L3 Apparent power
+        address: 1048
+        unit: 68
+        alias: S3 
+      - name: Total Apparent power
+        address: 1050
+        unit: 69
+        alias: STotal
+      - name: Phase 1 power factor 
+        address: 1052
+        unit: 70
+        alias: PF1
+      - name: Phase 2 power factor 
+        address: 1054
+        unit: 71
+        alias: PF2
+      - name: Phase 3 power factor 
+        address: 1056
+        unit: 72
+        alias: PF3
+      - name: Total power factor 
+        address: 1058
+        unit: 73
+        alias: PFTotal
+      - name: Phase L1 frequency 
+        address: 1068
+        unit: 74
+        alias: Freq1
+      - name: Phase L2 frequency 
+        address: 1070
+        unit: 75
+        alias: Freq2
+      - name: Phase L3 frequency 
+        address: 1072
+        unit: 76
+        alias: Freq3
+      - name: Frequency of supply voltages
+        address: 1074
+        unit: 27
+        alias: FreqTotal
+      - name: Phase L1 Positive active energy Int64
+        address: 2500
+        unit: 77
+        alias: EP1IMP
+      - name: Phase L2 Positive active energy Int64
+        address: 2504
+        unit: 78
+        alias: EP2IMP
+      - name: Phase L3 Positive active energy Int64
+        address: 2508
+        unit: 79
+        alias: EP3IMP
+      - name: Total Positive active energy Int64
+        address: 2512
+        unit: 80
+        alias: EPIMPTotal
+      - name: Phase L1 Reverse active energy Int64
+        address: 2516
+        unit: 81
+        alias: EP1Exp
+      - name: Phase L2 Reverse active energy Int64
+        address: 2520
+        unit: 82
+        alias: EP2Exp
+      - name: Phase L3 Reverse active energy Int64
+        address: 2524
+        unit: 83
+        alias: EP3Exp
+      - name: Total Reverse active energy Int64
+        address: 2528
+        unit: 84
+        alias: EPExpTotal
+      - name: Phase L1 Positive reactive energy Int64
+        address: 2532
+        unit: 85
+        alias: EQ1Imp
+      - name: Phase L2 Positive reactive energy Int64
+        address: 2536
+        unit: 86
+        alias: EQ2Imp
+      - name: Phase L3 Positive reactive energy Int64
+        address: 2540
+        unit: 87
+        alias: EQ3Imp
+      - name: Total Positive reactive energy Int64
+        address: 2544
+        unit: 88
+        alias: EQImpTotal
+      - name: Phase L1 Reverse reactive energy Int64
+        address: 2548
+        unit: 89
+        alias: EQ1Exp
+      - name: Phase L2 Reverse reactive energy Int64
+        address: 2552
+        unit: 90
+        alias: EQ2Exp
+      - name: Phase L3 Reverse reactive energy Int64
+        address: 2556
+        unit: 91
+        alias: EQ3Exp
+      - name: Total Reverse reactive energy Int64
+        address: 2560
+        unit: 92
+        alias: EQExpTotal
+      - name: Phase L1 Apparent Energy Int64
+        address: 2564
+        unit: 93
+        alias: ES1
+      - name: Phase L2 Apparent Energy Int64
+        address: 2568
+        unit: 94
+        alias: ES2
+      - name: Phase L3 Apparent Energy Int64
+        address: 2572
+        unit: 95
+        alias: ES3
+      - name: Total Apparent Energy Int64
+        address: 2576
+        unit: 96
+        alias: ESTotal
+      - name: Phase L1 Positive active energy UInt32
+        address: 2600
+        unit: 97
+        alias: EP1Imp
+      - name: Phase L2 Positive active energy UInt32
+        address: 2602
+        unit: 98
+        alias: EP2Imp
+      - name: Phase L3 Positive active energy UInt32
+        address: 2604
+        unit: 99
+        alias: EP3Imp
+      - name: Total Positive active energy UInt32
+        address: 2606
+        unit: 100
+        alias: EPImpTotal
+      - name: Phase L1 Reverse active energy UInt32
+        address: 2608
+        unit: 101
+        alias: EP1Exp
+      - name: Phase L2 Reverse active energy UInt32
+        address: 2610
+        unit: 102
+        alias: EP2Exp
+      - name: Phase L3 Reverse active energy UInt32
+        address: 2612
+        unit: 103
+        alias: EP3Exp
+      - name: Total Reverse active energy UInt32
+        address: 2614
+        unit: 104
+        alias: EPExpTotal
+      - name: Phase L1 Positive reactive energy UInt32
+        address: 2616
+        unit: 105
+        alias: EQ1Imp
+      - name: Phase L2 Positive reactive energy UInt32
+        address: 2618
+        unit: 106
+        alias: EQ2Imp
+      - name: Phase L3 Positive reactive energy UInt32
+        address: 2620
+        unit: 107
+        alias: EQ3Imp
+      - name: Total Positive reactive energy UInt32
+        address: 2622
+        unit: 108
+        alias: EQImpTotal
+      - name: Phase L1 Reverse reactive energy UInt32
+        address: 2624
+        unit: 109
+        alias: EQ1Exp
+      - name: Phase L2 Reverse reactive energy UInt32
+        address: 2626
+        unit: 110
+        alias: EQ2Exp
+      - name: Phase L3 Reverse reactive energy UInt32
+        address: 2628
+        unit: 111
+        alias: EQ3Exp
+      - name: Total Reverse reactive energy UInt32
+        address: 2630
+        unit: 112
+        alias: EQExpTotal
+      - name: Phase L1 Apparent Energy UInt32
+        address: 2632
+        unit: 113
+        alias: ES1
+      - name: Phase L2 Apparent Energy UInt32
+        address: 2634
+        unit: 114
+        alias: ES2
+      - name: Phase L3 Apparent Energy UInt32
+        address: 2636
+        unit: 115
+        alias: ES3
+      - name: Total Apparent Energy UInt32
+        address: 2638
+        unit: 116
+        alias: ESTotal
+      - name: Phase L1 current total harmonic percentage
+        address: 4000
+        unit: 117
+        alias: I1THD
+      - name: Phase L2 current total harmonic percentage
+        address: 4002
+        unit: 118
+        alias: I2THD
+      - name: Phase L3 current total harmonic percentage
+        address: 4004
+        unit: 119
+        alias: I3THD
+      - name: Phase L1 volage total harmonic percentage
+        address: 5000
+        unit: 120
+        alias: U1THD
+      - name: Phase L2 volage total harmonic percentage
+        address: 5002
+        unit: 121
+        alias: U2THD
+      - name: Phase L3 volage total harmonic percentage
+        address: 5004
+        unit: 122
+        alias: U3THD
+      - name: Phase L1 Maximum current
+        address: 6000
+        unit: 123
+        alias: I1Max
+      - name: Phase L2 Maximum current
+        address: 6002
+        unit: 124
+        alias: I2Max
+      - name: Phase L3 Maximum current
+        address: 6004
+        unit: 125
+        alias: I3Max
+      - name: Phase L1 Minimum current
+        address: 6010
+        unit: 126
+        alias: I1Min
+      - name: Phase L2 Minimum current
+        address: 6012
+        unit: 127
+        alias: I2Min
+      - name: Phase L3 Minimum current
+        address: 6014
+        unit: 128
+        alias: I3Min
+      - name: U1-UN Maximum phase voltage
+        address: 6020
+        unit: 129
+        alias: U1Max
+      - name: U2-UN Maximum phase voltage
+        address: 6022
+        unit: 130
+        alias: U2Max
+      - name: U3-UN Maximum phase voltage
+        address: 6024
+        unit: 131
+        alias: U3Max
+      - name: U1-UN Minimum phase voltage
+        address: 6030
+        unit: 132
+        alias: U1Min
+      - name: U2-UN Minimum phase voltage
+        address: 6032
+        unit: 133
+        alias: U2Min
+      - name: U3-UN Minimum phase voltage
+        address: 6034
+        unit: 134
+        alias: U3Min
+
+  

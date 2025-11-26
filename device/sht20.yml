@@ -1,0 +1,18 @@
+medidores:  
+  sht20_sensor:
+    id_device: 10
+    slave_id: 8
+    baudrate: 19200
+    bytesize: 8
+    parity: N
+    stopbits: 1
+    timeout: 1
+    registers:
+      - name: Temperature
+        address: 1
+        unit: 1
+        alias: Temp
+      - name: Humidity
+        address: 2
+        unit: 2
+        alias: Humidity
