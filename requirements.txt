@@ -1,0 +1,9 @@
+awscrt==0.21.1
+AWSIoTPythonSDK==1.5.4
+awsiotsdk==1.22.0
+minimalmodbus==2.1.1
+psutil==6.1.0
+pyserial==3.5
+python-dotenv==1.0.1
+PyYAML==6.0.2
+RPi.GPIO==0.7.1
