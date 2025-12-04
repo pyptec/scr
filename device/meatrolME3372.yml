@@ -3,7 +3,7 @@ medidores:
   meatrolME337_2:
     slave_id: 46
     tipo: "g"
-    id_device: 11
+    id_device: 25
     baudrate: 19200
     bytesize: 8
     parity: N

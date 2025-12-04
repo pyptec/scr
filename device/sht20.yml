@@ -1,6 +1,6 @@
 medidores:  
   sht20_sensor:
-    id_device: 10
+    id_device: 26
     slave_id: 8
     baudrate: 19200
     bytesize: 8
