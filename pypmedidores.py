@@ -174,14 +174,14 @@ def obtener_datos_medidores_y_sensor():
 
     # Configurar el segundo medidor ME3372
     config2 = util.cargar_configuracion('/home/pi/SAMEE200/scr/device/meatrolME3372.yml', 'meatrolME337_2')
-    medicion2 = payloadMedicion(config2)  # Obtener la medición como JSON
+    medicion2 = modbusdevice.payloadMedicion(config2)  # Obtener la medición como JSON
     medicionME3372 = json.dumps(medicion2)  # Convertir a JSON con formato legible
-
+     print(medicionME3372)
     # Configurar el sensor SHT20
     config_sht20 = util.cargar_configuracion('/home/pi/SAMEE200/scr/device/sht20.yml', 'sht20_sensor')
-    medicion_sht20 = payload_event_sht20(config_sht20)  # Obtener la medición como JSON
+    medicion_sht20 = modbusdevice.payload_event_sht20(config_sht20)  # Obtener la medición como JSON
     medicionSensorSHT20 = json.dumps(medicion_sht20)  # Convertir a JSON con formato legible
-
+    print(medicionSensorSHT20)
     # Devolver los tres JSON en un diccionario
     return {
         'medidor_1': medicionME337,
