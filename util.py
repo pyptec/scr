@@ -10,6 +10,8 @@ import socket
 import threading
 import yaml
 import Temp
+import json
+import shlex, pathlib
 
 # Configuración básica de logging
 logging.basicConfig(
@@ -219,6 +221,78 @@ def ip_a_numero(ip:str) -> str:
     return "".join(ip.split("."))
 
 def payload_estado_sistema_y_medidor():
+       # === Métricas del sistema ===
+    cpu_temp_c = Temp.cpu_temp()
+    memoria = psutil.virtual_memory()
+    cpu_usage = psutil.cpu_percent(interval=1)
+
+    # === Ethernet ===
+    eth_iface = primera_eth_disponible() or "eth0"
+    eth_up    = iface_exists(eth_iface) and iface_operstate(eth_iface) == "up"
+    eth_ip    = iface_ip4(eth_iface) if eth_up else None
+
+    # === USB0 (SIM7600) ===
+    usb_iface  = "usb0"
+    usb_exists = iface_exists(usb_iface)
+    usb_up     = usb_exists and iface_operstate(usb_iface) == "up"
+    usb_ip     = iface_ip4(usb_iface) if usb_up else None
+    if not usb_ip and usb_exists:
+        # Si la IP aún no aparece (ventana de renovación), usa fallback desde la tabla de rutas
+        usb_ip = usb0_ip_fallback()
+
+    # === IP activa para el campo numérico (prioridad ETH > USB) ===
+    if eth_up and eth_ip:
+        ip_activa = eth_ip
+    elif usb_ip:
+        ip_activa = usb_ip
+    else:
+        ip_activa = ""
+
+    # === Reportes de texto (cada interfaz por separado) ===
+    ip_usb_report = usb_ip or ""      # << esto es lo que verás en IP_USB0
+    ip_eth_report = eth_ip or ""
+
+    # === Campos numéricos (mantengo tu estructura actual) ===
+    ip_sin_puntos = ip_a_numero(ip_activa)     # unidad 137 (IP activa numérica)
+    ip_eth_num    = ip_a_numero(ip_eth_report) # unidad 144 (IP Ethernet numérica)
+
+    # === Valores mensurados ===
+    mensurados = [
+        str(round(cpu_temp_c, 1)),
+        str(memoria.percent),
+        str(cpu_usage),
+        ip_sin_puntos,
+        ip_eth_num,
+    ]
+
+    # Watchdog térmico
+    Temp.check_temp()
+
+    # === YAML de variables del sistema ===
+    cfg = cargar_configuracion(
+        '/home/pi/SAMEE200/scr/device/sistema.yml',
+        'variables_del_sistema'
+    )
+    g_id = cfg.get('id_device')
+    unidades_cfg = cfg.get('unidades', [])
+    codigos_unidades = [u['codigo'] for u in unidades_cfg]
+
+    # === Log limpio (sin falsos warnings) con ambas IPs separadas ===
+    logging.info(
+        f"SISTEMA (g={g_id}) → Temp={cpu_temp_c:.1f}°C | RAM={memoria.percent}% | "
+        f"CPU={cpu_usage}% | IP_USB0={ip_usb_report} | IP_Ethernet={ip_eth_report}"
+    )
+
+    # === Payload ===
+    estado_sistema = {
+        "t": get__time_utc(),
+        "g": g_id,
+        "v": mensurados,
+        "u": codigos_unidades
+    }
+    return {"d": [estado_sistema]} 
+    
+'''
     cpu = Temp.cpu_temp()
     memoria = psutil.virtual_memory()
     cpu_usage = psutil.cpu_percent(interval=1)
@@ -257,7 +331,7 @@ def payload_estado_sistema_y_medidor():
                 }
     # Retorno doble: el JSON y el estado de la puerta
     return { "d": [estado_sistema] },door_state
-
+'''
 def renovar_ip_usb0():
     try:
         # Ejecutar dhclient en la interfaz usb0

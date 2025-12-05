@@ -157,7 +157,7 @@ def main_loop():
     while True:
         tempRaspberry, tempMedidor, tempQueue, tempPing, tempCheckusb = util.actualizar_temporizadores(
         tempRaspberry, tempMedidor, tempQueue, tempPing, tempCheckusb)
-    '''    
+       
         if tempRaspberry == 0:
             tempRaspberry = TIMERCHEQUEOTEMPERATURA
             json_estado, door_state = util.payload_estado_sistema_y_medidor()
@@ -181,7 +181,7 @@ def main_loop():
                 else:
                     fileventqueue.agregar_evento(Sistema)
                 
-             
+        '''     
         # Mediciones cada 10 minutos
         if tempMedidor == 0:
             tempMedidor = TIMERMEDICION
@@ -204,7 +204,7 @@ def main_loop():
                 # No hay internet:
                 for key in ('medidor_1', 'medidor_2', 'sensor_sht20'):
                     fileventqueue.agregar_evento(datos[key])
-                
+        '''       
         if tempQueue == 0:
             tempQueue = TIMERCOLAEVENTOS
             process_event_queue()
@@ -226,7 +226,7 @@ def main_loop():
                 tempHora = TIMECHECK_USB_ETHERNET_TIME
                 util.check_usb_connection()
                 
-    
+        '''
         with shared.mensaje_lock:
             if shared.mensaje_recibido:
                 mensaje = shared.mensaje_recibido
