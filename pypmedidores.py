@@ -53,94 +53,7 @@ def door_interrupt_callback(channel):
             awsaccess.disconnect_from_aws_iot(mqtt_client)
     else:
         fileventqueue.agregar_evento(Sistema)
-'''       
-def leer_float32(instrumento, address):
-    registros = instrumento.read_registers(address, 2, functioncode=3)
-    return struct.unpack(">f", struct.pack(">HH", registros[0], registros[1]))[0]
-def payload_event_sht20(config):
-    valores = []
-    unidades = []
-    try:
-        instrumento = minimalmodbus.Instrument(serialPort, config['slave_id'])
-        instrumento.serial.baudrate = config['baudrate']
-        instrumento.serial.bytesize = config['bytesize']
-        instrumento.serial.stopbits = config['stopbits']
-        instrumento.serial.timeout = config['timeout']
-        instrumento.mode = minimalmodbus.MODE_RTU
-        instrumento.clear_buffers_before_each_transaction = True
-         # Interpretar la paridad desde el YAML (N, E, O)
-        parity_map = {
-            'N': serial.PARITY_NONE,
-            'E': serial.PARITY_EVEN,
-            'O': serial.PARITY_ODD
-        }
-        instrumento.serial.parity = parity_map.get(config['parity'].upper(), serial.PARITY_NONE)
-     # Leer cada registro del medidor desde la configuración YAML
-        for reg in config['registers']:
-            val = instrumento.read_register(reg['address'], 1, functioncode=4)
-            valores.append(str(round(val, 1)))
-            unidades.append(str(reg['unit']))
-        return {
-            "d": [{
-                "t": util.get__time_utc(),
-                "g": config['id_device'],
-                "v": valores,
-                "u": unidades
-            }]
-        }
 
-    except Exception as e:
-       util.logging.error(f"Error al leer el SHT20: {e}")
-       return None
-
-# Función para generar los parámetros del evento
-def payload_event(config):
-    voltages = []  # Lista para almacenar los valores de voltaje leídos
-    units_list = []  # Lista para almacenar las unidades correspondientes
-    slave_id = config['slave_id']
-    instrumento = minimalmodbus.Instrument(serialPort, slave_id)
-    instrumento.serial.baudrate = config['baudrate']
-    instrumento.serial.bytesize = config['bytesize']
-    instrumento.serial.stopbits = config['stopbits']
-    instrumento.serial.timeout = config['timeout']
-    instrumento.mode = minimalmodbus.MODE_RTU
-    instrumento.clear_buffers_before_each_transaction = True
-    
-     # Interpretar la paridad desde el YAML (N, E, O)
-    parity_map = {
-        'N': serial.PARITY_NONE,
-        'E': serial.PARITY_EVEN,
-        'O': serial.PARITY_ODD
-    }
-    instrumento.serial.parity = parity_map.get(config['parity'].upper(), serial.PARITY_NONE)
-     # Leer cada registro del medidor desde la configuración YAML
-    for reg in config['registers']:
-        try:
-            # Leer el valor flotante de cada registro
-            value = leer_float32(instrumento, reg['address'])
-            voltages.append(str(round(value, 3)))  # Agregar el voltaje leído a la lista
-            units_list.append(str(reg['unit']))  # Agregar la unidad correspondiente a la lista
-        except Exception as e:  # Manejo de excepciones
-            util.logging.error(f"Error al intentar leer el registro: {reg['address']}: {e}")
-            #os.system('sudo reboot')  # Reiniciar si hay error
-
-    # Crear el diccionario con los parámetros del medidor
-    key = config['tipo']
-    params = {
-        "t": util.get__time_utc(),  # Hora en UTC
-        key: config['id_device'],  # Identificador o índice
-        "v": voltages,  # Lista de voltajes leídos
-        "u": units_list  # Lista de unidades
-    }
-    
-    return params
-
-# Función que empaqueta el evento en una estructura JSON
-def payloadMedicion(config):
-    return {
-        "d": [payload_event(config)]  # Contiene los eventos dentro de una lista
-    }
-'''
 #---------------------------------------------------------------------------------------------------    
 # Función para procesar eventos en la cola
 #---------------------------------------------------------------------------------------------------
@@ -171,18 +84,18 @@ def obtener_datos_medidores_y_sensor():
     config = util.cargar_configuracion('/home/pi/SAMEE200/scr/device/meatrolME337.yml', 'meatrolME337')
     medicion = modbusdevices.payload_event_modbus(config)  # Obtener la medición como JSON
     medicionME337 = json.dumps(medicion)  # Convertir a JSON con formato legible
-    print(medicionME337)
+    #print(medicionME337)
 
     # Configurar el segundo medidor ME3372
     config2 = util.cargar_configuracion('/home/pi/SAMEE200/scr/device/meatrolME3372.yml', 'meatrolME337_2')
     medicion2 = modbusdevices.payload_event_modbus(config2)  # Obtener la medición como JSON
     medicionME3372 = json.dumps(medicion2)  # Convertir a JSON con formato legible
-    print(medicionME3372)
+    #print(medicionME3372)
     # Configurar el sensor SHT20
     config_sht20 = util.cargar_configuracion('/home/pi/SAMEE200/scr/device/sht20.yml', 'sht20_sensor')
     medicion_sht20 = modbusdevices.payload_event_modbus(config_sht20)  # Obtener la medición como JSON
     medicionSensorSHT20 = json.dumps(medicion_sht20)  # Convertir a JSON con formato legible
-    print(medicionSensorSHT20)
+    #print(medicionSensorSHT20)
     # Devolver los tres JSON en un diccionario
     return {
         'medidor_1': medicionME337,
@@ -207,7 +120,7 @@ def main_loop():
     # Publicar el encendido del sistema
     util.logging.info("Sistema encendido.")
     # conexion a AWS
-    conneced_meter = json.dumps(eventHandler.medidor_conectado())
+    conneced_meter = json.dumps(eventHandler.pyp_Conect())
     # mediciones de los medidores ME337 y el  sensor SHT20
     datos = obtener_datos_medidores_y_sensor()
     Temp.iniciar_wdt()

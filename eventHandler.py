@@ -1,23 +1,31 @@
 import util
+import yaml
+def pyp_Conect():
+    """
+    Lee la configuración desde el archivo pyp_Conect.yml y construye
+    el payload de conexión inicial con hora, grupo, valores y unidades.
+    """
+    config = util.cargar_configuracion(
+        '/home/pi/SAMEE200/scr/device/pyp_Conect.yml',
+        'pyp_connect'
+    )
+    # Datos base
+    id_device = config.get('id_device')
+    i = config.get('i', id_device)
 
-def medidor_conectado():
+    valores = []
+    unidades = []
+
+    # Recorre los registros del YAML
+    for reg in config.get('registers', []):
+        valores.append(str(reg.get('v', '')))
+        unidades.append(str(reg.get('u', '')))
+
     params = {
-        "t": util.get__time_utc(),   # Añade la hora en UTC
-        "i": 10,                 # Número de identificación o índice
-        "v": ['0'],                 # Lista de voltajes leídos
-        "u": ['53']                 # Lista de unidades
-    }  
-    # Contiene los eventos dentro de una lista
-    return { "d": [params] }   
-'''
-def sht20_conectado(mensurados):
-    params = {
-        "t": util.get__time_utc(),   # Añade la hora en UTC
-        "g": 10,                 # Número de identificación o índice
-        "v": mensurados,                 # Lista de variables  leídos
-        "u": ['1','2']                 # Lista de unidades
-    }  
-    # Contiene los eventos dentro de una lista
-    
-    return { "d": [params] }   
-'''
+        "t": util.get__time_utc(),
+        "i": i,
+        "v": valores,
+        "u": unidades
+    }
+
+    return {"d": [params]} 
