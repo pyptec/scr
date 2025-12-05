@@ -29,6 +29,8 @@ def payload_event_modbus(config):
     port = config.get('port', None)
     if port is None:
         port = serialPort
+    # leer flag debug desde el YAML (default: false)
+    debug_enabled = config.get('debug', False)
     try:
         #print("\n=== Iniciando lectura THT03R ===")
         #print(f"Puerto: {serialPort}")
@@ -54,7 +56,7 @@ def payload_event_modbus(config):
         device_name = config.get('device_name') 
 
         
-        #instrumento.debug = True
+        instrumento.debug = debug_enabled
         # Leer cada registro del sensor
         for reg in config['registers']:
             address = reg['address']
