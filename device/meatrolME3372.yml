@@ -1,9 +1,12 @@
 
 medidores:
   meatrolME337_2:
+    device_name: "ME337"
+    id_device: 25
+    port: "/dev/ttyS0"
+    debug: False 
     slave_id: 46
     tipo: "g"
-    id_device: 25
     baudrate: 19200
     bytesize: 8
     parity: N

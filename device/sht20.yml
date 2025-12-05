@@ -1,6 +1,8 @@
 medidores:  
   sht20_sensor:
     id_device: 26
+    port: "/dev/ttyS0"
+    debug: True
     slave_id: 8
     baudrate: 19200
     bytesize: 8
