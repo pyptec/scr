@@ -13,6 +13,7 @@ import threading
 import eventHandler
 import shared
 import subprocess
+import modbusdevices
 #import tunel_watcher
 
 '''
@@ -91,7 +92,7 @@ def payload_event_sht20(config):
     except Exception as e:
        util.logging.error(f"Error al leer el SHT20: {e}")
        return None
-
+'''
 # Función para generar los parámetros del evento
 def payload_event(config):
     voltages = []  # Lista para almacenar los valores de voltaje leídos
@@ -133,7 +134,7 @@ def payload_event(config):
     }
     
     return params
-
+'''
 # Función que empaqueta el evento en una estructura JSON
 def payloadMedicion(config):
     return {
@@ -167,8 +168,9 @@ def process_event_queue():
 def obtener_datos_medidores_y_sensor():
     # PRIMER medidor ME337
     config = util.cargar_configuracion('/home/pi/SAMEE200/scr/device/meatrolME337.yml', 'meatrolME337')
-    medicion = payloadMedicion(config)  # Obtener la medición como JSON
+    medicion = modbusdevice.payloadMedicion(config)  # Obtener la medición como JSON
     medicionME337 = json.dumps(medicion)  # Convertir a JSON con formato legible
+    print(medicionME337)
 
     # Configurar el segundo medidor ME3372
     config2 = util.cargar_configuracion('/home/pi/SAMEE200/scr/device/meatrolME3372.yml', 'meatrolME337_2')
@@ -199,7 +201,7 @@ def main_loop():
     tempCheckusb  = TIMECHECKUSBETHERNET 
     tempHora      = TIMECHECK_USB_ETHERNET_TIME
     
-    threading.Thread(target=awsaccess.iniciar_recepcion_mensajes, daemon=True).start()
+    #threading.Thread(target=awsaccess.iniciar_recepcion_mensajes, daemon=True).start()
  
     # Publicar el encendido del sistema
     util.logging.info("Sistema encendido.")
@@ -241,7 +243,7 @@ def main_loop():
     while True:
         tempRaspberry, tempMedidor, tempQueue, tempPing, tempCheckusb = util.actualizar_temporizadores(
         tempRaspberry, tempMedidor, tempQueue, tempPing, tempCheckusb)
-        
+    '''    
         if tempRaspberry == 0:
             tempRaspberry = TIMERCHEQUEOTEMPERATURA
             json_estado, door_state = util.payload_estado_sistema_y_medidor()
@@ -333,7 +335,7 @@ def main_loop():
                        util.logging.warning(f"Comando no reconocido: {comando_mensaje}")
                 except Exception as e:
                     util.logging.error(f"Error al procesar el mensaje MQTT: {e}")
-
+'''
 # Punto de entrada principal
 if __name__ == '__main__':
     main_loop()
