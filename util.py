@@ -220,6 +220,42 @@ def ip_a_numero(ip:str) -> str:
         return "0"
     return "".join(ip.split("."))
 
+
+def iface_exists(iface: str) -> bool:
+    return os.path.isdir(f"/sys/class/net/{iface}")
+
+def iface_operstate(iface: str) -> str:
+    try:
+        with open(f"/sys/class/net/{iface}/operstate", "r") as f:
+            return f.read().strip()
+    except Exception:
+        return "unknown"
+
+def iface_ip4(iface: str) -> str | None:
+    try:
+        out = subprocess.check_output(
+            ["ip", "-4", "-o", "addr", "show", "dev", iface],
+            text=True
+        )
+        for tok in out.split():
+            if tok.count(".") == 3 and "/" in tok:
+                return tok.split("/")[0]
+    except Exception:
+        pass
+    return None
+#-----------------------------------------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------------------------------------
+def primera_eth_disponible() -> str | None:
+    # Prioriza nombres típicos (eth*, en*)
+    candidatos = [n for n in psutil.net_if_addrs().keys() if n.startswith(("eth", "en"))]
+    for iface in sorted(candidatos):
+        if iface_exists(iface):
+            return iface
+    return "eth0" if iface_exists("eth0") else None
+#-----------------------------------------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------------------------------------
 def payload_estado_sistema_y_medidor():
        # === Métricas del sistema ===
     cpu_temp_c = Temp.cpu_temp()
