@@ -176,7 +176,7 @@ def obtener_datos_medidores_y_sensor():
     config2 = util.cargar_configuracion('/home/pi/SAMEE200/scr/device/meatrolME3372.yml', 'meatrolME337_2')
     medicion2 = modbusdevice.payloadMedicion(config2)  # Obtener la medición como JSON
     medicionME3372 = json.dumps(medicion2)  # Convertir a JSON con formato legible
-     print(medicionME3372)
+    print(medicionME3372)
     # Configurar el sensor SHT20
     config_sht20 = util.cargar_configuracion('/home/pi/SAMEE200/scr/device/sht20.yml', 'sht20_sensor')
     medicion_sht20 = modbusdevice.payload_event_sht20(config_sht20)  # Obtener la medición como JSON
