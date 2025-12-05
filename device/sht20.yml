@@ -10,14 +10,14 @@ medidores:
     registers:
       - name: Temperature
         address: 1
-        fc: 3
+        fc: 4
         decimals: 1        # decimals = 0 → deja el valor tal cual (entero), decimals = 1 → divide el valor por 10, decimals = 2 → divide por 100
         readWrite: "R"
         unit: 1
         alias: Temp
       - name: Humidity
         address: 2
-        fc: 3
+        fc: 4
         decimals: 1        # decimals = 0 → deja el valor tal cual (entero), decimals = 1 → divide el valor por 10, decimals = 2 → divide por 100
         readWrite: "R"
         unit: 2
