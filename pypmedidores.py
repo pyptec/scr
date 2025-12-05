@@ -53,7 +53,7 @@ def door_interrupt_callback(channel):
             awsaccess.disconnect_from_aws_iot(mqtt_client)
     else:
         fileventqueue.agregar_evento(Sistema)
-        
+ '''       
 def leer_float32(instrumento, address):
     registros = instrumento.read_registers(address, 2, functioncode=3)
     return struct.unpack(">f", struct.pack(">HH", registros[0], registros[1]))[0]
@@ -92,7 +92,7 @@ def payload_event_sht20(config):
     except Exception as e:
        util.logging.error(f"Error al leer el SHT20: {e}")
        return None
-'''
+
 # Función para generar los parámetros del evento
 def payload_event(config):
     voltages = []  # Lista para almacenar los valores de voltaje leídos
@@ -134,12 +134,13 @@ def payload_event(config):
     }
     
     return params
-'''
+
 # Función que empaqueta el evento en una estructura JSON
 def payloadMedicion(config):
     return {
         "d": [payload_event(config)]  # Contiene los eventos dentro de una lista
     }
+'''
 #---------------------------------------------------------------------------------------------------    
 # Función para procesar eventos en la cola
 #---------------------------------------------------------------------------------------------------
