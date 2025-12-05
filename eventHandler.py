@@ -3,7 +3,7 @@ import util
 def medidor_conectado():
     params = {
         "t": util.get__time_utc(),   # Añade la hora en UTC
-        "g": 9,                 # Número de identificación o índice
+        "g": 10,                 # Número de identificación o índice
         "v": ['0'],                 # Lista de voltajes leídos
         "u": ['53']                 # Lista de unidades
     }  

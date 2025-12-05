@@ -1,7 +1,7 @@
 medidores:
   meatrolME337:
     slave_id: 1
-    tipo: "i"
+    tipo: "g"
     id_device: 24
     baudrate: 19200
     bytesize: 8

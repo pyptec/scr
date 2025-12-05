@@ -251,7 +251,7 @@ def payload_estado_sistema_y_medidor():
     logging.info(f"Estado puerta (GPIO6): {door_status_text}")
     estado_sistema = {
                     "t": get__time_utc(),
-                    "g": 12,
+                    "g": 15,
                     "v": mensurados,
                     "u": [1, 135,136,137,138]  # 1 = °C, 2 = %RAM
                 }
