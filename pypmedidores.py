@@ -165,9 +165,9 @@ def main_loop():
             #se inicia el wdt 
             Temp.iniciar_wdt()
             # Si la puerta está abierta, forzar transmisión inmediata
-            if door_state == 0:  # 0 = abierta
-                door_interrupt_callback(door_state)
-                util.logging.info("Puerta abierta → transmisión prioritaria a AWS")
+            #if door_state == 0:  # 0 = abierta
+            #    door_interrupt_callback(door_state)
+            #    util.logging.info("Puerta abierta → transmisión prioritaria a AWS")
                 
                 # lógica normal de envío cada 3 ciclos
             contador_envio += 1
