@@ -68,7 +68,9 @@ def payload_event_modbus(config):
              
             val = instrumento.read_register(address, decimals, functioncode=fc, signed=signed)
             #print(f"   Valor leído bruto: {val}")
-            
+            if debug_enabled:
+                util.logging.info(f"[{device_name}] Valor bruto leido={val}")
+
             # Redondeo suave
             val = round(val, 1)
 
