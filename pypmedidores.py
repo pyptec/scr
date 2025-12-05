@@ -160,7 +160,7 @@ def main_loop():
        
         if tempRaspberry == 0:
             tempRaspberry = TIMERCHEQUEOTEMPERATURA
-            json_estado, door_state = util.payload_estado_sistema_y_medidor()
+            json_estado = util.payload_estado_sistema_y_medidor()
             Sistema =json.dumps(json_estado)
             #se inicia el wdt 
             Temp.iniciar_wdt()
