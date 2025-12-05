@@ -40,7 +40,7 @@ def payload_event_modbus(config):
         instrumento.serial.baudrate = config['baudrate']
         instrumento.serial.bytesize = config['bytesize']
         instrumento.serial.stopbits = config['stopbits']
-        instrumento.serial.timeout = 1 #config['timeout']
+        instrumento.serial.timeout = config['timeout']
         instrumento.serial.inter_byte_timeout = 0.2
         instrumento.mode = minimalmodbus.MODE_RTU
         instrumento.clear_buffers_before_each_transaction = True
