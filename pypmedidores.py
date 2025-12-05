@@ -53,7 +53,7 @@ def door_interrupt_callback(channel):
             awsaccess.disconnect_from_aws_iot(mqtt_client)
     else:
         fileventqueue.agregar_evento(Sistema)
- '''       
+'''       
 def leer_float32(instrumento, address):
     registros = instrumento.read_registers(address, 2, functioncode=3)
     return struct.unpack(">f", struct.pack(">HH", registros[0], registros[1]))[0]
