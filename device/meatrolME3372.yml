@@ -12,6 +12,9 @@ medidores:
     registers:
       - name: Phase L1 current
         address: 1000
+        fc: 3
+        decimals: 2        # decimals = 0 → deja el valor tal cual (entero), decimals = 1 → divide el valor por 10, decimals = 2 → divide por 100
+        readWrite: "R"
         unit: 10
         alias: AL1
       - name: Phase L2 current

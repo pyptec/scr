@@ -139,8 +139,9 @@ def payloadMedicion(config):
     return {
         "d": [payload_event(config)]  # Contiene los eventos dentro de una lista
     }
-    
+#---------------------------------------------------------------------------------------------------    
 # Función para procesar eventos en la cola
+#---------------------------------------------------------------------------------------------------
 def process_event_queue():
     if fileventqueue.contar_eventos() != 0:
         if  util.check_internet_connection():

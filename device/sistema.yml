@@ -1,0 +1,15 @@
+medidores:
+  variables_del_sistema:
+    id_device: 15            # <- este será tu "g"
+    unidades: 
+      - codigo: 1
+        descripcion: "Temperatura CPU (°C)"
+      - codigo: 135
+        descripcion: "Porcentaje de RAM usada (%)"
+      - codigo: 136
+        descripcion: "Porcentaje de CPU usada (%)"
+      - codigo: 137
+        descripcion: "Dirección IP usb0 convertida a número entero"
+      - codigo: 144
+        descripcion: "IP Ethernet (convertida a entero)"
+    descripcion: "Variables del sistema Raspberry Pi"

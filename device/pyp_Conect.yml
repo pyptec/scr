@@ -1,0 +1,9 @@
+medidores:
+  pyp_connect:
+    id_device: 1
+    i: 10
+    registers:
+      - name: conexion
+        alias: connect
+        v: 0
+        u: 53
