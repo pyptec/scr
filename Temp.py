@@ -180,7 +180,7 @@ def setup_door_interrupt():
 def _door_callback(channel):
     
     door = _door_cfg()
-    i_value = int(door.get('i', 12))
+    i_value = int(door.get('i'))
     regs = door.get('registers', [])
 
     # usa lo que venga en YAML; defaults:
