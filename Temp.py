@@ -110,26 +110,40 @@ def door_is_open() -> bool:
 def _door_cfg():
     try:
         cfg = util.cargar_configuracion('/home/pi/SAMEE200/scr/device/door.yml')
-        return cfg.get('medidores', {}).get('door_sensor', {}) if isinstance(cfg, dict) else {}
+
+        if not isinstance(cfg, dict):
+            util.logging.error("[DOOR] door.yml no devolvió un dict válido")
+            return {}
+
+        if isinstance(cfg.get('medidores'), dict):
+            door = cfg['medidores'].get('door_sensor')
+            if isinstance(door, dict):
+                return door
+
+        door = cfg.get('door_sensor')
+        if isinstance(door, dict):
+            return door
+
+        if 'i' in cfg or 'debounce_ms' in cfg or 'invert_active_low' in cfg:
+            return cfg
+
+        util.logging.error(f"[DOOR] Estructura no reconocida en door.yml: {cfg}")
+        return {}
+
     except Exception as e:
-        util.logging.error(f"[DOOR] No se pudo cargar door.yml: {e}")
+        util.logging.error(f"[DOOR] No se pudo cargar door.yml: {type(e).__name__}: {e}")
         return {}
 #-----------------------------------------------------------------------------------------------------------
 #Configura interrupción GPIO de puerta solo una vez
 #-----------------------------------------------------------------------------------------------------------
 def setup_door_interrupt():
-    """
-    Configura GPIO6_DOOR=6 como entrada con pull-up y registra interrupción BOTH.
-    Si add_event_detect falla (pin ya tomado/permisos), activa fallback por polling.
-    """
     door = _door_cfg()
-    debounce_ms = int(door.get('debounce_ms', 80))
-    invert = bool(door.get('invert_active_low', True))
+    debounce_ms = int(door.get('debounce_ms') or 80)
+    invert = bool(door.get('invert_active_low') if door.get('invert_active_low') is not None else True)
 
     GPIO.setwarnings(False)
     GPIO.setmode(GPIO.BCM)
 
-    # Limpieza defensiva: quita detección previa y limpia SOLO este pin
     try:
         GPIO.remove_event_detect(GPIO6_DOOR)
     except Exception:
@@ -139,15 +153,12 @@ def setup_door_interrupt():
     except Exception:
         pass
 
-    # Re-configura y estabiliza
     GPIO.setup(GPIO6_DOOR, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     time.sleep(0.02)
 
-    # Inicializa estado
     _door_state["active"] = _door_read_active(invert)
     _door_state["changed_ts"] = time.monotonic()
 
-    # Intenta edge detection
     try:
         GPIO.add_event_detect(
             GPIO6_DOOR,
@@ -160,44 +171,42 @@ def setup_door_interrupt():
     except RuntimeError as e:
         util.logging.error(f"[DOOR] add_event_detect falló: {e}. Activando fallback por polling…")
 
-    # Fallback por polling (50 ms o el debounce configurado)
     def _door_poll_worker():
         last = _door_state["active"]
         while True:
             cur = _door_read_active(invert)
             if cur != last:
-                _door_callback(GPIO6_DOOR)  # dispara la misma lógica
+                _door_callback(GPIO6_DOOR)
                 last = cur
             time.sleep(max(0.05, debounce_ms / 1000.0))
 
     t = threading.Thread(target=_door_poll_worker, daemon=True)
     t.start()
     util.logging.info("[DOOR] Fallback por polling activado.")
-    
 #-----------------------------------------------------------------------------------------------------------
 # Callback de interrupción de puerta
 #-----------------------------------------------------------------------------------------------------------
 def _door_callback(channel):
-    
     door = _door_cfg()
-    i_value = int(door.get('i'))
-    regs = door.get('registers', [])
 
-    # usa lo que venga en YAML; defaults:
-    # estado puerta = 138
-    # duración abierta = 145
+    raw_i = door.get('i')
+    if raw_i is None:
+        util.logging.warning("[DOOR] 'i' no definido en door.yml; usando 12 por defecto")
+        raw_i = 12
+    i_value = int(raw_i)
+
+    regs = door.get('registers', [])
     u_open = _get_unit(regs, {"door_open", "estado_puerta"}, "138")
     u_dur  = _get_unit(regs, {"door_open_duration_s", "duracion_abierta"}, "145")
 
-    invert = bool(door.get('invert_active_low', True))
-    active = _door_read_active(invert)  # True = abierta
+    invert = bool(door.get('invert_active_low') if door.get('invert_active_low') is not None else True)
+    active = _door_read_active(invert)
     now = time.monotonic()
 
     last = _door_state.get("active")
     if last is None:
         _door_state["active"] = active
         _door_state["changed_ts"] = now
-
         if active:
             util.logging.warning("[DOOR] ABIERTA")
             _publish_ivu(i_value, ["1"], [u_open])
@@ -215,11 +224,11 @@ def _door_callback(channel):
 
     if active:
         util.logging.warning("[DOOR] ABIERTA")
-        _publish_ivu(i_value, ["1"], [u_open])   # estado abierta
+        _publish_ivu(i_value, ["1"], [u_open])
     else:
         dur = round(now - prev_ts, 1)
         util.logging.info(f"[DOOR] CERRADA. Abierta {dur}s")
-        _publish_ivu(i_value, ["0", str(dur)], [u_open, u_dur])  # estado cerrada + duración
+        _publish_ivu(i_value, ["0", str(dur)], [u_open, u_dur])
 #-----------------------------------------------------------------------------------------------------------
 # Busca en registers por alias o name; devuelve u en str.
 #-----------------------------------------------------------------------------------------------------------
