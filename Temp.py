@@ -178,10 +178,14 @@ def setup_door_interrupt():
 # Callback de interrupción de puerta
 #-----------------------------------------------------------------------------------------------------------
 def _door_callback(channel):
+    
     door = _door_cfg()
     i_value = int(door.get('i', 12))
     regs = door.get('registers', [])
-    # usa lo que venga en YAML; defaults: abierta=145, duración=138
+
+    # usa lo que venga en YAML; defaults:
+    # estado puerta = 138
+    # duración abierta = 145
     u_open = _get_unit(regs, {"door_open", "estado_puerta"}, "138")
     u_dur  = _get_unit(regs, {"door_open_duration_s", "duracion_abierta"}, "145")
 
@@ -193,9 +197,13 @@ def _door_callback(channel):
     if last is None:
         _door_state["active"] = active
         _door_state["changed_ts"] = now
-        # opcional: publicar estado inicial solo si está abierta
+
         if active:
+            util.logging.warning("[DOOR] ABIERTA")
             _publish_ivu(i_value, ["1"], [u_open])
+        else:
+            util.logging.info("[DOOR] CERRADA")
+            _publish_ivu(i_value, ["0"], [u_open])
         return
 
     if active == last:
@@ -206,17 +214,12 @@ def _door_callback(channel):
     _door_state["changed_ts"] = now
 
     if active:
-        util.logging.warning("[DOOR] ABIERTA → apagar relés Modbus.")
-        #restablecer_sistema_post_puerta()
-        _publish_ivu(i_value, ["1"], [u_open])  # v=1, u=138
-        #_man_state["last_pressed"] = _btn_read_active(True)  # activo-bajo
+        util.logging.warning("[DOOR] ABIERTA")
+        _publish_ivu(i_value, ["1"], [u_open])   # estado abierta
     else:
-        global _door_restored
-        _door_restored = False
         dur = round(now - prev_ts, 1)
         util.logging.info(f"[DOOR] CERRADA. Abierta {dur}s")
-        _publish_ivu(i_value, [str(dur)], [u_dur])  # evento “cerrada” (solo duración)
-        
+        _publish_ivu(i_value, ["0", str(dur)], [u_open, u_dur])  # estado cerrada + duración
 #-----------------------------------------------------------------------------------------------------------
 # Busca en registers por alias o name; devuelve u en str.
 #-----------------------------------------------------------------------------------------------------------

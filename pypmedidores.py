@@ -32,27 +32,6 @@ TIMERPING = int(os.getenv('TIMERPING', 120))
 TIMECHECKUSBETHERNET = int(os.getenv('TIMECHECKUSBETHERNET', 600))
 TIMECHECK_USB_ETHERNET_TIME = int(os.getenv('TIMECHECK_USB_ETHERNET_TIME', 6))
 
-def door_interrupt_callback(channel):
-    time.sleep(0.05)
-    state = Temp.door()
-    estado_txt = "Cerrada" if state  == 1 else "Abierta"
-    util.logging.warning(f"Puerta Alarma (GPIO6): {estado_txt}")
-    estado_sistema = {
-                    "t": util.get__time_utc(),
-                    "g": 12,
-                    "v": [int(state)],
-                    "u": [138]  # 1 = °C, 2 = %RAM
-                }
-    json_estado ={ "d": [estado_sistema] }
-    Sistema =json.dumps(json_estado)
-
-    if  util.check_internet_connection():
-        mqtt_client = awsaccess.connect_to_mqtt()
-        if mqtt_client:
-            awsaccess.publish_mediciones(mqtt_client, Sistema)
-            awsaccess.disconnect_from_aws_iot(mqtt_client)
-    else:
-        fileventqueue.agregar_evento(Sistema)
 
 #---------------------------------------------------------------------------------------------------    
 # Función para procesar eventos en la cola
@@ -168,10 +147,7 @@ def main_loop():
             #se inicia el wdt 
             Temp.iniciar_wdt()
             # Si la puerta está abierta, forzar transmisión inmediata
-            #if door_state == 0:  # 0 = abierta
-            #    door_interrupt_callback(door_state)
-            #    util.logging.info("Puerta abierta → transmisión prioritaria a AWS")
-                
+           
                 # lógica normal de envío cada 3 ciclos
             contador_envio += 1
             if contador_envio >= 3:
