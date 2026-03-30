@@ -78,7 +78,9 @@ def process_event_queue():
     else:
         util.logging.info("No hay eventos para procesar.")
         
-        
+#-----------------------------------------------------------------------------------------------------------   
+# Rutina de lectura de sensores Modbus RTU y devuelve datos en formato JSON 
+#-----------------------------------------------------------------------------------------------------------        
 def obtener_datos_medidores_y_sensor():
     # PRIMER medidor ME337
     config = util.cargar_configuracion('/home/pi/SAMEE200/scr/device/meatrolME337.yml', 'meatrolME337')
@@ -116,7 +118,8 @@ def main_loop():
     tempHora      = TIMECHECK_USB_ETHERNET_TIME
     
     #threading.Thread(target=awsaccess.iniciar_recepcion_mensajes, daemon=True).start()
- 
+    # Interrupciones
+    Temp.setup_door_interrupt()
     # Publicar el encendido del sistema
     util.logging.info("Sistema encendido.")
     # conexion a AWS

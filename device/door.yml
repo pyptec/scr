@@ -1,0 +1,15 @@
+medidores:
+  door_sensor:
+    i: 12                   # identificador lógico del grupo o área (igual que en otros)
+    name: "door_chamber"
+    invert_active_low: true
+    debounce_ms: 80
+    registers:
+      - name: estado_puerta
+        alias: door_open
+        v: 1                # 1 = abierta
+        u: 138
+      - name: duracion_abierta
+        alias: door_open_duration_s
+        v: 0                # segundos que ha estado abierta 
+        u: 145
