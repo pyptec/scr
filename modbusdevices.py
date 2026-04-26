@@ -31,6 +31,9 @@ def payload_event_modbus(config):
         port = serialPort
     # leer flag debug desde el YAML (default: false)
     debug_enabled = config.get('debug', False)
+     # nombre para logs (desde el YAML)
+    device_name = config.get('device_name') 
+
     try:
         #print("\n=== Iniciando lectura THT03R ===")
         #print(f"Puerto: {serialPort}")
@@ -52,33 +55,59 @@ def payload_event_modbus(config):
             'O': serial.PARITY_ODD
         }
         instrumento.serial.parity = parity_map.get(config['parity'].upper(), serial.PARITY_NONE)
-        # nombre para logs (desde el YAML)
-        device_name = config.get('device_name') 
-
-        
         instrumento.debug = debug_enabled
+        
+        device_name = config.get('device_name', device_name)
         # Leer cada registro del sensor
         for reg in config['registers']:
             address = reg['address']
             # valores por defecto para este sensor
-            fc  = reg.get('fc')
-            decimals = reg.get('decimals')
-            signed = False
+            fc  = reg.get('fc',3)
+            data_type = str(reg.get('type', '')).lower().strip()
+            decimals = reg.get('decimals',0)
+            signed = False #bool(reg.get('signed', False))
             #print(f"→ Leyendo dirección {address} (función {fc}) ...")
-             
-            val = instrumento.read_register(address, decimals, functioncode=fc, signed=signed)
-            #print(f"   Valor leído bruto: {val}")
-            if debug_enabled:
-                util.logging.info(f"[{device_name}] Valor bruto leido={val}")
+            try:
+                if data_type == "float32":
+                    val = instrumento.read_float(address, functioncode=fc, number_of_registers=2)
+                elif data_type == "uint32":
+                    #val = instrumento.read_long(address,functioncode=fc,signed=False,byteorder=minimalmodbus.BYTEORDER_BIG)
+                    raw = instrumento.read_registers(address, 2, functioncode=fc)
+                    val = (raw[0] << 16) + raw[1]
+                    val = float(val)
+                    if debug_enabled:
+                        
+                        util.logging.info(
+                        f"[{device_name}] UINT32 addr={address} raw={raw} valor={val}"
+                        )
+                elif data_type == "int32": 
+                    #no se a probado
+                    val = instrumento.read_long(address,functioncode=fc,signed=True,byteorder=minimalmodbus.BYTEORDER_BIG)
+                else: 
+                    val = instrumento.read_register(address, decimals, functioncode=fc, signed=signed)
+                #print(f"   Valor leído bruto: {val}")
+                if debug_enabled:
+                    util.logging.info( f"[{device_name}] addr={address} fc={fc} type={data_type or 'register'} valor bruto={val}")
 
-            # Redondeo suave
-            val = round(val, 1)
-
-            valores.append(str(val))
-            unidades.append(str(reg['unit']))
-            #print(f"\nValores finales leídos: {valores}")
-            #print(f"Unidades asociadas: {unidades}")
-            #print("==============================\n")
+                # Redondeo suave
+                if isinstance(val, float):
+                    val = round(val, 1)
+            
+                valores.append(str(val))
+                #unidades.append(int(reg['unit'])) #ojo no funciona bien
+                unidades.append(str(reg['unit']))
+                #print(f"\nValores finales leídos: {valores}")
+                #print(f"Unidades asociadas: {unidades}")
+                #print("==============================\n")
+            except Exception as e:
+                util.logging.error(
+                    f"[{device_name}] ERROR registro {reg.get('alias', reg.get('name'))} "
+                    f"addr={address} type={data_type}: {type(e).__name__}: {e}"
+                )
+                valores.append("0")
+                unidades.append(int(reg['unit']))
+        util.logging.info(
+        f"[{device_name}] Payload armado: valores={len(valores)} unidades={len(unidades)}")        
         return {
             "d": [{
                 "t": util.get__time_utc(),

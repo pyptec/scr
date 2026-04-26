@@ -6,4 +6,5 @@ source /home/pi/SAMEE200/bin/activate
 sleep 5
 
 # Ejecutar el script en Python
+
 python /home/pi/SAMEE200/scr/pypmedidores.py

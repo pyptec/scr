@@ -148,7 +148,7 @@ def main_loop():
             Temp.iniciar_wdt()
             # Si la puerta está abierta, forzar transmisión inmediata
            
-                # lógica normal de envío cada 3 ciclos
+            # lógica normal de envío cada 3 ciclos
             contador_envio += 1
             if contador_envio >= 3:
                 contador_envio = 0  # Reiniciar después de enviar
@@ -160,7 +160,7 @@ def main_loop():
                 else:
                     fileventqueue.agregar_evento(Sistema)
                 
-        '''     
+             
         # Mediciones cada 10 minutos
         if tempMedidor == 0:
             tempMedidor = TIMERMEDICION
@@ -183,7 +183,7 @@ def main_loop():
                 # No hay internet:
                 for key in ('medidor_1', 'medidor_2', 'sensor_sht20'):
                     fileventqueue.agregar_evento(datos[key])
-        '''       
+               
         if tempQueue == 0:
             tempQueue = TIMERCOLAEVENTOS
             process_event_queue()

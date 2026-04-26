@@ -1,5 +1,6 @@
 medidores:  
   sht20_sensor:
+    device_name: "SHT20"
     id_device: 26
     port: "/dev/ttyS0"
     debug: False #True
