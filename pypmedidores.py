@@ -189,13 +189,12 @@ def main_loop():
             process_event_queue()
 
         if tempPing == 0:
-            interfaz = "eth0"
             tempPing = TIMERPING
-            util.run_in_thread(interfaz)
-            #if util.enable_interface(interfaz):
-                #util.logging.info(f"Conexión a internet disponible en {interfaz}.")
-            #else:
-                #util.logging.info(f"Sin conexión a internet en {interfaz}.")    
+            ok = util.ensure_internet_failover()
+            if ok:
+                util.logging.info("Internet OK por al menos una interfaz.")
+            else:
+                util.logging.warning("Sin Internet por eth0 ni usb0.")
             
 
         if tempCheckusb == 0:
