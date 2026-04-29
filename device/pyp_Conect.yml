@@ -1,7 +1,7 @@
 medidores:
   pyp_connect:
     id_device: 1
-    i: 10
+    i: 14  #10
     registers:
       - name: conexion
         alias: connect

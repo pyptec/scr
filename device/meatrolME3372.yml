@@ -2,7 +2,7 @@
 medidores:
   meatrolME337_2:
     device_name: "ME337"
-    id_device: 25
+    id_device: 30 #25
     port: "/dev/ttyS0"
     debug: False 
     slave_id: 46
