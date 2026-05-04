@@ -65,18 +65,24 @@ def obtener_datos_medidores_y_sensor():
     datos = {}
     if medidor_activo == "eastron":
          # Medidor Eastron SDM630MCT
-        config = util.cargar_configuracion('/home/pi/SAMEE100/scr/device/eastronSDm630.yml', 'samee100')
+        cfg_path = os.getenv("CFG_EASTRON")
+        cfg_section = os.getenv("CFG_EASTRON_SECTION")
+         
+        #config = util.cargar_configuracion('/home/pi/SAMEE100/scr/device/eastronSDm630.yml', 'samee100')
+        config = util.cargar_configuracion(cfg_path, cfg_section)
         medicion = modbusdevices.payload_event_modbus(config)
         datos ['medidor_eastron'] = json.dumps(medicion)
     elif medidor_activo == "meatrol":
         # PRIMER medidor ME337
-        config = util.cargar_configuracion('/home/pi/SAMEE200/scr/device/meatrolME337.yml', 'meatrolME337')
+        config = util.cargar_configuracion(os.getenv("CFG_MEATROL1"), os.getenv("CFG_MEATROL1_SECTION"))
+        #config = util.cargar_configuracion('/home/pi/SAMEE200/scr/device/meatrolME337.yml', 'meatrolME337')
         medicion = modbusdevices.payload_event_modbus(config)  # Obtener la medición como JSON
         datos ['medicionME337'] = json.dumps(medicion)  # Convertir a JSON con formato legible
         #print(medicionME337)
 
         # Configurar el segundo medidor ME3372
-        config2 = util.cargar_configuracion('/home/pi/SAMEE200/scr/device/meatrolME3372.yml', 'meatrolME337_2')
+        config2 = util.cargar_configuracion(os.getenv("CFG_MEATROL2"), os.getenv("CFG_MEATROL2_SECTION"))
+        #config2 = util.cargar_configuracion('/home/pi/SAMEE200/scr/device/meatrolME3372.yml', 'meatrolME337_2')
         medicion2 = modbusdevices.payload_event_modbus(config2)  # Obtener la medición como JSON
         datos ['medicionME3372'] = json.dumps(medicion2)  # Convertir a JSON con formato legible
         #print(medicionME3372)
@@ -84,7 +90,8 @@ def obtener_datos_medidores_y_sensor():
     
     
     # Configurar el sensor SHT20
-    config_sht20 = util.cargar_configuracion('/home/pi/SAMEE200/scr/device/sht20.yml', 'sht20_sensor')
+    config_sht20 = util.cargar_configuracion(os.getenv("CFG_SHT20"),os.getenv("CFG_SHT20_SECTION"))
+    #config_sht20 = util.cargar_configuracion('/home/pi/SAMEE100/scr/device/sht20.yml', 'sht20_sensor')
     medicion_sht20 = modbusdevices.payload_event_modbus(config_sht20)  # Obtener la medición como JSON
     datos ['medicionSHT20'] = json.dumps(medicion_sht20)  # Convertir a JSON con formato legible
     #print(medicionSensorSHT20)
@@ -103,7 +110,6 @@ def main_loop():
     tempCheckusb  = TIMECHECKUSBETHERNET 
     tempHora      = TIMECHECK_USB_ETHERNET_TIME
     
-    #threading.Thread(target=awsaccess.iniciar_recepcion_mensajes, daemon=True).start()
     # Interrupciones
     Temp.setup_door_interrupt()
     # Publicar el encendido del sistema

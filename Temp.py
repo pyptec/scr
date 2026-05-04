@@ -1,3 +1,4 @@
+import os
 import subprocess
 import time, json
 import RPi.GPIO as GPIO
@@ -109,7 +110,8 @@ def door_is_open() -> bool:
 #-----------------------------------------------------------------------------------------------------------
 def _door_cfg():
     try:
-        cfg = util.cargar_configuracion('/home/pi/SAMEE200/scr/device/door.yml')
+        cfg = util.cargar_configuracion(os.getenv("CFG_DOOR"),os.getenv("CFG_DOOR_SECTION"))
+        #cfg = util.cargar_configuracion('/home/pi/SAMEE200/scr/device/door.yml')
 
         if not isinstance(cfg, dict):
             util.logging.error("[DOOR] door.yml no devolvió un dict válido")
