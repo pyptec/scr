@@ -1,0 +1,240 @@
+medidores:
+  samee100:
+    device_name: "SDM630MCT"
+    id_device: 30
+    port: "/dev/ttyS0"
+    debug: False
+    slave_id: 1
+    baudrate: 19200
+    bytesize: 8
+    parity: N
+    stopbits: 1
+    timeout: 1
+    tipo: "g"
+
+    registers:
+      # =========================
+      # CORRIENTES
+      # =========================
+      - name: Phase L1 current
+        address: 6
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 10
+        alias: AL1
+
+      - name: Phase L2 current
+        address: 8
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 11
+        alias: AL2
+
+      - name: Phase L3 current
+        address: 10
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 12
+        alias: AL3
+
+      - name: Average line current
+        address: 46
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 54
+        alias: AVGcurrent
+
+      - name: Neutral current
+        address: 224
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 55
+        alias: Ncurrent
+
+      # =========================
+      # VOLTAJES
+      # =========================
+      - name: Phase L1 line to neutral volts
+        address: 0
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 7
+        alias: VL1
+
+      - name: Phase L2 line to neutral volts
+        address: 2
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 8
+        alias: VL2
+
+      - name: Phase L3 line to neutral volts
+        address: 4
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 9
+        alias: VL3
+
+      - name: Average line to neutral volts
+        address: 42
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 56
+        alias: AVGvoltage
+
+      # =========================
+      # VOLTAJES L-L
+      # =========================
+      - name: Line L1 to L2 volts
+        address: 200
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 29
+        alias: U12
+
+      - name: Line L2 to L3 volts
+        address: 202
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 30
+        alias: U23
+
+      - name: Line L3 to L1 volts
+        address: 204
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 31
+        alias: U31
+
+      - name: Average line to line volts
+        address: 206
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 57
+        alias: AVGU
+
+      # =========================
+      # POTENCIA ACTIVA
+      # =========================
+      - name: Phase L1 active power
+        address: 12
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 58
+        alias: P1
+
+      - name: Phase L2 active power
+        address: 14
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 59
+        alias: P2
+
+      - name: Phase L3 active power
+        address: 16
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 60
+        alias: P3
+
+      - name: Total system power
+        address: 52
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 61
+        alias: PTotal
+
+      # =========================
+      # FRECUENCIA
+      # =========================
+      - name: Frequency
+        address: 70
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 27
+        alias: Freq
+
+      # =========================
+      # ENERGÍA ACTIVA (SOLAR)
+      # =========================
+      - name: Total Import kWh
+        address: 72
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 100
+        alias: kWh_total_import
+
+      - name: Total Export kWh
+        address: 74
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 104
+        alias: kWh_total_export
+
+      - name: L1 Import kWh
+        address: 346
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 97
+        alias: kWh_L1_import
+
+      - name: L2 Import kWh
+        address: 348
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 98
+        alias: kWh_L2_import
+
+      - name: L3 Import kWh
+        address: 350
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 99
+        alias: kWh_L3_import
+
+      - name: L1 Export kWh
+        address: 352
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 81
+        alias: kWh_L1_export
+
+      - name: L2 Export kWh
+        address: 354
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 82
+        alias: kWh_L2_export
+
+      - name: L3 Export kWh
+        address: 356
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 83
+        alias: kWh_L3_export
