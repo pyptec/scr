@@ -61,28 +61,35 @@ def process_event_queue():
 # Rutina de lectura de sensores Modbus RTU y devuelve datos en formato JSON 
 #-----------------------------------------------------------------------------------------------------------        
 def obtener_datos_medidores_y_sensor():
-    # PRIMER medidor ME337
-    config = util.cargar_configuracion('/home/pi/SAMEE200/scr/device/meatrolME337.yml', 'meatrolME337')
-    medicion = modbusdevices.payload_event_modbus(config)  # Obtener la medición como JSON
-    medicionME337 = json.dumps(medicion)  # Convertir a JSON con formato legible
-    #print(medicionME337)
+    medidor_activo = os.getenv("MEDIDOR_ACTIVO", "meatrol").lower()
+    datos = {}
+    if medidor_activo == "eastron":
+         # Medidor Eastron SDM630MCT
+        config = util.cargar_configuracion('/home/pi/SAMEE100/scr/device/eastronSDm630.yml', 'samee100')
+        medicion = modbusdevices.payload_event_modbus(config)
+        datos ['medidor_eastron'] = json.dumps(medicion)
+    elif medidor_activo == "meatrol":
+        # PRIMER medidor ME337
+        config = util.cargar_configuracion('/home/pi/SAMEE200/scr/device/meatrolME337.yml', 'meatrolME337')
+        medicion = modbusdevices.payload_event_modbus(config)  # Obtener la medición como JSON
+        datos ['medicionME337'] = json.dumps(medicion)  # Convertir a JSON con formato legible
+        #print(medicionME337)
 
-    # Configurar el segundo medidor ME3372
-    config2 = util.cargar_configuracion('/home/pi/SAMEE200/scr/device/meatrolME3372.yml', 'meatrolME337_2')
-    medicion2 = modbusdevices.payload_event_modbus(config2)  # Obtener la medición como JSON
-    medicionME3372 = json.dumps(medicion2)  # Convertir a JSON con formato legible
-    #print(medicionME3372)
+        # Configurar el segundo medidor ME3372
+        config2 = util.cargar_configuracion('/home/pi/SAMEE200/scr/device/meatrolME3372.yml', 'meatrolME337_2')
+        medicion2 = modbusdevices.payload_event_modbus(config2)  # Obtener la medición como JSON
+        datos ['medicionME3372'] = json.dumps(medicion2)  # Convertir a JSON con formato legible
+        #print(medicionME3372)
+    
+    
+    
     # Configurar el sensor SHT20
     config_sht20 = util.cargar_configuracion('/home/pi/SAMEE200/scr/device/sht20.yml', 'sht20_sensor')
     medicion_sht20 = modbusdevices.payload_event_modbus(config_sht20)  # Obtener la medición como JSON
-    medicionSensorSHT20 = json.dumps(medicion_sht20)  # Convertir a JSON con formato legible
+    datos ['medicionSHT20'] = json.dumps(medicion_sht20)  # Convertir a JSON con formato legible
     #print(medicionSensorSHT20)
     # Devolver los tres JSON en un diccionario
-    return {
-        'medidor_1': medicionME337,
-        'medidor_2': medicionME3372,
-        'sensor_sht20': medicionSensorSHT20
-    }
+    return datos
     
 
 # Lógica principal
@@ -112,9 +119,11 @@ def main_loop():
         if mqtt_client:
                                         
             awsaccess.publish_mediciones(mqtt_client, conneced_meter)
-            awsaccess.publish_mediciones(mqtt_client, datos['medidor_1'])
-            awsaccess.publish_mediciones(mqtt_client, datos['medidor_2'])
-            awsaccess.publish_mediciones(mqtt_client, datos['sensor_sht20'])
+            for payload in datos.values():
+                awsaccess.publish_mediciones(mqtt_client, payload)
+            #awsaccess.publish_mediciones(mqtt_client, datos['medidor_1'])
+            #awsaccess.publish_mediciones(mqtt_client, datos['medidor_2'])
+            #awsaccess.publish_mediciones(mqtt_client, datos['sensor_sht20'])
             awsaccess.disconnect_from_aws_iot(mqtt_client)# Mantener la conexión activa y recibir mensajes
             
             
@@ -122,15 +131,19 @@ def main_loop():
             # Hay internet, pero falla conectar MQTT:
             util.logging.error("No hay Conexion a AWS, almacena en la cola, las mediciones del medidor, Temp, Humedad y la hora de encendido.")
             fileventqueue.agregar_evento(conneced_meter)
-            for key in ('medidor_1', 'medidor_2', 'sensor_sht20'):
-                fileventqueue.agregar_evento(datos[key])
+            #for key in ('medidor_1', 'medidor_2', 'sensor_sht20'):
+            #    fileventqueue.agregar_evento(datos[key])
+            for payload in datos.values():
+                fileventqueue.agregar_evento(payload)
             
     else:
         # No hay internet:
         util.logging.error("No hay internet, almacena en la cola, las mediciones del medidor, Temp, Humedad y la hora de encendido.")
         fileventqueue.agregar_evento(conneced_meter)
-        for key in ('medidor_1', 'medidor_2', 'sensor_sht20'):
-            fileventqueue.agregar_evento(datos[key])
+        #for key in ('medidor_1', 'medidor_2', 'sensor_sht20'):
+            #fileventqueue.agregar_evento(datos[key])
+        for payload in datos.values():
+            fileventqueue.agregar_evento(payload)
         
     # Verificar la temperatura al inicio
     #Temp.check_temp()
@@ -169,20 +182,27 @@ def main_loop():
             if  util.check_internet_connection():
                 mqtt_client = awsaccess.connect_to_mqtt()
                 if mqtt_client:
-                    awsaccess.publish_mediciones(mqtt_client, datos['medidor_1'])
-                    awsaccess.publish_mediciones(mqtt_client, datos['medidor_2'])
-                    awsaccess.publish_mediciones(mqtt_client,datos['sensor_sht20'])
+                    for payload in datos.values():
+                        awsaccess.publish_mediciones(mqtt_client, payload)
+                    
+                    
+                    #awsaccess.publish_mediciones(mqtt_client, datos['medidor_1'])
+                    #awsaccess.publish_mediciones(mqtt_client, datos['medidor_2'])
+                    #awsaccess.publish_mediciones(mqtt_client,datos['sensor_sht20'])
                     awsaccess.disconnect_from_aws_iot(mqtt_client)
                    
                 else:
                     # Hay internet, pero falla conectar MQTT:
-                    for key in ('medidor_1', 'medidor_2', 'sensor_sht20'):
-                        fileventqueue.agregar_evento(datos[key])
-                    
+                    #for key in ('medidor_1', 'medidor_2', 'sensor_sht20'):
+                    #    fileventqueue.agregar_evento(datos[key])
+                    for payload in datos.values():
+                        fileventqueue.agregar_evento(payload)
             else:
                 # No hay internet:
-                for key in ('medidor_1', 'medidor_2', 'sensor_sht20'):
-                    fileventqueue.agregar_evento(datos[key])
+                #for key in ('medidor_1', 'medidor_2', 'sensor_sht20'):
+                #    fileventqueue.agregar_evento(datos[key])
+                for payload in datos.values():
+                    fileventqueue.agregar_evento(payload)
                
         if tempQueue == 0:
             tempQueue = TIMERCOLAEVENTOS
