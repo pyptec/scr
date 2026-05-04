@@ -2,7 +2,7 @@ medidores:
   samee100:
     device_name: "SDM630MCT"
     id_device: 30
-    port: "/dev/ttyS0"
+    port: "/dev/ttyUSB0"
     debug: False
     slave_id: 1
     baudrate: 19200
