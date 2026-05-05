@@ -3,7 +3,7 @@ medidores:
     device_name: "SHT20"
     id_device: 7  #26
     port: "/dev/ttyUSB0"
-    debug: False #True
+    debug: True #False #
     slave_id: 8
     baudrate: 19200
     bytesize: 8

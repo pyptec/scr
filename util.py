@@ -685,6 +685,9 @@ def payload_estado_sistema_y_medidor():
         "v": mensurados,
         "u": codigos_unidades
     }
+    
+    logging.info(f"[SISTEMA] JSON={json.dumps({'d': [estado_sistema]}, indent=2)}")
+
     return {"d": [estado_sistema]}
 
 
