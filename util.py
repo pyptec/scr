@@ -668,8 +668,8 @@ def payload_estado_sistema_y_medidor():
 
     if Temp:
         Temp.check_temp()
-
-    cfg = cargar_configuracion('/home/pi/SAMEE200/scr/device/sistema.yml', 'variables_del_sistema')
+    cfg = cargar_configuracion(os.getenv("CFG_SISTEMA"), os.getenv("CFG_SISTEMA_SECTION"))
+    #cfg = cargar_configuracion('/home/pi/SAMEE200/scr/device/sistema.yml', 'variables_del_sistema')
     g_id = cfg.get('id_device', 0)
     unidades_cfg = cfg.get('unidades', [])
     codigos_unidades = [u['codigo'] for u in unidades_cfg if 'codigo' in u]
