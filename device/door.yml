@@ -1,6 +1,6 @@
 medidores:
   door_sensor:
-    i: 14  #10                  # identificador lógico del grupo o área (igual que en otros)15 es el de prueba
+    i: 8  #10                  # identificador lógico del grupo o área (igual que en otros)15 es el de prueba
     name: "door_chamber"
     invert_active_low: true
     debounce_ms: 80
