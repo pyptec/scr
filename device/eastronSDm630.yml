@@ -1,7 +1,7 @@
 medidores:
   samee100:
     device_name: "SDM630MCT"
-    id_device: 30
+    id_device: 31
     port: "/dev/ttyUSB0"
     debug: False
     slave_id: 1
@@ -220,7 +220,7 @@ medidores:
         fc: 4
         type: float32
         readWrite: "R"
-        unit: 81
+        unit: 101
         alias: kWh_L1_export
 
       - name: L2 Export kWh
@@ -228,7 +228,7 @@ medidores:
         fc: 4
         type: float32
         readWrite: "R"
-        unit: 82
+        unit: 102
         alias: kWh_L2_export
 
       - name: L3 Export kWh
@@ -236,5 +236,111 @@ medidores:
         fc: 4
         type: float32
         readWrite: "R"
-        unit: 83
+        unit: 103
         alias: kWh_L3_export
+      
+      # =========================
+      # DEMANDA
+      # =========================
+      - name: Total system power demand
+        address: 84
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 25
+        alias: P_Demand
+
+      - name: Maximum total system power demand
+        address: 86
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 147
+        alias: P_Demand_Max
+
+      - name: Total system apparent power demand
+        address: 100
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 148
+        alias: S_Demand
+
+      - name: Maximum total system apparent power demand
+        address: 102
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 149
+        alias: S_Demand_Max
+
+      - name: Total system reactive power demand
+        address: 108
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 150
+        alias: Q_Demand
+
+      - name: Maximum total system reactive power demand
+        address: 110
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 151
+        alias: Q_Demand_Max
+      # =========================
+      # ENERGÍA REACTIVA
+      # =========================
+      - name: Total Import kVArh
+        address: 76
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 152
+        alias: kVArh_total_import
+
+      - name: Total Export kVArh
+        address: 78
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 153
+        alias: kVArh_total_export
+      # =========================
+      # ENERGÍA APARENTE
+      # =========================
+      - name: Total VAh
+        address: 80
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 154
+        alias: kVAh_total
+
+      # =========================
+      # ÁNGULOS DE FASE
+      # =========================
+      - name: Phase L1 angle
+        address: 36
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 155
+        alias: Angle1
+
+      - name: Phase L2 angle
+        address: 38
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 156
+        alias: Angle2
+
+      - name: Phase L3 angle
+        address: 40
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 157
+        alias: Angle3
