@@ -10,6 +10,7 @@ medidores:
     parity: N
     stopbits: 1
     timeout: 1
+    tipo: "g"
     registers:
       - name: Temperature
         address: 1
