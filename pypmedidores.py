@@ -22,7 +22,7 @@ Parametros del pto serie modbus
 serialPort= "/dev/ttyS0"
 
 # Ruta al archivo .env
-load_dotenv(dotenv_path="/home/pi/SAMEE200/scr/.env")
+load_dotenv(dotenv_path="/home/pi/SAMEE100/scr/.env")
 
 # Leer variables como enteros
 TIMERCHEQUEOTEMPERATURA = int(os.getenv('TIMERCHEQUEOTEMPERATURA', 60))
