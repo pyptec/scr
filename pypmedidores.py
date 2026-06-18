@@ -14,6 +14,11 @@ import eventHandler
 import shared
 import subprocess
 import modbusdevices
+from db.samee100_db import init_db
+from db.samee100_db import guardar_medicion
+import random
+   
+
 #import tunel_watcher
 
 '''
@@ -56,7 +61,52 @@ def process_event_queue():
             util.logging.info("No hay internet para procesar la cola de eventos.")
     else:
         util.logging.info("No hay eventos para procesar.")
-        
+ 
+#---------------------------------------------------------------------------------------------------    
+# simulador de datos del medidor eastron
+#---------------------------------------------------------------------------------------------------  
+def payload_event_modbus_simulado(config):
+    
+
+    valores = []
+    unidades = []
+
+    for reg in config.get("registers", []):
+        alias = str(reg.get("alias", reg.get("name", ""))).lower()
+        unit = str(reg.get("unit", ""))
+
+        if "voltage" in alias or "volt" in alias:
+            val = round(random.uniform(210, 230), 1)
+
+        elif "current" in alias or "amp" in alias:
+            val = round(random.uniform(2, 15), 2)
+
+        elif "power" in alias or "ptotal" in alias:
+            val = round(random.uniform(2.5, 6.5), 2)
+
+        elif "energy" in alias or "epexp" in alias or "epimp" in alias:
+            val = round(random.uniform(1000, 5000), 2)
+
+        elif "frequency" in alias or "freq" in alias:
+            val = round(random.uniform(59.8, 60.2), 2)
+
+        elif "pf" in alias or "factor" in alias:
+            val = round(random.uniform(0.92, 1.0), 3)
+
+        else:
+            val = round(random.uniform(0, 100), 2)
+
+        valores.append(str(val))
+        unidades.append(str(reg.get("unit")))
+
+    return {
+        "d": [{
+            "t": util.get__time_utc(),
+            "g": config.get("id_device"),
+            "v": valores,
+            "u": unidades
+        }]
+    }      
 #-----------------------------------------------------------------------------------------------------------   
 # Rutina de lectura de sensores Modbus RTU y devuelve datos en formato JSON 
 #-----------------------------------------------------------------------------------------------------------        
@@ -67,10 +117,13 @@ def obtener_datos_medidores_y_sensor():
          # Medidor Eastron SDM630MCT
         cfg_path = os.getenv("CFG_EASTRON")
         cfg_section = os.getenv("CFG_EASTRON_SECTION")
-         
+        simular = bool(config.get("simular", False)) 
         #config = util.cargar_configuracion('/home/pi/SAMEE100/scr/device/eastronSDm630.yml', 'samee100')
         config = util.cargar_configuracion(cfg_path, cfg_section)
-        medicion = modbusdevices.payload_event_modbus(config)
+        if simular:
+            medicion = modbusdevices.payload_event_modbus_simulado(config)
+        else:
+            medicion = modbusdevices.payload_event_modbus(config)
         datos ['medidor_eastron'] = json.dumps(medicion)
     elif medidor_activo == "meatrol":
         # PRIMER medidor ME337
@@ -102,7 +155,7 @@ def obtener_datos_medidores_y_sensor():
 # Lógica principal
 def main_loop():
     #global ssh_process  
-   
+    init_db()
     tempRaspberry = TIMERCHEQUEOTEMPERATURA
     tempMedidor   = TIMERMEDICION
     tempQueue     = TIMERCOLAEVENTOS
@@ -126,6 +179,7 @@ def main_loop():
                                         
             awsaccess.publish_mediciones(mqtt_client, conneced_meter)
             for payload in datos.values():
+                guardar_medicion(payload)
                 awsaccess.publish_mediciones(mqtt_client, payload)
             #awsaccess.publish_mediciones(mqtt_client, datos['medidor_1'])
             #awsaccess.publish_mediciones(mqtt_client, datos['medidor_2'])
@@ -189,6 +243,7 @@ def main_loop():
                 mqtt_client = awsaccess.connect_to_mqtt()
                 if mqtt_client:
                     for payload in datos.values():
+                        guardar_medicion(payload)
                         awsaccess.publish_mediciones(mqtt_client, payload)
                     
                     
