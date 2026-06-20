@@ -189,7 +189,7 @@ def main_loop():
                                         
             awsaccess.publish_mediciones(mqtt_client, conneced_meter)
             guardar_medicion(conneced_meter, sent_aws=1)
-            util.logging.INFO(f"[SQLITE] Conectado a AWS:")
+            util.logging.INFO("[SQLITE] Conectado a AWS:")
             for payload in datos.values():
                 guardar_medicion(payload, sent_aws=1)
                 awsaccess.publish_mediciones(mqtt_client, payload)
@@ -200,7 +200,7 @@ def main_loop():
             # Hay internet, pero falla conectar MQTT:
             util.logging.error("No hay Conexion a AWS, almacena en la cola, las mediciones del medidor, Temp, Humedad y la hora de encendido.")
             guardar_medicion(conneced_meter, sent_aws=0)
-            util.logging.INFO(f"[SQLITE] NO Conectado a AWS:")
+            util.logging.INFO("[SQLITE] NO Conectado a AWS:")
             fileventqueue.agregar_evento(conneced_meter)
             for payload in datos.values():
                 guardar_medicion(payload, sent_aws=0)
