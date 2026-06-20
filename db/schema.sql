@@ -10,6 +10,19 @@ CREATE TABLE IF NOT EXISTS dispositivos (
     ubicacion TEXT
 );
 
+
+
+CREATE TABLE IF NOT EXISTS mediciones_detalle (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    raw_id INTEGER,
+    timestamp_utc TEXT NOT NULL,
+    device_id TEXT,
+    unit_id INTEGER,
+    valor REAL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY(raw_id) REFERENCES mediciones(id),
+    FOREIGN KEY(unit_id) REFERENCES unidades(unit_id)
+);
 CREATE VIEW IF NOT EXISTS vw_mediciones AS
 SELECT
     md.timestamp_utc,
@@ -34,19 +47,6 @@ CREATE TABLE IF NOT EXISTS mediciones (
     sent_at TEXT,
     created_at TEXT NOT NULL
 );
-
-CREATE TABLE IF NOT EXISTS mediciones_detalle (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    raw_id INTEGER,
-    timestamp_utc TEXT NOT NULL,
-    device_id TEXT,
-    unit_id INTEGER,
-    valor REAL,
-    created_at TEXT NOT NULL,
-    FOREIGN KEY(raw_id) REFERENCES mediciones(id),
-    FOREIGN KEY(unit_id) REFERENCES unidades(unit_id)
-);
-
 CREATE TABLE IF NOT EXISTS aws_queue (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     medicion_id INTEGER,
