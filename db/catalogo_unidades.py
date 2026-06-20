@@ -1,8 +1,7 @@
 import pandas as pd
 from pathlib import Path
 
-from db.samee100_db import get_conn
-
+from samee100_db import get_conn
 
 def cargar_unidades_excel(
         archivo_excel="db/Unidades.xlsx",
