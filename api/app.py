@@ -21,6 +21,14 @@ def api_resumen():
         "9999999999"
     )
 
+@app.route("/api/potencia")
+def api_potencia():
+
+    from db.kpi_solar import potencia_actual_kw
+
+    return {
+        "potencia_kw": potencia_actual_kw()
+    }
 
 if __name__ == "__main__":
 
