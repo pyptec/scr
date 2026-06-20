@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 DB_PATH = Path("data/samee100.db")
-
+SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 
 def utc_now():
     return datetime.now(timezone.utc).isoformat()
@@ -20,47 +20,16 @@ def get_conn():
 
 def init_db():
     conn = get_conn()
-    cur = conn.cursor()
+    
 
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS mediciones (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp_utc TEXT NOT NULL,
-        device_id TEXT,
-        payload_json TEXT NOT NULL,
-        sent_aws INTEGER DEFAULT 0,
-        sent_at TEXT,
-        created_at TEXT NOT NULL
-    )
-    """)
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS aws_queue (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        medicion_id INTEGER,
-        topic TEXT,
-        payload_json TEXT NOT NULL,
-        status TEXT DEFAULT 'pending',
-        attempts INTEGER DEFAULT 0,
-        last_error TEXT,
-        created_at TEXT NOT NULL,
-        sent_at TEXT,
-        FOREIGN KEY(medicion_id) REFERENCES mediciones(id)
-    )
-    """)
-
-    cur.execute("""
-    CREATE INDEX IF NOT EXISTS idx_mediciones_time
-    ON mediciones(timestamp_utc)
-    """)
-
-    cur.execute("""
-    CREATE INDEX IF NOT EXISTS idx_queue_status
-    ON aws_queue(status)
-    """)
+    with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
+        schema_sql = f.read()
+    
+    conn.executescript(schema_sql)
 
     conn.commit()
     conn.close()
+ 
 
 
 def guardar_medicion(payload, device_id=None, sent_aws=0):
