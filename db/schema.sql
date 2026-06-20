@@ -10,8 +10,6 @@ CREATE TABLE IF NOT EXISTS dispositivos (
     ubicacion TEXT
 );
 
-
-
 CREATE TABLE IF NOT EXISTS mediciones_detalle (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     raw_id INTEGER,
@@ -23,6 +21,7 @@ CREATE TABLE IF NOT EXISTS mediciones_detalle (
     FOREIGN KEY(raw_id) REFERENCES mediciones(id),
     FOREIGN KEY(unit_id) REFERENCES unidades(unit_id)
 );
+DROP VIEW IF EXISTS vw_mediciones;
 CREATE VIEW IF NOT EXISTS vw_mediciones AS
 SELECT
     md.timestamp_utc,
