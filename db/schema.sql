@@ -9,6 +9,22 @@ CREATE TABLE IF NOT EXISTS dispositivos (
     tipo TEXT,
     ubicacion TEXT
 );
+
+CREATE VIEW IF NOT EXISTS vw_mediciones AS
+SELECT
+    md.timestamp_utc,
+    md.device_id,
+    d.nombre,
+    md.unit_id,
+    u.name,
+    u.simbol,
+    md.valor
+FROM mediciones_detalle md
+LEFT JOIN unidades u
+    ON md.unit_id = u.unit_id
+LEFT JOIN dispositivos d
+    ON md.device_id = d.device_id;
+    
 CREATE TABLE IF NOT EXISTS mediciones (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp_utc TEXT NOT NULL,
