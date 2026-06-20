@@ -81,8 +81,43 @@ def api_potencia():
         "potencia_kw": potencia_actual_kw()
     }
     
-#@app.route("/api/serie/<int:unit_id>")
+@app.route("/api/serie/<int:unit_id>")
+def api_serie(unit_id):
+    fecha_inicio = request.args.get("inicio", "0")
+    fecha_fin = request.args.get("fin", "9999999999")
+    limite = int(request.args.get("limite", 1000))
 
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT
+            timestamp_utc,
+            unit_id,
+            variable,
+            simbol,
+            valor
+        FROM vw_mediciones
+        WHERE unit_id = ?
+          AND timestamp_utc >= ?
+          AND timestamp_utc <= ?
+        ORDER BY timestamp_utc ASC
+        LIMIT ?
+    """, (
+        unit_id,
+        fecha_inicio,
+        fecha_fin,
+        limite
+    ))
+
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+
+    return {
+        "unit_id": unit_id,
+        "total": len(rows),
+        "serie": rows
+    }
 if __name__ == "__main__":
 
     app.run(
