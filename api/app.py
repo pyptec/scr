@@ -2,6 +2,7 @@ from flask import Flask, request
 from db.kpi_solar import resumen_periodo
 from db.kpi_solar import potencia_actual_kw
 from db.samee100_db import get_conn
+from flask import Flask, request, render_template
 
 app = Flask(__name__)
 
@@ -118,6 +119,11 @@ def api_serie(unit_id):
         "total": len(rows),
         "serie": rows
     }
+    
+@app.route("/dashboard")
+def dashboard():
+    return render_template("dashboard.html")    
+    
 if __name__ == "__main__":
 
     app.run(

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>SAMEE100 Solar</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f3f6fa;
+            color: #1f2937;
+        }
+
+        header {
+            background: #0f3b63;
+            color: white;
+            padding: 18px 30px;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .container {
+            padding: 25px;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 18px;
+            margin-bottom: 25px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 14px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+
+        .card h3 {
+            margin: 0;
+            font-size: 15px;
+            color: #6b7280;
+        }
+
+        .value {
+            margin-top: 12px;
+            font-size: 32px;
+            font-weight: bold;
+            color: #0f3b63;
+        }
+
+        .unit {
+            font-size: 16px;
+            color: #6b7280;
+        }
+
+        .chart-box {
+            background: white;
+            border-radius: 14px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    SAMEE100 Solar - Dashboard Energético
+</header>
+
+<div class="container">
+
+    <div class="cards">
+        <div class="card">
+            <h3>Potencia Actual</h3>
+            <div class="value"><span id="potencia">--</span> <span class="unit">kW</span></div>
+        </div>
+
+        <div class="card">
+            <h3>Generación Periodo</h3>
+            <div class="value"><span id="generacion">--</span> <span class="unit">kWh</span></div>
+        </div>
+
+        <div class="card">
+            <h3>Consumo Periodo</h3>
+            <div class="value"><span id="consumo">--</span> <span class="unit">kWh</span></div>
+        </div>
+
+        <div class="card">
+            <h3>Ahorro Estimado</h3>
+            <div class="value">$<span id="ahorro">--</span></div>
+        </div>
+
+        <div class="card">
+            <h3>CO₂ Evitado</h3>
+            <div class="value"><span id="co2">--</span> <span class="unit">kg</span></div>
+        </div>
+    </div>
+
+    <div class="chart-box">
+        <h3>Potencia Activa Total</h3>
+        <canvas id="chartPotencia"></canvas>
+    </div>
+
+</div>
+
+<script>
+let chartPotencia = null;
+
+async function cargarDashboard() {
+    const res = await fetch('/api/dashboard');
+    const data = await res.json();
+
+    document.getElementById('potencia').innerText =
+        data.potencia_actual_kw ?? '--';
+
+    document.getElementById('generacion').innerText =
+        data.generacion_kwh ?? '--';
+
+    document.getElementById('consumo').innerText =
+        data.consumo_kwh ?? '--';
+
+    document.getElementById('ahorro').innerText =
+        Number(data.ahorro_cop ?? 0).toLocaleString('es-CO');
+
+    document.getElementById('co2').innerText =
+        data.co2_evitado_kg ?? '--';
+}
+
+async function cargarGraficaPotencia() {
+    const res = await fetch('/api/serie/61?limite=200');
+    const data = await res.json();
+
+    const labels = data.serie.map(x => x.timestamp_utc);
+    const valores = data.serie.map(x => x.valor);
+
+    const ctx = document.getElementById('chartPotencia');
+
+    if (chartPotencia) {
+        chartPotencia.destroy();
+    }
+
+    chartPotencia = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Potencia kW',
+                data: valores,
+                tension: 0.25
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    ticks: {
+                        maxTicksLimit: 10
+                    }
+                },
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+async function actualizarTodo() {
+    await cargarDashboard();
+    await cargarGraficaPotencia();
+}
+
+actualizarTodo();
+
+setInterval(actualizarTodo, 30000);
+</script>
+
+</body>
+</html>
