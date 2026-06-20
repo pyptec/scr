@@ -31,13 +31,7 @@ def init_db():
     conn.close()
  
 
-
 def guardar_medicion(payload, device_id=None, sent_aws=0):
-    """
-    Guarda cualquier payload JSON enviado a AWS.
-    El payload puede venir como dict o como string JSON.
-    """
-
     if isinstance(payload, dict):
         payload_json = json.dumps(payload)
     else:
@@ -75,6 +69,53 @@ def guardar_medicion(payload, device_id=None, sent_aws=0):
     ))
 
     medicion_id = cur.lastrowid
+
+    # Normalizar v[] y u[] en mediciones_detalle
+    try:
+        data = json.loads(payload_json)
+        d = data.get("d", [])
+
+        if d and isinstance(d[0], dict):
+            item = d[0]
+
+            timestamp_det = item.get("t", timestamp_utc)
+            device_det = str(item.get("g", device_id or ""))
+
+            valores = item.get("v", [])
+            unidades = item.get("u", [])
+
+            for valor, unit_id in zip(valores, unidades):
+                if valor in [None, "", "None"]:
+                    continue
+
+                try:
+                    valor_float = float(valor)
+                    unit_id_int = int(unit_id)
+                except Exception:
+                    continue
+
+                cur.execute("""
+                INSERT INTO mediciones_detalle (
+                    raw_id,
+                    timestamp_utc,
+                    device_id,
+                    unit_id,
+                    valor,
+                    created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    medicion_id,
+                    timestamp_det,
+                    device_det,
+                    unit_id_int,
+                    valor_float,
+                    utc_now()
+                ))
+
+    except Exception as e:
+        print(f"[SQLITE] Error normalizando medicion detalle: {e}")
+
     conn.commit()
     conn.close()
 
