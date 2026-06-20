@@ -80,7 +80,8 @@ def api_potencia():
     return {
         "potencia_kw": potencia_actual_kw()
     }
-@app.route("/api/serie/<int:unit_id>")
+    
+#@app.route("/api/serie/<int:unit_id>")
 
 if __name__ == "__main__":
 
