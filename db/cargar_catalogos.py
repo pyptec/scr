@@ -2,7 +2,7 @@ from catalogo_unidades import cargar_unidades_excel
 
 if __name__ == "__main__":
     total = cargar_unidades_excel(
-        "db/Unidades.xlsx"
+        "Unidades.xlsx"
     )
 
     print(f"Se cargaron {total} unidades")
