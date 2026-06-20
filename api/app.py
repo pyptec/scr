@@ -94,7 +94,7 @@ def api_serie(unit_id):
         SELECT
             timestamp_utc,
             unit_id,
-            variable,
+            name AS variable,
             simbol,
             valor
         FROM vw_mediciones
