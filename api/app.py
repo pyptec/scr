@@ -3,7 +3,15 @@ from db.kpi_solar import resumen_periodo
 
 app = Flask(__name__)
 
+@app.route("/api/dashboard")
+def api_dashboard():
 
+    from db.kpi_solar import resumen_periodo
+
+    return resumen_periodo(
+        "0",
+        "9999999999"
+    )
 @app.route("/")
 def home():
 

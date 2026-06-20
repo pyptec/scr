@@ -3,7 +3,12 @@ CREATE TABLE IF NOT EXISTS unidades (
     name TEXT NOT NULL,
     simbol TEXT
 );
-
+CREATE TABLE IF NOT EXISTS dispositivos (
+    device_id INTEGER PRIMARY KEY,
+    nombre TEXT,
+    tipo TEXT,
+    ubicacion TEXT
+);
 CREATE TABLE IF NOT EXISTS mediciones (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp_utc TEXT NOT NULL,
