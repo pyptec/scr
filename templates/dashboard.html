@@ -108,14 +108,19 @@
     </div>
 
     <div class="chart-box" style="margin-top:25px;">
-    <h3>Voltajes Línea-Neutro</h3>
-    <canvas id="chartVoltajes"></canvas>
+        <h3>Voltajes Línea-Neutro</h3>
+        <canvas id="chartVoltajes"></canvas>
     </div>
 
     <div class="chart-box" style="margin-top:25px;">
-    <h3>Generación Diaria</h3>
-    <canvas id="chartEnergiaDia"></canvas>
+        <h3>Generación Diaria</h3>
+        <canvas id="chartEnergiaDia"></canvas>
     </div>
+
+    <div class="chart-box" style="margin-top:25px;">
+        <h3>Corrientes por Fase</h3>
+        <canvas id="chartCorrientes"></canvas>
+</div>
 
 </div>
 
@@ -123,6 +128,7 @@
 let chartPotencia = null;
 let chartEnergiaDia = null;
 let chartVoltajes = null;
+let chartCorrientes = null;
 
 async function cargarDashboard() {
     const res = await fetch('/api/dashboard');
@@ -268,11 +274,67 @@ async function cargarGraficaVoltajes() {
         }
     });
 }
+
+async function cargarGraficaCorrientes() {
+    const res = await fetch('/api/series?ids=10,11,12&limite=200');
+    const data = await res.json();
+
+    const s10 = data.series["10"] || [];
+    const s11 = data.series["11"] || [];
+    const s12 = data.series["12"] || [];
+
+    const labels = s10.map(x => x.timestamp_utc);
+
+    const ctx = document.getElementById('chartCorrientes');
+
+    if (chartCorrientes) {
+        chartCorrientes.destroy();
+    }
+
+    chartCorrientes = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'I1 / AL1',
+                    data: s10.map(x => x.valor),
+                    tension: 0.25
+                },
+                {
+                    label: 'I2 / AL2',
+                    data: s11.map(x => x.valor),
+                    tension: 0.25
+                },
+                {
+                    label: 'I3 / AL3',
+                    data: s12.map(x => x.valor),
+                    tension: 0.25
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    ticks: {
+                        maxTicksLimit: 10
+                    }
+                },
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
 async function actualizarTodo() {
     await cargarDashboard();
     await cargarGraficaPotencia();
     await cargarGraficaEnergiaDia();
     await cargarGraficaVoltajes();
+    await cargarGraficaCorrientes();
 }
 
 actualizarTodo();
