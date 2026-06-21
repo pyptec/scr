@@ -140,3 +140,35 @@ def serie_variable(unit_id, fecha_inicio, fecha_fin, limite=1000):
 
     conn.close()
     return rows
+
+def energia_diaria_generada(unit_id=UNIT_EPEXP, limite_dias=30):
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT
+            date(datetime(CAST(timestamp_utc AS INTEGER), 'unixepoch')) AS dia,
+            MIN(valor) AS inicial,
+            MAX(valor) AS final,
+            ROUND(MAX(valor) - MIN(valor), 3) AS kwh
+        FROM mediciones_detalle
+        WHERE unit_id = ?
+        GROUP BY dia
+        ORDER BY dia DESC
+        LIMIT ?
+    """, (
+        unit_id,
+        limite_dias
+    ))
+
+    rows = [
+        {
+            "dia": r["dia"],
+            "kwh": r["kwh"] if r["kwh"] >= 0 else 0
+        }
+        for r in cur.fetchall()
+    ]
+
+    conn.close()
+
+    return list(reversed(rows))

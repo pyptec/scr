@@ -4,7 +4,7 @@ from db.kpi_solar import potencia_actual_kw
 from db.samee100_db import get_conn
 from flask import Flask, request, render_template
 from pathlib import Path
-
+from db.kpi_solar import energia_diaria_generada
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -132,6 +132,16 @@ def api_serie(unit_id):
 @app.route("/dashboard")
 def dashboard():
     return render_template("dashboard.html")    
+
+@app.route("/api/energia/dia")
+def api_energia_dia():
+    limite = int(request.args.get("limite", 30))
+
+    return {
+        "unit_id": 104,
+        "total": limite,
+        "datos": energia_diaria_generada(limite_dias=limite)
+    }
     
 if __name__ == "__main__":
 
