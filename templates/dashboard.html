@@ -107,10 +107,16 @@
         <canvas id="chartPotencia"></canvas>
     </div>
 
+    <div class="chart-box" style="margin-top:25px;">
+    <h3>Generación Diaria</h3>
+    <canvas id="chartEnergiaDia"></canvas>
+    </div>
+
 </div>
 
 <script>
 let chartPotencia = null;
+let chartEnergiaDia = null;
 
 async function cargarDashboard() {
     const res = await fetch('/api/dashboard');
@@ -170,10 +176,42 @@ async function cargarGraficaPotencia() {
         }
     });
 }
+async function cargarGraficaEnergiaDia() {
+    const res = await fetch('/api/energia/dia?limite=30');
+    const data = await res.json();
 
+    const labels = data.datos.map(x => x.dia);
+    const valores = data.datos.map(x => x.kwh);
+
+    const ctx = document.getElementById('chartEnergiaDia');
+
+    if (chartEnergiaDia) {
+        chartEnergiaDia.destroy();
+    }
+
+    chartEnergiaDia = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Generación kWh/día',
+                data: valores
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
 async function actualizarTodo() {
     await cargarDashboard();
     await cargarGraficaPotencia();
+    await cargarGraficaEnergiaDia();
 }
 
 actualizarTodo();
