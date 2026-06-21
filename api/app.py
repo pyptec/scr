@@ -3,8 +3,17 @@ from db.kpi_solar import resumen_periodo
 from db.kpi_solar import potencia_actual_kw
 from db.samee100_db import get_conn
 from flask import Flask, request, render_template
+from pathlib import Path
 
-app = Flask(__name__)
+
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+app = Flask(
+    __name__,
+    template_folder=str(BASE_DIR / "templates"),
+    static_folder=str(BASE_DIR / "static")
+)
 
 
 @app.route("/api/variable/<int:unit_id>")
