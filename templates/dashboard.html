@@ -108,6 +108,11 @@
     </div>
 
     <div class="chart-box" style="margin-top:25px;">
+    <h3>Voltajes Línea-Neutro</h3>
+    <canvas id="chartVoltajes"></canvas>
+    </div>
+
+    <div class="chart-box" style="margin-top:25px;">
     <h3>Generación Diaria</h3>
     <canvas id="chartEnergiaDia"></canvas>
     </div>
@@ -117,6 +122,7 @@
 <script>
 let chartPotencia = null;
 let chartEnergiaDia = null;
+let chartVoltajes = null;
 
 async function cargarDashboard() {
     const res = await fetch('/api/dashboard');
@@ -208,10 +214,65 @@ async function cargarGraficaEnergiaDia() {
         }
     });
 }
+
+async function cargarGraficaVoltajes() {
+    const res = await fetch('/api/series?ids=7,8,9&limite=200');
+    const data = await res.json();
+
+    const s7 = data.series["7"] || [];
+    const s8 = data.series["8"] || [];
+    const s9 = data.series["9"] || [];
+
+    const labels = s7.map(x => x.timestamp_utc);
+
+    const ctx = document.getElementById('chartVoltajes');
+
+    if (chartVoltajes) {
+        chartVoltajes.destroy();
+    }
+
+    chartVoltajes = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'VL1',
+                    data: s7.map(x => x.valor),
+                    tension: 0.25
+                },
+                {
+                    label: 'VL2',
+                    data: s8.map(x => x.valor),
+                    tension: 0.25
+                },
+                {
+                    label: 'VL3',
+                    data: s9.map(x => x.valor),
+                    tension: 0.25
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    ticks: {
+                        maxTicksLimit: 10
+                    }
+                },
+                y: {
+                    beginAtZero: false
+                }
+            }
+        }
+    });
+}
 async function actualizarTodo() {
     await cargarDashboard();
     await cargarGraficaPotencia();
     await cargarGraficaEnergiaDia();
+    await cargarGraficaVoltajes();
 }
 
 actualizarTodo();
