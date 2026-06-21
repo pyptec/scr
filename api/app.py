@@ -142,7 +142,56 @@ def api_energia_dia():
         "total": limite,
         "datos": energia_diaria_generada(limite_dias=limite)
     }
-    
+   
+@app.route("/api/series")
+def api_series():
+    ids = request.args.get("ids", "")
+    fecha_inicio = request.args.get("inicio", "0")
+    fecha_fin = request.args.get("fin", "9999999999")
+    limite = int(request.args.get("limite", 1000))
+
+    unit_ids = [
+        int(x.strip())
+        for x in ids.split(",")
+        if x.strip().isdigit()
+    ]
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    resultado = {}
+
+    for unit_id in unit_ids:
+        cur.execute("""
+            SELECT
+                timestamp_utc,
+                unit_id,
+                variable,
+                simbol,
+                valor
+            FROM vw_mediciones
+            WHERE unit_id = ?
+              AND timestamp_utc >= ?
+              AND timestamp_utc <= ?
+            ORDER BY timestamp_utc ASC
+            LIMIT ?
+        """, (
+            unit_id,
+            fecha_inicio,
+            fecha_fin,
+            limite
+        ))
+
+        rows = [dict(r) for r in cur.fetchall()]
+        resultado[str(unit_id)] = rows
+
+    conn.close()
+
+    return {
+        "unit_ids": unit_ids,
+        "series": resultado
+    }  
+ 
 if __name__ == "__main__":
 
     app.run(
