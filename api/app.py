@@ -201,7 +201,7 @@ def api_variables():
         SELECT DISTINCT
             md.unit_id,
             u.name AS variable,
-            u.simbol
+            u.simbol As simbolo
         FROM mediciones_detalle md
         LEFT JOIN unidades u
             ON md.unit_id = u.unit_id
