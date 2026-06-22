@@ -47,7 +47,7 @@ async function mostrarGrafica(tipo) {
         chartPrincipal = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: data.serie.map(x => x.timestamp_utc),
+                labels: data.serie.map(x => formatearHoraColombia(x.timestamp_utc)),
                 datasets: [{
                     label: 'Potencia kW',
                     data: data.serie.map(x => x.valor),
