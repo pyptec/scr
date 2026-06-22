@@ -419,6 +419,40 @@ function exportarUltimosCSV() {
     URL.revokeObjectURL(url);
 }
 
+function generarReporteExcelVariable() {
+    const select = document.getElementById('selectVariable');
+    const unitId = select.value;
+
+    if (!unitId) {
+        alert('Seleccione una variable para generar el reporte');
+        return;
+    }
+
+    const rango = obtenerRangoUnix();
+
+    const url =
+        `/api/reporte/excel?inicio=${rango.inicio}&fin=${rango.fin}&variables=${unitId}`;
+
+    window.location.href = url;
+}
+
+function generarReporteExcelTodas() {
+    const rango = obtenerRangoUnix();
+
+    const confirmar = confirm(
+        'Este reporte incluirá todas las variables disponibles en el rango seleccionado. ¿Desea continuar?'
+    );
+
+    if (!confirmar) {
+        return;
+    }
+
+    const url =
+        `/api/reporte/excel?inicio=${rango.inicio}&fin=${rango.fin}&variables=all`;
+
+    window.location.href = url;
+}
+
 cargarSelectorVariables();
 actualizarTodo();
 

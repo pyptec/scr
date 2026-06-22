@@ -78,17 +78,25 @@
                 <span class="unit">kg</span>
             </div>
 
-        <div class="variable-selector">
-            <label for="selectVariable">Variable personalizada:</label>
+    <div class="variable-selector">
+        <label for="selectVariable">Variable personalizada:</label>
 
-            <select id="selectVariable">
-                <option value="">Cargando variables...</option>
-            </select>
+        <select id="selectVariable">
+            <option value="">Cargando variables...</option>
+        </select>
 
-            <button onclick="graficarVariableSeleccionada()">
-                Graficar
-            </button>
-        </div>
+        <button onclick="graficarVariableSeleccionada()">
+            Graficar
+        </button>
+
+        <button onclick="generarReporteExcelVariable()">
+            Reporte Excel variable
+        </button>
+
+        <button onclick="generarReporteExcelTodas()">
+            Reporte Excel todas
+        </button>
+    </div>
 
 
         </div>

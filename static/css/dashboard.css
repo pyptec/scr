@@ -108,7 +108,9 @@ header {
     cursor: pointer;
     font-weight: bold;
 }
-
+.variable-selector button:hover {
+    background: #14558c;
+}
 .filtro-tiempo {
     margin: 20px 0;
     display: flex;
