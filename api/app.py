@@ -219,7 +219,41 @@ def api_variables():
         "variables": rows
     }
  
- 
+@app.route("/api/ultimos")
+def api_ultimos():
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT
+            md.unit_id,
+            u.name AS variable,
+            u.simbol,
+            md.valor,
+            md.timestamp_utc
+        FROM mediciones_detalle md
+        INNER JOIN (
+            SELECT
+                unit_id,
+                MAX(id) AS max_id
+            FROM mediciones_detalle
+            GROUP BY unit_id
+        ) ult
+            ON md.unit_id = ult.unit_id
+           AND md.id = ult.max_id
+        LEFT JOIN unidades u
+            ON md.unit_id = u.unit_id
+        ORDER BY md.unit_id ASC
+    """)
+
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+
+    return {
+        "total": len(rows),
+        "datos": rows
+    }
+     
 if __name__ == "__main__":
 
     app.run(
