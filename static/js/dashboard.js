@@ -1,7 +1,5 @@
-let chartPotencia = null;
-let chartEnergiaDia = null;
-let chartVoltajes = null;
-let chartCorrientes = null;
+let chartPrincipal = null;
+let graficaActual = 'potencia';
 
 async function cargarDashboard() {
 
@@ -24,136 +22,131 @@ async function cargarDashboard() {
         data.co2_evitado_kg ?? '--';
 }
 
-async function cargarGraficaPotencia() {
+async function mostrarGrafica(tipo) {
 
-    const res = await fetch('/api/serie/61?limite=200');
-    const data = await res.json();
+    graficaActual = tipo;
 
-    const labels = data.serie.map(x => x.timestamp_utc);
-    const valores = data.serie.map(x => x.valor);
+    if (chartPrincipal) {
+        chartPrincipal.destroy();
+    }
 
-    const ctx = document.getElementById('chartPotencia');
+    const ctx = document.getElementById('chartPrincipal');
 
-    if (chartPotencia) chartPotencia.destroy();
+    if (tipo === 'potencia') {
 
-    chartPotencia = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels,
-            datasets: [{
-                label: 'Potencia kW',
-                data: valores,
-                tension: 0.25
-            }]
-        }
-    });
-}
+        document.getElementById('tituloGrafica').innerText =
+            'Potencia Activa Total';
 
-async function cargarGraficaEnergiaDia() {
+        const res = await fetch('/api/serie/61?limite=200');
+        const data = await res.json();
 
-    const res = await fetch('/api/energia/dia?limite=30');
-    const data = await res.json();
+        chartPrincipal = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.serie.map(x => x.timestamp_utc),
+                datasets: [{
+                    label: 'Potencia kW',
+                    data: data.serie.map(x => x.valor),
+                    tension: 0.25
+                }]
+            }
+        });
+    }
 
-    const labels = data.datos.map(x => x.dia);
-    const valores = data.datos.map(x => x.kwh);
+    if (tipo === 'energia') {
 
-    const ctx = document.getElementById('chartEnergiaDia');
+        document.getElementById('tituloGrafica').innerText =
+            'Generación Diaria';
 
-    if (chartEnergiaDia) chartEnergiaDia.destroy();
+        const res = await fetch('/api/energia/dia?limite=30');
+        const data = await res.json();
 
-    chartEnergiaDia = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels,
-            datasets: [{
-                label: 'Generación kWh/día',
-                data: valores
-            }]
-        }
-    });
-}
+        chartPrincipal = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.datos.map(x => x.dia),
+                datasets: [{
+                    label: 'Generación kWh/día',
+                    data: data.datos.map(x => x.kwh)
+                }]
+            }
+        });
+    }
 
-async function cargarGraficaVoltajes() {
+    if (tipo === 'voltajes') {
 
-    const res = await fetch('/api/series?ids=7,8,9&limite=200');
-    const data = await res.json();
+        document.getElementById('tituloGrafica').innerText =
+            'Voltajes Línea-Neutro';
 
-    const s7 = data.series["7"] || [];
-    const s8 = data.series["8"] || [];
-    const s9 = data.series["9"] || [];
+        const res = await fetch('/api/series?ids=7,8,9&limite=200');
+        const data = await res.json();
 
-    const labels = s7.map(x => x.timestamp_utc);
+        chartPrincipal = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.series["7"].map(x => x.timestamp_utc),
+                datasets: [
+                    {
+                        label: 'VL1',
+                        data: data.series["7"].map(x => x.valor),
+                        tension: 0.25
+                    },
+                    {
+                        label: 'VL2',
+                        data: data.series["8"].map(x => x.valor),
+                        tension: 0.25
+                    },
+                    {
+                        label: 'VL3',
+                        data: data.series["9"].map(x => x.valor),
+                        tension: 0.25
+                    }
+                ]
+            }
+        });
+    }
 
-    const ctx = document.getElementById('chartVoltajes');
+    if (tipo === 'corrientes') {
 
-    if (chartVoltajes) chartVoltajes.destroy();
+        document.getElementById('tituloGrafica').innerText =
+            'Corrientes por Fase';
 
-    chartVoltajes = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels,
-            datasets: [
-                {
-                    label: 'VL1',
-                    data: s7.map(x => x.valor)
-                },
-                {
-                    label: 'VL2',
-                    data: s8.map(x => x.valor)
-                },
-                {
-                    label: 'VL3',
-                    data: s9.map(x => x.valor)
-                }
-            ]
-        }
-    });
-}
+        const res = await fetch('/api/series?ids=10,11,12&limite=200');
+        const data = await res.json();
 
-async function cargarGraficaCorrientes() {
-
-    const res = await fetch('/api/series?ids=10,11,12&limite=200');
-    const data = await res.json();
-
-    const s10 = data.series["10"] || [];
-    const s11 = data.series["11"] || [];
-    const s12 = data.series["12"] || [];
-
-    const labels = s10.map(x => x.timestamp_utc);
-
-    const ctx = document.getElementById('chartCorrientes');
-
-    if (chartCorrientes) chartCorrientes.destroy();
-
-    chartCorrientes = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels,
-            datasets: [
-                {
-                    label: 'I1',
-                    data: s10.map(x => x.valor)
-                },
-                {
-                    label: 'I2',
-                    data: s11.map(x => x.valor)
-                },
-                {
-                    label: 'I3',
-                    data: s12.map(x => x.valor)
-                }
-            ]
-        }
-    });
+        chartPrincipal = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.series["10"].map(x => x.timestamp_utc),
+                datasets: [
+                    {
+                        label: 'I1',
+                        data: data.series["10"].map(x => x.valor),
+                        tension: 0.25
+                    },
+                    {
+                        label: 'I2',
+                        data: data.series["11"].map(x => x.valor),
+                        tension: 0.25
+                    },
+                    {
+                        label: 'I3',
+                        data: data.series["12"].map(x => x.valor),
+                        tension: 0.25
+                    }
+                ]
+            }
+        });
+    }
 }
 
 async function actualizarTodo() {
 
     await cargarDashboard();
-    await cargarGraficaPotencia();
-    await cargarGraficaEnergiaDia();
-    await cargarGraficaVoltajes();
-    await cargarGraficaCorrientes();
+
+    if (graficaActual) {
+        await mostrarGrafica(graficaActual);
+    }
 }
 
 actualizarTodo();

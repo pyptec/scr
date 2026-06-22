@@ -59,3 +59,23 @@ header {
 .mt {
     margin-top: 25px;
 }
+
+.chart-selector {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.chart-selector button {
+    background: #0f3b63;
+    color: white;
+    border: none;
+    padding: 12px 18px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.chart-selector button:hover {
+    background: #14558c;
+}

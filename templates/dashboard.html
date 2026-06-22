@@ -60,25 +60,18 @@
 
     </div>
 
-    <div class="chart-box">
-        <h3>Potencia Activa Total</h3>
-        <canvas id="chartPotencia"></canvas>
-    </div>
+    <div class="chart-selector">
+    <button onclick="mostrarGrafica('potencia')">Potencia</button>
+    <button onclick="mostrarGrafica('energia')">Generación Diaria</button>
+    <button onclick="mostrarGrafica('voltajes')">Voltajes L-N</button>
+    <button onclick="mostrarGrafica('corrientes')">Corrientes</button>
+</div>
 
-    <div class="chart-box mt">
-        <h3>Voltajes Línea-Neutro</h3>
-        <canvas id="chartVoltajes"></canvas>
-    </div>
-
-    <div class="chart-box mt">
-        <h3>Generación Diaria</h3>
-        <canvas id="chartEnergiaDia"></canvas>
-    </div>
-
-    <div class="chart-box mt">
-        <h3>Corrientes por Fase</h3>
-        <canvas id="chartCorrientes"></canvas>
-    </div>
+<div class="chart-box mt">
+    <h3 id="tituloGrafica">Potencia Activa Total</h3>
+    <canvas id="chartPrincipal"></canvas>
+    
+</div>
 
 </div>
 
