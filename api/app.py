@@ -7,6 +7,9 @@ from pathlib import Path
 from db.kpi_solar import energia_diaria_generada
 from db.kpi_solar import reporte_kpi_energetico
 from db.kpi_solar import rango_real_datos
+from flask import send_file
+from db.reporte_excel import crear_reporte_excel
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -306,6 +309,28 @@ def convertir_utc_a_colombia(timestamp_utc):
 
     except Exception:
         return ""
+ 
+@app.route("/api/reporte/excel")
+def api_reporte_excel():
+    fecha_inicio = request.args.get("inicio", "0")
+    fecha_fin = request.args.get("fin", "9999999999")
+    variables = request.args.get("variables", "61,104,100")
+
+    output = crear_reporte_excel(
+        fecha_inicio,
+        fecha_fin,
+        variables
+    )
+
+    nombre_archivo = f"samee100_reporte_{fecha_inicio}_{fecha_fin}.xlsx"
+
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=nombre_archivo,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )   
+    
     
 if __name__ == "__main__":
 
