@@ -92,7 +92,8 @@ async function mostrarGrafica(tipo) {
         chartPrincipal = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: s7.map(x => x.timestamp_utc),
+                //labels: s7.map(x => x.timestamp_utc),
+                labels: s7.map(x => formatearHoraColombia(x.timestamp_utc)),
                 datasets: [
                     {
                         label: 'VL1',
@@ -129,7 +130,8 @@ async function mostrarGrafica(tipo) {
         chartPrincipal = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: s10.map(x => x.timestamp_utc),
+                //labels: s10.map(x => x.timestamp_utc),
+                labels: s10.map(x => formatearHoraColombia(x.timestamp_utc)),
                 datasets: [
                     {
                         label: 'I1',
@@ -198,7 +200,8 @@ async function graficarVariableSeleccionada() {
     chartPrincipal = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: data.serie.map(x => x.timestamp_utc),
+            labels: data.serie.map(x => formatearHoraColombia(x.timestamp_utc)),
+            //labels: data.serie.map(x => x.timestamp_utc),
             datasets: [{
                 label: texto,
                 data: data.serie.map(x => x.valor),
@@ -272,7 +275,7 @@ function pintarTablaUltimos(datos) {
             <td>${item.variable || 'Sin nombre'}</td>
             <td>${Number(item.valor).toLocaleString('es-CO')}</td>
             <td>${item.simbol || ''}</td>
-            <td>${item.timestamp_utc}</td>
+            <td>${formatearHoraColombia(item.timestamp_utc)}</td>
         `;
 
         tbody.appendChild(tr);
@@ -306,6 +309,114 @@ function filtrarTablaUltimos() {
     });
 
     pintarTablaUltimos(filtrados);
+}
+
+function formatearHoraColombia(timestampUtc) {
+    if (!timestampUtc) return '';
+
+    let fecha;
+
+    // Caso 1: timestamp Unix en segundos, ejemplo: 1718800000
+    if (!isNaN(timestampUtc)) {
+        fecha = new Date(Number(timestampUtc) * 1000);
+    }
+
+    // Caso 2: fecha ISO, ejemplo: 2026-06-19T15:20:00+00:00
+    else {
+        fecha = new Date(timestampUtc);
+    }
+
+    return fecha.toLocaleString('es-CO', {
+        timeZone: 'America/Bogota',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    });
+}
+function exportarUltimosCSV() {
+    if (!ultimosValores || ultimosValores.length === 0) {
+        alert('No hay datos para exportar');
+        return;
+    }
+
+    const textoBusqueda = document
+        .getElementById('buscarTabla')
+        .value
+        .toLowerCase()
+        .trim();
+
+    let datosExportar = ultimosValores;
+
+    if (textoBusqueda) {
+        datosExportar = ultimosValores.filter(item => {
+            const unitId = String(item.unit_id || '').toLowerCase();
+            const variable = String(item.variable || '').toLowerCase();
+            const simbolo = String(item.simbol || '').toLowerCase();
+            const valor = String(item.valor || '').toLowerCase();
+
+            return (
+                unitId.includes(textoBusqueda) ||
+                variable.includes(textoBusqueda) ||
+                simbolo.includes(textoBusqueda) ||
+                valor.includes(textoBusqueda)
+            );
+        });
+    }
+
+    const encabezados = [
+        'Unit ID',
+        'Variable',
+        'Valor',
+        'Unidad',
+        'Timestamp UTC',
+        'Hora Colombia'
+    ];
+
+    const filas = datosExportar.map(item => [
+        item.unit_id,
+        item.variable || '',
+        item.valor,
+        item.simbol || '',
+        item.timestamp_utc || '',
+        formatearHoraColombia(item.timestamp_utc)
+    ]);
+
+    const csv = [
+        encabezados,
+        ...filas
+    ]
+    .map(fila =>
+        fila.map(campo =>
+            `"${String(campo).replace(/"/g, '""')}"`
+        ).join(';')
+    )
+    .join('\n');
+
+    const blob = new Blob([csv], {
+        type: 'text/csv;charset=utf-8;'
+    });
+
+    const url = URL.createObjectURL(blob);
+
+    const enlace = document.createElement('a');
+    enlace.href = url;
+
+    const fecha = new Date()
+        .toISOString()
+        .slice(0, 19)
+        .replace(/:/g, '-');
+
+    enlace.download = `samee100_ultimos_valores_${fecha}.csv`;
+
+    document.body.appendChild(enlace);
+    enlace.click();
+    document.body.removeChild(enlace);
+
+    URL.revokeObjectURL(url);
 }
 
 cargarSelectorVariables();
