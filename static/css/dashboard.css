@@ -192,3 +192,25 @@ header {
     border-color: #0f3b63;
     box-shadow: 0 0 0 2px rgba(15, 59, 99, 0.12);
 }
+
+.main-header {
+    background: #0f3b63;
+    color: white;
+    padding: 12px 24px;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.logo-pyp {
+    height: 38px;
+    width: auto;
+    border-radius: 6px;
+    background: white;
+    padding: 3px;
+}
