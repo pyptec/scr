@@ -1,6 +1,7 @@
 let chartPrincipal = null;
 let graficaActual = 'potencia';
 let rangoActual = 'hoy';
+let ultimosValores = [];
 
 async function cargarDashboard() {
     const rango = obtenerRangoUnix();
@@ -154,7 +155,7 @@ async function mostrarGrafica(tipo) {
 async function actualizarTodo() {
     await cargarDashboard();
     await cargarUltimosValores();
-    
+
     if (graficaActual) {
         await mostrarGrafica(graficaActual);
     }
@@ -244,11 +245,26 @@ async function cargarUltimosValores() {
     const res = await fetch('/api/ultimos');
     const data = await res.json();
 
+    ultimosValores = data.datos || [];
+
+    pintarTablaUltimos(ultimosValores);
+}
+
+function pintarTablaUltimos(datos) {
     const tbody = document.getElementById('tablaUltimos');
 
     tbody.innerHTML = '';
 
-    data.datos.forEach(item => {
+    if (!datos || datos.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5">No hay datos para mostrar</td>
+            </tr>
+        `;
+        return;
+    }
+
+    datos.forEach(item => {
         const tr = document.createElement('tr');
 
         tr.innerHTML = `
@@ -261,6 +277,35 @@ async function cargarUltimosValores() {
 
         tbody.appendChild(tr);
     });
+}
+
+function filtrarTablaUltimos() {
+    const texto = document
+        .getElementById('buscarTabla')
+        .value
+        .toLowerCase()
+        .trim();
+
+    if (!texto) {
+        pintarTablaUltimos(ultimosValores);
+        return;
+    }
+
+    const filtrados = ultimosValores.filter(item => {
+        const unitId = String(item.unit_id || '').toLowerCase();
+        const variable = String(item.variable || '').toLowerCase();
+        const simbolo = String(item.simbol || '').toLowerCase();
+        const valor = String(item.valor || '').toLowerCase();
+
+        return (
+            unitId.includes(texto) ||
+            variable.includes(texto) ||
+            simbolo.includes(texto) ||
+            valor.includes(texto)
+        );
+    });
+
+    pintarTablaUltimos(filtrados);
 }
 
 cargarSelectorVariables();

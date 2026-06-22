@@ -167,3 +167,28 @@ header {
 .tabla-valores td:nth-child(4) {
     white-space: nowrap;
 }
+.tabla-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 15px;
+}
+
+.tabla-header h3 {
+    margin: 0;
+}
+
+.tabla-header input {
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    min-width: 320px;
+    font-size: 14px;
+}
+
+.tabla-header input:focus {
+    outline: none;
+    border-color: #0f3b63;
+    box-shadow: 0 0 0 2px rgba(15, 59, 99, 0.12);
+}
