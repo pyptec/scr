@@ -172,3 +172,126 @@ def energia_diaria_generada(unit_id=UNIT_EPEXP, limite_dias=30):
     conn.close()
 
     return list(reversed(rows))
+
+def valor_inicial_final(unit_id, fecha_inicio, fecha_fin):
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT valor, timestamp_utc
+        FROM mediciones_detalle
+        WHERE unit_id = ?
+          AND timestamp_utc >= ?
+          AND timestamp_utc <= ?
+        ORDER BY timestamp_utc ASC, id ASC
+        LIMIT 1
+    """, (unit_id, fecha_inicio, fecha_fin))
+
+    inicial = cur.fetchone()
+
+    cur.execute("""
+        SELECT valor, timestamp_utc
+        FROM mediciones_detalle
+        WHERE unit_id = ?
+          AND timestamp_utc >= ?
+          AND timestamp_utc <= ?
+        ORDER BY timestamp_utc DESC, id DESC
+        LIMIT 1
+    """, (unit_id, fecha_inicio, fecha_fin))
+
+    final = cur.fetchone()
+
+    conn.close()
+
+    if not inicial or not final:
+        return {
+            "inicial": None,
+            "final": None,
+            "delta": 0.0,
+            "timestamp_inicial": None,
+            "timestamp_final": None
+        }
+
+    delta = float(final["valor"]) - float(inicial["valor"])
+
+    if delta < 0:
+        delta = 0.0
+
+    return {
+        "inicial": round(float(inicial["valor"]), 3),
+        "final": round(float(final["valor"]), 3),
+        "delta": round(delta, 3),
+        "timestamp_inicial": inicial["timestamp_utc"],
+        "timestamp_final": final["timestamp_utc"]
+    }
+
+
+def estadisticas_variable(unit_id, fecha_inicio, fecha_fin):
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT
+            MIN(valor) AS minimo,
+            MAX(valor) AS maximo,
+            AVG(valor) AS promedio,
+            COUNT(*) AS muestras
+        FROM mediciones_detalle
+        WHERE unit_id = ?
+          AND timestamp_utc >= ?
+          AND timestamp_utc <= ?
+    """, (unit_id, fecha_inicio, fecha_fin))
+
+    row = cur.fetchone()
+    conn.close()
+
+    if not row or row["muestras"] == 0:
+        return {
+            "minimo": 0.0,
+            "maximo": 0.0,
+            "promedio": 0.0,
+            "muestras": 0
+        }
+
+    return {
+        "minimo": round(float(row["minimo"]), 3),
+        "maximo": round(float(row["maximo"]), 3),
+        "promedio": round(float(row["promedio"]), 3),
+        "muestras": int(row["muestras"])
+    }
+
+
+def reporte_kpi_energetico(fecha_inicio, fecha_fin):
+    exportada = valor_inicial_final(UNIT_EPEXP, fecha_inicio, fecha_fin)
+    importada = valor_inicial_final(UNIT_EPIMP, fecha_inicio, fecha_fin)
+
+    potencia = estadisticas_variable(UNIT_PTOTAL, fecha_inicio, fecha_fin)
+    potencia_actual = potencia_actual_kw()
+
+    energia_exportada = exportada["delta"]
+    energia_importada = importada["delta"]
+
+    balance_neto = energia_exportada - energia_importada
+
+    return {
+        "energia": {
+            "exportada_kwh": energia_exportada,
+            "importada_kwh": energia_importada,
+            "balance_neto_kwh": round(balance_neto, 3),
+            "exportada_inicial_kwh": exportada["inicial"],
+            "exportada_final_kwh": exportada["final"],
+            "importada_inicial_kwh": importada["inicial"],
+            "importada_final_kwh": importada["final"]
+        },
+        "potencia": {
+            "actual_kw": potencia_actual,
+            "maxima_kw": potencia["maximo"],
+            "minima_kw": potencia["minimo"],
+            "promedio_kw": potencia["promedio"],
+            "muestras": potencia["muestras"]
+        },
+        "impacto": {
+            "ahorro_cop": ahorro_cop(energia_exportada),
+            "co2_evitado_kg": co2_evitado_kg(energia_exportada)
+        }
+    }

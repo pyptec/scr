@@ -5,6 +5,7 @@ from db.samee100_db import get_conn
 from flask import Flask, request, render_template
 from pathlib import Path
 from db.kpi_solar import energia_diaria_generada
+from db.kpi_solar import reporte_kpi_energetico
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -253,7 +254,51 @@ def api_ultimos():
         "total": len(rows),
         "datos": rows
     }
+    
+@app.route("/api/reporte/kpi")
+def api_reporte_kpi():
+    fecha_inicio = request.args.get("inicio", "0")
+    fecha_fin = request.args.get("fin", "9999999999")
+
+    data = reporte_kpi_energetico(fecha_inicio, fecha_fin)
+
+    data["periodo"] = {
+        "inicio_utc": fecha_inicio,
+        "fin_utc": fecha_fin,
+        "inicio_colombia": convertir_utc_a_colombia(fecha_inicio),
+        "fin_colombia": convertir_utc_a_colombia(fecha_fin)
+    }
+
+    return data
      
+from datetime import datetime, timezone, timedelta
+
+def convertir_utc_a_colombia(timestamp_utc):
+    try:
+        if timestamp_utc is None:
+            return ""
+
+        if str(timestamp_utc).isdigit():
+            dt_utc = datetime.fromtimestamp(
+                int(timestamp_utc),
+                tz=timezone.utc
+            )
+        else:
+            texto = str(timestamp_utc).replace("Z", "+00:00")
+            dt_utc = datetime.fromisoformat(texto)
+
+            if dt_utc.tzinfo is None:
+                dt_utc = dt_utc.replace(tzinfo=timezone.utc)
+
+        dt_col = dt_utc.astimezone(
+            timezone(timedelta(hours=-5))
+        )
+
+        return dt_col.strftime("%Y-%m-%d %H:%M:%S")
+
+    except Exception:
+        return ""
+    
 if __name__ == "__main__":
 
     app.run(
