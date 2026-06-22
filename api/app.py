@@ -191,6 +191,31 @@ def api_series():
         "unit_ids": unit_ids,
         "series": resultado
     }  
+
+@app.route("/api/variables")
+def api_variables():
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT DISTINCT
+            md.unit_id,
+            u.name AS variable,
+            u.simbol
+        FROM mediciones_detalle md
+        LEFT JOIN unidades u
+            ON md.unit_id = u.unit_id
+        ORDER BY md.unit_id ASC
+    """)
+
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+
+    return {
+        "total": len(rows),
+        "variables": rows
+    }
+ 
  
 if __name__ == "__main__":
 
