@@ -149,6 +149,55 @@ async function actualizarTodo() {
     }
 }
 
+async function cargarSelectorVariables() {
+    const res = await fetch('/api/variables');
+    const data = await res.json();
+
+    const select = document.getElementById('selectVariable');
+
+    select.innerHTML = '';
+
+    data.variables.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v.unit_id;
+        opt.textContent = `${v.unit_id} - ${v.variable} (${v.simbolo || 'NA'})`;
+        select.appendChild(opt);
+    });
+}
+
+async function graficarVariableSeleccionada() {
+    const select = document.getElementById('selectVariable');
+    const unitId = select.value;
+
+    if (!unitId) return;
+
+    if (chartPrincipal) {
+        chartPrincipal.destroy();
+    }
+
+    const texto = select.options[select.selectedIndex].text;
+    document.getElementById('tituloGrafica').innerText = texto;
+
+    const res = await fetch(`/api/serie/${unitId}?limite=200`);
+    const data = await res.json();
+
+    const ctx = document.getElementById('chartPrincipal');
+
+    chartPrincipal = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.serie.map(x => x.timestamp_utc),
+            datasets: [{
+                label: texto,
+                data: data.serie.map(x => x.valor),
+                tension: 0.25
+            }]
+        }
+    });
+
+    graficaActual = null;
+}
+cargarSelectorVariables();
 actualizarTodo();
 
 setInterval(actualizarTodo, 30000);

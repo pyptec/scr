@@ -79,3 +79,32 @@ header {
 .chart-selector button:hover {
     background: #14558c;
 }
+
+.variable-selector {
+    margin: 20px 0;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.variable-selector label {
+    font-weight: bold;
+    color: #1f2937;
+}
+
+.variable-selector select {
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    min-width: 420px;
+}
+
+.variable-selector button {
+    background: #0f3b63;
+    color: white;
+    border: none;
+    padding: 11px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+}
