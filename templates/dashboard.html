@@ -100,6 +100,27 @@
     
 </div>
 
+<div class="tabla-box mt">
+    <h3>Últimos valores reportados</h3>
+
+    <table class="tabla-valores">
+        <thead>
+            <tr>
+                <th>Unit ID</th>
+                <th>Variable</th>
+                <th>Valor</th>
+                <th>Unidad</th>
+                <th>Timestamp</th>
+            </tr>
+        </thead>
+        <tbody id="tablaUltimos">
+            <tr>
+                <td colspan="5">Cargando datos...</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
 </div>
 
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>

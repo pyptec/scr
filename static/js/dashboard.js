@@ -153,7 +153,8 @@ async function mostrarGrafica(tipo) {
 
 async function actualizarTodo() {
     await cargarDashboard();
-
+    await cargarUltimosValores();
+    
     if (graficaActual) {
         await mostrarGrafica(graficaActual);
     }
@@ -237,6 +238,29 @@ function obtenerRangoUnix() {
 async function cambiarRangoTiempo() {
     rangoActual = document.getElementById('rangoTiempo').value;
     await actualizarTodo();
+}
+
+async function cargarUltimosValores() {
+    const res = await fetch('/api/ultimos');
+    const data = await res.json();
+
+    const tbody = document.getElementById('tablaUltimos');
+
+    tbody.innerHTML = '';
+
+    data.datos.forEach(item => {
+        const tr = document.createElement('tr');
+
+        tr.innerHTML = `
+            <td>${item.unit_id}</td>
+            <td>${item.variable || 'Sin nombre'}</td>
+            <td>${Number(item.valor).toLocaleString('es-CO')}</td>
+            <td>${item.simbol || ''}</td>
+            <td>${item.timestamp_utc}</td>
+        `;
+
+        tbody.appendChild(tr);
+    });
 }
 
 cargarSelectorVariables();

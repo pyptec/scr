@@ -127,3 +127,43 @@ header {
     border: 1px solid #cbd5e1;
     min-width: 180px;
 }
+
+.tabla-box {
+    background: white;
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.tabla-box h3 {
+    margin-top: 0;
+    color: #0f3b63;
+}
+
+.tabla-valores {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.tabla-valores th {
+    background: #0f3b63;
+    color: white;
+    text-align: left;
+    padding: 10px;
+}
+
+.tabla-valores td {
+    padding: 9px 10px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.tabla-valores tr:hover {
+    background: #f1f5f9;
+}
+
+.tabla-valores td:nth-child(1),
+.tabla-valores td:nth-child(3),
+.tabla-valores td:nth-child(4) {
+    white-space: nowrap;
+}
