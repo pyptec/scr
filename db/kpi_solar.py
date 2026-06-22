@@ -296,7 +296,7 @@ def reporte_kpi_energetico(fecha_inicio, fecha_fin):
         }
     }
     
-    def rango_real_datos(fecha_inicio="0", fecha_fin="9999999999"):
+def rango_real_datos(fecha_inicio="0", fecha_fin="9999999999"):
     conn = get_conn()
     cur = conn.cursor()
 
