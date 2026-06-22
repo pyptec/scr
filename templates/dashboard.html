@@ -15,6 +15,19 @@
     SAMEE100 Solar - Dashboard Energético
 </header>
 
+<div class="filtro-tiempo">
+    <label for="rangoTiempo">Rango:</label>
+
+    <select id="rangoTiempo" onchange="cambiarRangoTiempo()">
+        <option value="hora">Última hora</option>
+        <option value="hoy" selected>Hoy</option>
+        <option value="semana">Semana</option>
+        <option value="mes">Mes</option>
+        <option value="anio">Año</option>
+        <option value="todo">Todo</option>
+    </select>
+</div>
+
 <div class="container">
 
     <div class="cards">
