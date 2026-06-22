@@ -428,7 +428,11 @@ function generarReporteExcelVariable() {
         return;
     }
 
-    const rango = obtenerRangoUnix();
+    const rango = obtenerRangoReporte();
+
+    if (!rango) {
+        return;
+    }
 
     const url =
         `/api/reporte/excel?inicio=${rango.inicio}&fin=${rango.fin}&variables=${unitId}`;
@@ -437,10 +441,14 @@ function generarReporteExcelVariable() {
 }
 
 function generarReporteExcelTodas() {
-    const rango = obtenerRangoUnix();
+    const rango = obtenerRangoReporte();
+
+    if (!rango) {
+        return;
+    }
 
     const confirmar = confirm(
-        'Este reporte incluirá todas las variables disponibles en el rango seleccionado. ¿Desea continuar?'
+        'Este reporte incluirá todas las variables disponibles entre las fechas seleccionadas. ¿Desea continuar?'
     );
 
     if (!confirmar) {
@@ -451,6 +459,68 @@ function generarReporteExcelTodas() {
         `/api/reporte/excel?inicio=${rango.inicio}&fin=${rango.fin}&variables=all`;
 
     window.location.href = url;
+}
+function fechaLocalColombiaAUnixUtc(valorDatetimeLocal) {
+    if (!valorDatetimeLocal) {
+        return null;
+    }
+
+    /*
+      El input datetime-local entrega algo como:
+      2026-06-22T08:30
+
+      Esa hora representa hora Colombia.
+      Colombia es UTC-5, entonces agregamos -05:00.
+    */
+    const fecha = new Date(`${valorDatetimeLocal}:00-05:00`);
+
+    return Math.floor(fecha.getTime() / 1000);
+}
+
+function obtenerRangoReporte() {
+    const inicioInput = document.getElementById('fechaInicioReporte').value;
+    const finInput = document.getElementById('fechaFinReporte').value;
+
+    const inicio = fechaLocalColombiaAUnixUtc(inicioInput);
+    const fin = fechaLocalColombiaAUnixUtc(finInput);
+
+    if (!inicio || !fin) {
+        alert('Seleccione fecha y hora de inicio y fin del reporte');
+        return null;
+    }
+
+    if (inicio >= fin) {
+        alert('La fecha inicial debe ser menor que la fecha final');
+        return null;
+    }
+
+    return {
+        inicio,
+        fin
+    };
+}
+
+function inicializarFechasReporte() {
+    const ahora = new Date();
+
+    const inicio = new Date();
+    inicio.setHours(0, 0, 0, 0);
+
+    document.getElementById('fechaInicioReporte').value =
+        formatoDatetimeLocal(inicio);
+
+    document.getElementById('fechaFinReporte').value =
+        formatoDatetimeLocal(ahora);
+}
+
+function formatoDatetimeLocal(fecha) {
+    const year = fecha.getFullYear();
+    const month = String(fecha.getMonth() + 1).padStart(2, '0');
+    const day = String(fecha.getDate()).padStart(2, '0');
+    const hour = String(fecha.getHours()).padStart(2, '0');
+    const minute = String(fecha.getMinutes()).padStart(2, '0');
+
+    return `${year}-${month}-${day}T${hour}:${minute}`;
 }
 
 cargarSelectorVariables();

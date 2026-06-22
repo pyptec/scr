@@ -216,3 +216,44 @@ header {
     background: white;
     padding: 3px;
 }
+
+.reporte-selector {
+    margin: 18px 0 24px 0;
+    display: flex;
+    gap: 14px;
+    align-items: end;
+    flex-wrap: wrap;
+}
+
+.reporte-selector div {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.reporte-selector label {
+    font-weight: bold;
+    color: #1f2937;
+    font-size: 13px;
+}
+
+.reporte-selector input {
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    min-width: 210px;
+}
+
+.reporte-selector button {
+    background: #0f3b63;
+    color: white;
+    border: none;
+    padding: 11px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.reporte-selector button:hover {
+    background: #14558c;
+}

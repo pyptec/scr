@@ -78,7 +78,7 @@
                 <span class="unit">kg</span>
             </div>
 
-    <div class="variable-selector">
+   <div class="variable-selector">
         <label for="selectVariable">Variable personalizada:</label>
 
         <select id="selectVariable">
@@ -88,6 +88,18 @@
         <button onclick="graficarVariableSeleccionada()">
             Graficar
         </button>
+    </div>
+
+        <div class="reporte-selector">
+        <div>
+            <label for="fechaInicioReporte">Desde:</label>
+            <input type="datetime-local" id="fechaInicioReporte">
+        </div>
+
+        <div>
+            <label for="fechaFinReporte">Hasta:</label>
+            <input type="datetime-local" id="fechaFinReporte">
+        </div>
 
         <button onclick="generarReporteExcelVariable()">
             Reporte Excel variable
