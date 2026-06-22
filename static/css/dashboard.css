@@ -1,0 +1,61 @@
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f3f6fa;
+    color: #1f2937;
+}
+
+header {
+    background: #0f3b63;
+    color: white;
+    padding: 18px 30px;
+    font-size: 24px;
+    font-weight: bold;
+}
+
+.container {
+    padding: 25px;
+}
+
+.cards {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 18px;
+    margin-bottom: 25px;
+}
+
+.card {
+    background: white;
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.card h3 {
+    margin: 0;
+    font-size: 15px;
+    color: #6b7280;
+}
+
+.value {
+    margin-top: 12px;
+    font-size: 32px;
+    font-weight: bold;
+    color: #0f3b63;
+}
+
+.unit {
+    font-size: 16px;
+    color: #6b7280;
+}
+
+.chart-box {
+    background: white;
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.mt {
+    margin-top: 25px;
+}
