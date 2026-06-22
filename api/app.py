@@ -6,7 +6,7 @@ from flask import Flask, request, render_template
 from pathlib import Path
 from db.kpi_solar import energia_diaria_generada
 from db.kpi_solar import reporte_kpi_energetico
-
+from db.kpi_solar import rango_real_datos
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -261,12 +261,20 @@ def api_reporte_kpi():
     fecha_fin = request.args.get("fin", "9999999999")
 
     data = reporte_kpi_energetico(fecha_inicio, fecha_fin)
+    rango_real = rango_real_datos(fecha_inicio, fecha_fin)
+
+    inicio_real = rango_real.get("inicio_real")
+    fin_real = rango_real.get("fin_real")
 
     data["periodo"] = {
-        "inicio_utc": fecha_inicio,
-        "fin_utc": fecha_fin,
-        "inicio_colombia": convertir_utc_a_colombia(fecha_inicio),
-        "fin_colombia": convertir_utc_a_colombia(fecha_fin)
+        "inicio_consulta_utc": fecha_inicio,
+        "fin_consulta_utc": fecha_fin,
+
+        "inicio_real_utc": inicio_real,
+        "fin_real_utc": fin_real,
+
+        "inicio_colombia": convertir_utc_a_colombia(inicio_real),
+        "fin_colombia": convertir_utc_a_colombia(fin_real)
     }
 
     return data

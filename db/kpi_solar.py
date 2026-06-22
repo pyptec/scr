@@ -295,3 +295,30 @@ def reporte_kpi_energetico(fecha_inicio, fecha_fin):
             "co2_evitado_kg": co2_evitado_kg(energia_exportada)
         }
     }
+    
+    def rango_real_datos(fecha_inicio="0", fecha_fin="9999999999"):
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT
+            MIN(timestamp_utc) AS inicio_real,
+            MAX(timestamp_utc) AS fin_real
+        FROM mediciones_detalle
+        WHERE timestamp_utc >= ?
+          AND timestamp_utc <= ?
+    """, (fecha_inicio, fecha_fin))
+
+    row = cur.fetchone()
+    conn.close()
+
+    if not row:
+        return {
+            "inicio_real": None,
+            "fin_real": None
+        }
+
+    return {
+        "inicio_real": row["inicio_real"],
+        "fin_real": row["fin_real"]
+    }
