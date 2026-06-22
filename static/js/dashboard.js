@@ -3,7 +3,11 @@ let graficaActual = 'potencia';
 let rangoActual = 'hoy';
 
 async function cargarDashboard() {
-    const res = await fetch('/api/dashboard');
+    const rango = obtenerRangoUnix();
+
+    const res = await fetch(
+    `/api/dashboard?inicio=${rango.inicio}&fin=${rango.fin}`
+    );
     const data = await res.json();
 
     document.getElementById('potencia').innerText =

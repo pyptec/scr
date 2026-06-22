@@ -59,11 +59,14 @@ def api_variable(unit_id):
 @app.route("/api/dashboard")
 def api_dashboard():
 
+    fecha_inicio = request.args.get("inicio", "0")
+    fecha_fin = request.args.get("fin", "9999999999")
+
     from db.kpi_solar import resumen_periodo
 
     return resumen_periodo(
-        "0",
-        "9999999999"
+        fecha_inicio,
+        fecha_fin
     )
 @app.route("/")
 def home():
