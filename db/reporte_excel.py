@@ -518,7 +518,7 @@ def crear_reporte_excel(inicio, fin, variables_param="61,104,100"):
 
     ajustar_columnas(ws5)
 
-    agregar_hoja_graficas(wb, inicio, fin)
+    agregar_hoja_graficas(wb, inicio, fin, gateway_id=8, device_id=31)
     agregar_hoja_calidad_datos(wb, inicio, fin, variables_param)
     output = BytesIO()
     wb.save(output)
@@ -536,7 +536,7 @@ def insertar_logo(ws, celda="A1"):
     except Exception as e:
         print(f"[REPORTE] No se pudo insertar logo: {e}")
         
-def agregar_hoja_graficas(wb, inicio, fin):
+def agregar_hoja_graficas(wb, inicio, fin, gateway_id=8, device_id=31):
     ws_data = wb.create_sheet("Datos_Graficas")
 
     ws_data.append([
@@ -553,18 +553,40 @@ def agregar_hoja_graficas(wb, inicio, fin):
 
     cur.execute("""
         SELECT
-            timestamp_utc,
-            MAX(CASE WHEN unit_id = 61 THEN valor END) AS potencia_kw,
-            MAX(CASE WHEN unit_id = 100 THEN valor END) AS importada_kwh,
-            MAX(CASE WHEN unit_id = 104 THEN valor END) AS exportada_kwh
-        FROM mediciones_detalle
-        WHERE unit_id IN (61, 100, 104)
-          AND timestamp_utc >= ?
-          AND timestamp_utc <= ?
-        GROUP BY timestamp_utc
-        ORDER BY timestamp_utc ASC
+            md.timestamp_utc,
+
+            MAX(CASE WHEN md.unit_id = 61 THEN md.valor END) AS potencia_kw,
+            MAX(CASE WHEN md.unit_id = 100 THEN md.valor END) AS importada_kwh,
+            MAX(CASE WHEN md.unit_id = 104 THEN md.valor END) AS exportada_kwh
+
+        FROM mediciones_detalle md
+
+        LEFT JOIN dispositivos d
+            ON CAST(NULLIF(TRIM(md.device_id), '') AS INTEGER) = d.device_id
+
+        WHERE md.unit_id IN (61, 100, 104)
+          AND md.timestamp_utc >= ?
+          AND md.timestamp_utc <= ?
+          AND COALESCE(md.gateway_id, d.gateway_id) = ?
+          AND (
+                md.source_type = 'device'
+                OR (
+                    md.source_type IS NULL
+                    AND md.device_id IS NOT NULL
+                    AND TRIM(md.device_id) <> ''
+                )
+          )
+          AND TRIM(md.device_id) = ?
+
+        GROUP BY md.timestamp_utc
+        ORDER BY md.timestamp_utc ASC
         LIMIT 1000
-    """, (inicio, fin))
+    """, (
+        inicio,
+        fin,
+        int(gateway_id),
+        str(device_id)
+    ))
 
     rows = cur.fetchall()
     conn.close()
@@ -582,15 +604,19 @@ def agregar_hoja_graficas(wb, inicio, fin):
     ws_chart = wb.create_sheet("Graficas")
 
     ws_chart.merge_cells("A1:H1")
-    aplicar_estilo_titulo(ws_chart, "A1", "GRÁFICAS ENERGÉTICAS SAMEE100")
+    aplicar_estilo_titulo(
+        ws_chart,
+        "A1",
+        "GRÁFICAS ENERGÉTICAS SAMEE100 - EASTRON SDM630"
+    )
 
-    ws_chart["A3"] = "Potencia activa total"
+    ws_chart["A3"] = "Potencia activa total - Unit ID 61"
     ws_chart["A3"].font = Font(bold=True, size=13, color="0F3B63")
 
-    ws_chart["A22"] = "Energía importada de red"
+    ws_chart["A22"] = "Energía importada de red - Unit ID 100"
     ws_chart["A22"].font = Font(bold=True, size=13, color="0F3B63")
 
-    ws_chart["A41"] = "Energía exportada / generada"
+    ws_chart["A41"] = "Energía exportada / generada - Unit ID 104"
     ws_chart["A41"].font = Font(bold=True, size=13, color="0F3B63")
 
     max_row = ws_data.max_row
@@ -599,11 +625,18 @@ def agregar_hoja_graficas(wb, inicio, fin):
         ws_chart["A5"] = "No hay suficientes datos para generar gráficas."
         return
 
+    cats = Reference(
+        ws_data,
+        min_col=1,
+        min_row=2,
+        max_row=max_row
+    )
+
     # =========================
     # Gráfica 1: Potencia
     # =========================
     chart_potencia = LineChart()
-    chart_potencia.title = "Potencia activa total"
+    chart_potencia.title = "Potencia activa total - Eastron SDM630"
     chart_potencia.y_axis.title = "kW"
     chart_potencia.x_axis.title = "Hora Colombia"
     chart_potencia.height = 9
@@ -613,13 +646,6 @@ def agregar_hoja_graficas(wb, inicio, fin):
         ws_data,
         min_col=2,
         min_row=1,
-        max_row=max_row
-    )
-
-    cats = Reference(
-        ws_data,
-        min_col=1,
-        min_row=2,
         max_row=max_row
     )
 
@@ -633,7 +659,7 @@ def agregar_hoja_graficas(wb, inicio, fin):
     # Gráfica 2: Importada
     # =========================
     chart_importada = LineChart()
-    chart_importada.title = "Energía importada de red"
+    chart_importada.title = "Energía importada de red - Eastron SDM630"
     chart_importada.y_axis.title = "kWh"
     chart_importada.x_axis.title = "Hora Colombia"
     chart_importada.height = 9
@@ -656,7 +682,7 @@ def agregar_hoja_graficas(wb, inicio, fin):
     # Gráfica 3: Exportada
     # =========================
     chart_exportada = LineChart()
-    chart_exportada.title = "Energía exportada / generada"
+    chart_exportada.title = "Energía exportada / generada - Eastron SDM630"
     chart_exportada.y_axis.title = "kWh"
     chart_exportada.x_axis.title = "Hora Colombia"
     chart_exportada.height = 9
