@@ -282,6 +282,13 @@ def crear_reporte_excel(inicio, fin, variables_param="61,104,100"):
     for fila in filas_kpi:
         ws.append(fila)
 
+    ws.append([])
+    ws.append([
+    "Nota",
+    "La hoja Calidad_Datos muestra alertas si algún contador acumulado disminuye dentro del periodo.",
+    "",
+    ""
+    ])
     ajustar_columnas(ws)
 
     # =========================================================
@@ -425,6 +432,7 @@ def crear_reporte_excel(inicio, fin, variables_param="61,104,100"):
     ajustar_columnas(ws5)
 
     agregar_hoja_graficas(wb, inicio, fin)
+    agregar_hoja_calidad_datos(wb, inicio, fin)
     output = BytesIO()
     wb.save(output)
     output.seek(0)
@@ -579,3 +587,101 @@ def agregar_hoja_graficas(wb, inicio, fin):
     chart_exportada.legend = None
 
     ws_chart.add_chart(chart_exportada, "A42")
+    
+def agregar_hoja_calidad_datos(wb, inicio, fin):
+    ws = wb.create_sheet("Calidad_Datos")
+
+    ws.merge_cells("A1:G1")
+    aplicar_estilo_titulo(ws, "A1", "CALIDAD DE DATOS DEL REPORTE")
+
+    ws.append([])
+    ws.append([
+        "Unit ID",
+        "Variable",
+        "Unidad",
+        "Muestras",
+        "Valor inicial",
+        "Valor final",
+        "Observación"
+    ])
+    aplicar_header(ws, 3)
+
+    variables_control = [
+        61,    # Potencia activa total
+        100,   # Energía importada total
+        104,   # Energía exportada total
+        97, 98, 99,
+        101, 102, 103,
+        7, 8, 9,
+        10, 11, 12,
+        27
+    ]
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    for unit_id in variables_control:
+        info = obtener_variable(unit_id)
+
+        cur.execute("""
+            SELECT
+                COUNT(*) AS muestras,
+                MIN(id) AS min_id,
+                MAX(id) AS max_id
+            FROM mediciones_detalle
+            WHERE unit_id = ?
+              AND timestamp_utc >= ?
+              AND timestamp_utc <= ?
+        """, (unit_id, inicio, fin))
+
+        row = cur.fetchone()
+
+        muestras = int(row["muestras"]) if row and row["muestras"] else 0
+
+        valor_inicial = None
+        valor_final = None
+        observacion = "OK"
+
+        if muestras == 0:
+            observacion = "Sin datos en el periodo"
+        else:
+            cur.execute("""
+                SELECT valor
+                FROM mediciones_detalle
+                WHERE id = ?
+            """, (row["min_id"],))
+            inicial = cur.fetchone()
+
+            cur.execute("""
+                SELECT valor
+                FROM mediciones_detalle
+                WHERE id = ?
+            """, (row["max_id"],))
+            final = cur.fetchone()
+
+            if inicial:
+                valor_inicial = float(inicial["valor"])
+
+            if final:
+                valor_final = float(final["valor"])
+
+            if unit_id in [97, 98, 99, 100, 101, 102, 103, 104]:
+                if valor_inicial is not None and valor_final is not None:
+                    if valor_final < valor_inicial:
+                        observacion = "Alerta: contador de energía disminuye; delta energético se reporta como 0"
+
+            if muestras == 1:
+                observacion = "Solo una muestra en el periodo"
+
+        ws.append([
+            unit_id,
+            info["variable"],
+            info["simbolo"],
+            muestras,
+            valor_inicial,
+            valor_final,
+            observacion
+        ])
+
+    conn.close()
+    ajustar_columnas(ws)
