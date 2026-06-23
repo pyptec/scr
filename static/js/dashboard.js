@@ -171,7 +171,7 @@ async function mostrarGrafica(tipo) {
             'Potencia Activa Total';
 
         const res = await fetch(
-            `/api/serie/61?inicio=${rango.inicio}&fin=${rango.fin}&limite=200`
+            `/api/serie/61?inicio=${rango.inicio}&fin=${rango.fin}&limite=200&gateway_id=8&source_type=device&device_id=31`
         );
 
         const data = await res.json();
@@ -216,7 +216,7 @@ async function mostrarGrafica(tipo) {
             'Voltajes Línea-Neutro';
 
         const res = await fetch(
-            `/api/series?ids=7,8,9&inicio=${rango.inicio}&fin=${rango.fin}&limite=200`
+            `/api/series?ids=7,8,9&inicio=${rango.inicio}&fin=${rango.fin}&limite=200&gateway_id=8&source_type=device&device_id=31`
         );
 
         const data = await res.json();
@@ -255,7 +255,7 @@ async function mostrarGrafica(tipo) {
             'Corrientes por Fase';
 
         const res = await fetch(
-            `/api/series?ids=10,11,12&inicio=${rango.inicio}&fin=${rango.fin}&limite=200`
+            `/api/series?ids=10,11,12&inicio=${rango.inicio}&fin=${rango.fin}&limite=200&gateway_id=8&source_type=device&device_id=31`
         );
 
         const data = await res.json();
