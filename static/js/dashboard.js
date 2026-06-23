@@ -616,6 +616,7 @@ function generarReporteExcelSeleccionadas() {
 }
 inicializarFechasReporte();
 cargarSelectorVariables();
+cargarVariablesReporte();
 actualizarTodo();
 
 setInterval(actualizarTodo, 30000);
