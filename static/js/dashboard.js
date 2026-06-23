@@ -371,7 +371,7 @@ async function graficarVariableSeleccionada(mostrarAlertas = true) {
             data: {
                 labels: labels,
                 datasets: [{
-                    label: `${nombreDispositivo} - ${nombreVariable}`,
+                    label: `${nombreDispositivo} - Unit ID ${unitId} - ${nombreVariable}`,
                     data: valores,
                     borderWidth: 2,
                     tension: 0.25,
@@ -399,7 +399,7 @@ async function graficarVariableSeleccionada(mostrarAlertas = true) {
         });
 
         document.getElementById('tituloGrafica').innerText =
-            `${nombreGateway} | ${nombreDispositivo} | ${nombreVariable}`;
+            `${nombreGateway} | ${nombreDispositivo} | Unit ID ${unitId} | ${nombreVariable} ${unidad ? '(' + unidad + ')' : ''}`;
 
     } catch (error) {
         console.error('Error graficando variable:', error);
@@ -443,7 +443,7 @@ async function cargarSelectorVariables() {
             const dispositivo = v.dispositivo || origen;
 
             opt.textContent =
-                `${gateway} | ${dispositivo} | ${v.unit_id} - ${v.variable} (${v.simbolo || ''})`;
+                `${gateway} | ${dispositivo} | Unit ID ${v.unit_id} | ${v.variable} ${v.simbolo ? '(' + v.simbolo + ')' : ''}`;
 
             select.appendChild(opt);
         });
