@@ -385,28 +385,123 @@ def crear_reporte_excel(inicio, fin, variables_param="61,104,100"):
     ws4.append([
         "Timestamp UTC",
         "Hora Colombia",
+        "Gateway ID",
+        "Gateway",
+        "Source Type",
         "Device ID",
+        "Dispositivo",
         "Unit ID",
         "Variable",
         "Unidad",
         "Valor"
     ])
-    aplicar_header(ws4, 3)
+    aplicar_header(ws4, 1)
 
-    rows = obtener_series_variables(unit_ids, inicio, fin)
+    filtros_variables = parsear_variables_reporte(variables_param)
 
-    for r in rows:
-        ws4.append([
-            r["timestamp_utc"],
-            convertir_utc_a_colombia(r["timestamp_utc"]),
-            r["device_id"],
-            r["unit_id"],
-            r["variable"],
-            r["simbolo"],
-            r["valor"]
-        ])
+    conn = get_conn()
+    cur = conn.cursor()
 
+    for filtro in filtros_variables:
+        where_extra = """
+            md.unit_id = ?
+            AND md.timestamp_utc >= ?
+            AND md.timestamp_utc <= ?
+        """
+
+        params = [
+            filtro["unit_id"],
+            inicio,
+            fin
+        ]
+
+        if filtro["gateway_id"] is not None:
+            where_extra += """
+                AND COALESCE(md.gateway_id, d.gateway_id) = ?
+            """
+            params.append(filtro["gateway_id"])
+
+        if filtro["source_type"]:
+            where_extra += """
+                AND (
+                    md.source_type = ?
+                    OR (
+                        md.source_type IS NULL
+                        AND ? = 'device'
+                        AND md.device_id IS NOT NULL
+                        AND TRIM(md.device_id) <> ''
+                    )
+                )
+            """
+            params.extend([
+                filtro["source_type"],
+                filtro["source_type"]
+            ])
+
+        if filtro["device_id"]:
+            where_extra += """
+                AND TRIM(md.device_id) = ?
+            """
+            params.append(str(filtro["device_id"]))
+
+        if filtro["source_type"] == "gateway":
+            where_extra += """
+                AND (md.device_id IS NULL OR TRIM(md.device_id) = '')
+            """
+
+        cur.execute(f"""
+            SELECT
+                md.timestamp_utc,
+                COALESCE(md.gateway_id, d.gateway_id) AS gateway_id,
+                g.nombre AS gateway,
+                CASE
+                    WHEN md.source_type IS NOT NULL AND TRIM(md.source_type) <> ''
+                        THEN md.source_type
+                    WHEN md.gateway_id IS NOT NULL
+                        AND (md.device_id IS NULL OR TRIM(md.device_id) = '')
+                        THEN 'gateway'
+                    WHEN md.device_id IS NOT NULL
+                        AND TRIM(md.device_id) <> ''
+                        THEN 'device'
+                    ELSE 'unknown'
+                END AS source_type,
+                NULLIF(TRIM(md.device_id), '') AS device_id,
+                d.nombre AS dispositivo,
+                md.unit_id,
+                u.name AS variable,
+                u.simbol AS simbolo,
+                md.valor
+            FROM mediciones_detalle md
+            LEFT JOIN dispositivos d
+                ON CAST(NULLIF(TRIM(md.device_id), '') AS INTEGER) = d.device_id
+            LEFT JOIN gateways g
+                ON COALESCE(md.gateway_id, d.gateway_id) = g.gateway_id
+            LEFT JOIN unidades u
+                ON md.unit_id = u.unit_id
+            WHERE {where_extra}
+            ORDER BY md.timestamp_utc ASC
+        """, params)
+
+        rows = cur.fetchall()
+
+        for r in rows:
+            ws4.append([
+                r["timestamp_utc"],
+                convertir_utc_a_colombia(r["timestamp_utc"]),
+                r["gateway_id"],
+                r["gateway"],
+                r["source_type"],
+                r["device_id"],
+                r["dispositivo"],
+                r["unit_id"],
+                r["variable"],
+                r["simbolo"],
+                r["valor"]
+            ])
+
+    conn.close()
     ajustar_columnas(ws4)
+    
 
     # =========================================================
     # HOJA 5: METADATOS
@@ -685,3 +780,63 @@ def agregar_hoja_calidad_datos(wb, inicio, fin):
 
     conn.close()
     ajustar_columnas(ws)
+    
+def parsear_variables_reporte(variables_param):
+    """
+    Recibe variables en dos formatos:
+
+    Formato nuevo:
+        8|device|31|61
+        8|device|7|1
+        8|device|13|1
+        8|gateway||53
+
+    Formato viejo:
+        61,104,100
+
+    Devuelve lista de filtros.
+    """
+
+    filtros = []
+
+    if not variables_param:
+        return filtros
+
+    for item in str(variables_param).split(","):
+        item = item.strip()
+
+        if not item:
+            continue
+
+        # Formato nuevo: gateway_id|source_type|device_id|unit_id
+        if "|" in item:
+            partes = item.split("|")
+
+            if len(partes) != 4:
+                continue
+
+            gateway_id, source_type, device_id, unit_id = partes
+
+            try:
+                filtros.append({
+                    "gateway_id": int(gateway_id) if gateway_id else None,
+                    "source_type": source_type if source_type else None,
+                    "device_id": device_id if device_id else None,
+                    "unit_id": int(unit_id)
+                })
+            except Exception:
+                continue
+
+        # Formato viejo: solo unit_id
+        else:
+            try:
+                filtros.append({
+                    "gateway_id": None,
+                    "source_type": None,
+                    "device_id": None,
+                    "unit_id": int(item)
+                })
+            except Exception:
+                continue
+
+    return filtros

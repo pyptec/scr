@@ -474,7 +474,11 @@ async function cargarVariablesReporte() {
             <input
                 type="checkbox"
                 class="chk-variable-reporte"
-                value="${v.unit_id}"
+                value="${v.gateway_id || ''}|${v.source_type || ''}|${v.device_id || ''}|${v.unit_id}"
+                data-unit-id="${v.unit_id}"
+                data-device-id="${v.device_id || ''}"
+                data-gateway-id="${v.gateway_id || ''}"
+                data-source-type="${v.source_type || ''}"
             >
             <span>
                 <strong>${v.gateway || 'Gateway'} / ${v.dispositivo || 'Sin dispositivo'}</strong><br>
@@ -499,11 +503,14 @@ function seleccionarVariablesReporteBase() {
         101, 102, 103,
         7, 8, 9,
         10, 11, 12,
-        27
+        27,
+        135, 136, 137, 144,
+        53
     ];
 
     document.querySelectorAll('.chk-variable-reporte').forEach(chk => {
-        chk.checked = base.includes(Number(chk.value));
+        const unitId = Number(chk.dataset.unitId);
+        chk.checked = base.includes(unitId);
     });
 }
 
