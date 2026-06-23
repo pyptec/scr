@@ -4,10 +4,14 @@ from datetime import datetime, timezone, timedelta
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+from pathlib import Path
+from openpyxl.drawing.image import Image as XLImage
 
 from db.samee100_db import get_conn
 from db.kpi_solar import reporte_kpi_energetico, rango_real_datos
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+LOGO_PATH = BASE_DIR / "static" / "img" / "pyp_logo.jpg"
 
 UNIT_IDS_KPI = {
     "PTotal": 61,
@@ -224,17 +228,38 @@ def crear_reporte_excel(inicio, fin, variables_param="61,104,100"):
     # =========================================================
     ws = wb.create_sheet("Resumen_KPI")
 
-    ws.merge_cells("A1:F1")
-    aplicar_estilo_titulo(ws, "A1", "REPORTE ENERGÉTICO SAMEE100")
+    # Encabezado ejecutivo
+    insertar_logo(ws, "A1")
+
+    ws.merge_cells("B1:F1")
+    ws["B1"] = "REPORTE ENERGÉTICO SAMEE100"
+    ws["B1"].font = Font(bold=True, size=18, color="0F3B63")
+    ws["B1"].alignment = Alignment(horizontal="center", vertical="center")
+
+    ws.merge_cells("B2:F2")
+    ws["B2"] = "Sistema de Monitoreo Energético - PYP Tecnología Electrónica SAS"
+    ws["B2"].font = Font(bold=True, size=11, color="1F2937")
+    ws["B2"].alignment = Alignment(horizontal="center")
+
+    ws.row_dimensions[1].height = 42
+    ws.row_dimensions[2].height = 24
 
     ws.append([])
     ws.append(["Periodo consulta UTC", inicio, fin])
-    ws.append(["Periodo real Colombia", convertir_utc_a_colombia(inicio_real), convertir_utc_a_colombia(fin_real)])
-    ws.append(["Fecha generación reporte Colombia", convertir_utc_a_colombia(str(int(datetime.now(timezone.utc).timestamp())))])
+    ws.append([
+        "Periodo real Colombia",
+        convertir_utc_a_colombia(inicio_real),
+        convertir_utc_a_colombia(fin_real)
+    ])
+    ws.append([
+        "Fecha generación reporte Colombia",
+        convertir_utc_a_colombia(str(int(datetime.now(timezone.utc).timestamp()))),
+        ""
+    ])
 
     ws.append([])
     ws.append(["Indicador", "Valor", "Unidad", "Descripción"])
-    aplicar_header(ws, 7)
+    aplicar_header(ws, 8)
 
     energia = data_kpi["energia"]
     potencia = data_kpi["potencia"]
@@ -403,3 +428,13 @@ def crear_reporte_excel(inicio, fin, variables_param="61,104,100"):
     output.seek(0)
 
     return output
+
+def insertar_logo(ws, celda="A1"):
+    try:
+        if LOGO_PATH.exists():
+            img = XLImage(str(LOGO_PATH))
+            img.width = 110
+            img.height = 55
+            ws.add_image(img, celda)
+    except Exception as e:
+        print(f"[REPORTE] No se pudo insertar logo: {e}")
