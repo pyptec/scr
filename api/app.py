@@ -313,24 +313,82 @@ def api_ultimos():
 
     cur.execute("""
         SELECT
+            COALESCE(md.gateway_id, d.gateway_id) AS gateway_id,
+            g.nombre AS gateway,
+            g.cliente AS cliente,
+
+            CASE
+                WHEN md.source_type IS NOT NULL AND TRIM(md.source_type) <> ''
+                    THEN md.source_type
+                WHEN md.gateway_id IS NOT NULL
+                     AND (md.device_id IS NULL OR TRIM(md.device_id) = '')
+                    THEN 'gateway'
+                WHEN md.device_id IS NOT NULL
+                     AND TRIM(md.device_id) <> ''
+                    THEN 'device'
+                ELSE 'unknown'
+            END AS source_type,
+
+            NULLIF(TRIM(md.device_id), '') AS device_id,
+            d.nombre AS dispositivo,
+            d.tipo AS tipo_dispositivo,
+            d.ubicacion AS ubicacion_dispositivo,
+
             md.unit_id,
             u.name AS variable,
             u.simbol,
             md.valor,
             md.timestamp_utc
+
         FROM mediciones_detalle md
+
         INNER JOIN (
             SELECT
-                unit_id,
-                MAX(id) AS max_id
-            FROM mediciones_detalle
-            GROUP BY unit_id
+                COALESCE(md2.gateway_id, d2.gateway_id) AS gateway_id_resuelto,
+
+                CASE
+                    WHEN md2.source_type IS NOT NULL AND TRIM(md2.source_type) <> ''
+                        THEN md2.source_type
+                    WHEN md2.gateway_id IS NOT NULL
+                         AND (md2.device_id IS NULL OR TRIM(md2.device_id) = '')
+                        THEN 'gateway'
+                    WHEN md2.device_id IS NOT NULL
+                         AND TRIM(md2.device_id) <> ''
+                        THEN 'device'
+                    ELSE 'unknown'
+                END AS source_type_resuelto,
+
+                NULLIF(TRIM(md2.device_id), '') AS device_id_resuelto,
+                md2.unit_id,
+                MAX(md2.id) AS max_id
+
+            FROM mediciones_detalle md2
+
+            LEFT JOIN dispositivos d2
+                ON CAST(NULLIF(TRIM(md2.device_id), '') AS INTEGER) = d2.device_id
+
+            GROUP BY
+                COALESCE(md2.gateway_id, d2.gateway_id),
+                source_type_resuelto,
+                NULLIF(TRIM(md2.device_id), ''),
+                md2.unit_id
         ) ult
-            ON md.unit_id = ult.unit_id
-           AND md.id = ult.max_id
+            ON md.id = ult.max_id
+
+        LEFT JOIN dispositivos d
+            ON CAST(NULLIF(TRIM(md.device_id), '') AS INTEGER) = d.device_id
+
+        LEFT JOIN gateways g
+            ON COALESCE(md.gateway_id, d.gateway_id) = g.gateway_id
+
         LEFT JOIN unidades u
             ON md.unit_id = u.unit_id
-        ORDER BY md.unit_id ASC
+
+        ORDER BY
+            COALESCE(md.gateway_id, d.gateway_id) ASC,
+            source_type ASC,
+            CAST(NULLIF(TRIM(md.device_id), '') AS INTEGER) ASC,
+            md.unit_id ASC
     """)
 
     rows = [dict(r) for r in cur.fetchall()]
@@ -340,7 +398,6 @@ def api_ultimos():
         "total": len(rows),
         "datos": rows
     }
-    
 @app.route("/api/reporte/kpi")
 def api_reporte_kpi():
     fecha_inicio = request.args.get("inicio", "0")
