@@ -161,6 +161,11 @@ body {
     gap: 14px;
     align-items: end;
     flex-wrap: wrap;
+    margin-bottom: 16px;
+    padding: 12px;
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
 }
 
 .reporte-selector div {
