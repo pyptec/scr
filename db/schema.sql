@@ -5,9 +5,11 @@ CREATE TABLE IF NOT EXISTS unidades (
 );
 CREATE TABLE IF NOT EXISTS dispositivos (
     device_id INTEGER PRIMARY KEY,
+    gateway_id INTEGER,
     nombre TEXT,
     tipo TEXT,
-    ubicacion TEXT
+    ubicacion TEXT,
+    FOREIGN KEY(gateway_id) REFERENCES gateways(gateway_id)
 );
 
 CREATE TABLE IF NOT EXISTS mediciones_detalle (
@@ -60,6 +62,15 @@ CREATE TABLE IF NOT EXISTS aws_queue (
     sent_at TEXT,
     FOREIGN KEY(medicion_id) REFERENCES mediciones(id)
 );
+
+CREATE TABLE IF NOT EXISTS gateways (
+    gateway_id INTEGER PRIMARY KEY,
+    nombre TEXT NOT NULL,
+    tipo TEXT,
+    ubicacion TEXT,
+    cliente TEXT
+);
+
 
 CREATE INDEX IF NOT EXISTS idx_mediciones_time
 ON mediciones(timestamp_utc);

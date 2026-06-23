@@ -206,13 +206,29 @@ def api_variables():
 
     cur.execute("""
         SELECT DISTINCT
+            COALESCE(md.gateway_id, d.gateway_id) AS gateway_id,
+            g.nombre AS gateway,
+            g.cliente AS cliente,
+            md.source_type,
+            md.device_id,
+            d.nombre AS dispositivo,
+            d.tipo AS tipo_dispositivo,
+            d.ubicacion AS ubicacion_dispositivo,
             md.unit_id,
             u.name AS variable,
-            u.simbol As simbolo
+            u.simbol AS simbolo
         FROM mediciones_detalle md
+        LEFT JOIN dispositivos d
+            ON CAST(md.device_id AS INTEGER) = d.device_id
+        LEFT JOIN gateways g
+            ON COALESCE(md.gateway_id, d.gateway_id) = g.gateway_id
         LEFT JOIN unidades u
             ON md.unit_id = u.unit_id
-        ORDER BY md.unit_id ASC
+        ORDER BY
+            COALESCE(md.gateway_id, d.gateway_id) ASC,
+            md.source_type ASC,
+            CAST(md.device_id AS INTEGER) ASC,
+            md.unit_id ASC
     """)
 
     rows = [dict(r) for r in cur.fetchall()]
