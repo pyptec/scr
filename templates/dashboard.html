@@ -179,7 +179,7 @@
                 <input
                     type="text"
                     id="buscarTabla"
-                    placeholder="Buscar por variable, unidad o Unit ID..."
+                    placeholder="Buscar por gateway, dispositivo, variable o Unit ID..."
                     onkeyup="filtrarTablaUltimos()"
                 >
 
@@ -192,6 +192,10 @@
         <table class="tabla-valores">
             <thead>
                 <tr>
+                    <th>Gateway</th>
+                    <th>Origen</th>
+                    <th>Device ID</th>
+                    <th>Dispositivo</th>
                     <th>Unit ID</th>
                     <th>Variable</th>
                     <th>Valor</th>
@@ -202,7 +206,7 @@
 
             <tbody id="tablaUltimos">
                 <tr>
-                    <td colspan="5">Cargando datos...</td>
+                    <td colspan="9">Cargando datos...</td>
                 </tr>
             </tbody>
         </table>

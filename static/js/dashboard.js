@@ -578,7 +578,7 @@ function pintarTablaUltimos(datos) {
     if (!datos || datos.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="5">No hay datos para mostrar</td>
+                <td colspan="9">No hay datos para mostrar</td>
             </tr>
         `;
         return;
@@ -587,7 +587,23 @@ function pintarTablaUltimos(datos) {
     datos.forEach(item => {
         const tr = document.createElement('tr');
 
+        const origen =
+            item.source_type === 'gateway'
+                ? 'Gateway'
+                : item.source_type === 'device'
+                    ? 'Dispositivo'
+                    : 'Desconocido';
+
+        const dispositivo =
+            item.source_type === 'gateway'
+                ? 'Gateway'
+                : (item.dispositivo || 'Sin dispositivo');
+
         tr.innerHTML = `
+            <td>${item.gateway || `Gateway ${item.gateway_id || ''}`}</td>
+            <td>${origen}</td>
+            <td>${item.device_id || ''}</td>
+            <td>${dispositivo}</td>
             <td>${item.unit_id}</td>
             <td>${item.variable || 'Sin nombre'}</td>
             <td>${Number(item.valor).toLocaleString('es-CO')}</td>
@@ -612,12 +628,24 @@ function filtrarTablaUltimos() {
     }
 
     const filtrados = ultimosValores.filter(item => {
+        const gateway = String(item.gateway || '').toLowerCase();
+        const gatewayId = String(item.gateway_id || '').toLowerCase();
+        const sourceType = String(item.source_type || '').toLowerCase();
+        const deviceId = String(item.device_id || '').toLowerCase();
+        const dispositivo = String(item.dispositivo || '').toLowerCase();
+        const tipoDispositivo = String(item.tipo_dispositivo || '').toLowerCase();
         const unitId = String(item.unit_id || '').toLowerCase();
         const variable = String(item.variable || '').toLowerCase();
         const simbolo = String(item.simbol || '').toLowerCase();
         const valor = String(item.valor || '').toLowerCase();
 
         return (
+            gateway.includes(texto) ||
+            gatewayId.includes(texto) ||
+            sourceType.includes(texto) ||
+            deviceId.includes(texto) ||
+            dispositivo.includes(texto) ||
+            tipoDispositivo.includes(texto) ||
             unitId.includes(texto) ||
             variable.includes(texto) ||
             simbolo.includes(texto) ||
@@ -644,12 +672,24 @@ function exportarUltimosCSV() {
 
     if (textoBusqueda) {
         datosExportar = ultimosValores.filter(item => {
+            const gateway = String(item.gateway || '').toLowerCase();
+            const gatewayId = String(item.gateway_id || '').toLowerCase();
+            const sourceType = String(item.source_type || '').toLowerCase();
+            const deviceId = String(item.device_id || '').toLowerCase();
+            const dispositivo = String(item.dispositivo || '').toLowerCase();
+            const tipoDispositivo = String(item.tipo_dispositivo || '').toLowerCase();
             const unitId = String(item.unit_id || '').toLowerCase();
             const variable = String(item.variable || '').toLowerCase();
             const simbolo = String(item.simbol || '').toLowerCase();
             const valor = String(item.valor || '').toLowerCase();
 
             return (
+                gateway.includes(textoBusqueda) ||
+                gatewayId.includes(textoBusqueda) ||
+                sourceType.includes(textoBusqueda) ||
+                deviceId.includes(textoBusqueda) ||
+                dispositivo.includes(textoBusqueda) ||
+                tipoDispositivo.includes(textoBusqueda) ||
                 unitId.includes(textoBusqueda) ||
                 variable.includes(textoBusqueda) ||
                 simbolo.includes(textoBusqueda) ||
@@ -659,6 +699,13 @@ function exportarUltimosCSV() {
     }
 
     const encabezados = [
+        'Gateway ID',
+        'Gateway',
+        'Cliente',
+        'Source Type',
+        'Device ID',
+        'Dispositivo',
+        'Tipo Dispositivo',
         'Unit ID',
         'Variable',
         'Valor',
@@ -668,6 +715,13 @@ function exportarUltimosCSV() {
     ];
 
     const filas = datosExportar.map(item => [
+        item.gateway_id || '',
+        item.gateway || '',
+        item.cliente || '',
+        item.source_type || '',
+        item.device_id || '',
+        item.dispositivo || '',
+        item.tipo_dispositivo || '',
         item.unit_id,
         item.variable || '',
         item.valor,
@@ -709,7 +763,6 @@ function exportarUltimosCSV() {
 
     URL.revokeObjectURL(url);
 }
-
 /* =========================
    ACTUALIZACIÓN GENERAL
 ========================= */
