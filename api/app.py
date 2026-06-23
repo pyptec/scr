@@ -100,42 +100,91 @@ def api_potencia():
     
 @app.route("/api/serie/<int:unit_id>")
 def api_serie(unit_id):
-    fecha_inicio = request.args.get("inicio", "0")
-    fecha_fin = request.args.get("fin", "9999999999")
-    limite = int(request.args.get("limite", 1000))
+    inicio = request.args.get("inicio", "0")
+    fin = request.args.get("fin", "9999999999")
+    limite = int(request.args.get("limite", "500"))
+
+    gateway_id = request.args.get("gateway_id")
+    device_id = request.args.get("device_id")
+    source_type = request.args.get("source_type")
 
     conn = get_conn()
     cur = conn.cursor()
 
-    cur.execute("""
-        SELECT
-            timestamp_utc,
-            unit_id,
-            variable,
-            simbol,
-            valor
-        FROM vw_mediciones
-        WHERE unit_id = ?
-          AND timestamp_utc >= ?
-          AND timestamp_utc <= ?
-        ORDER BY timestamp_utc ASC
-        LIMIT ?
-    """, (
+    where = """
+        md.unit_id = ?
+        AND md.timestamp_utc >= ?
+        AND md.timestamp_utc <= ?
+    """
+
+    params = [
         unit_id,
-        fecha_inicio,
-        fecha_fin,
-        limite
-    ))
+        inicio,
+        fin
+    ]
+
+    if source_type:
+        where += """
+            AND (
+                md.source_type = ?
+                OR (
+                    md.source_type IS NULL
+                    AND ? = 'device'
+                    AND md.device_id IS NOT NULL
+                    AND TRIM(md.device_id) <> ''
+                )
+            )
+        """
+        params.extend([source_type, source_type])
+
+    if gateway_id:
+        where += """
+            AND COALESCE(md.gateway_id, d.gateway_id) = ?
+        """
+        params.append(int(gateway_id))
+
+    if device_id and device_id not in ["null", "None", ""]:
+        where += """
+            AND TRIM(md.device_id) = ?
+        """
+        params.append(str(device_id))
+
+    if source_type == "gateway":
+        where += """
+            AND (md.device_id IS NULL OR TRIM(md.device_id) = '')
+        """
+
+    cur.execute(f"""
+        SELECT
+            md.timestamp_utc,
+            md.valor,
+            md.unit_id,
+            COALESCE(md.gateway_id, d.gateway_id) AS gateway_id,
+            g.nombre AS gateway,
+            md.source_type,
+            NULLIF(TRIM(md.device_id), '') AS device_id,
+            d.nombre AS dispositivo,
+            u.name AS variable,
+            u.simbol AS simbolo
+        FROM mediciones_detalle md
+        LEFT JOIN dispositivos d
+            ON CAST(NULLIF(TRIM(md.device_id), '') AS INTEGER) = d.device_id
+        LEFT JOIN gateways g
+            ON COALESCE(md.gateway_id, d.gateway_id) = g.gateway_id
+        LEFT JOIN unidades u
+            ON md.unit_id = u.unit_id
+        WHERE {where}
+        ORDER BY md.timestamp_utc ASC
+        LIMIT ?
+    """, params + [limite])
 
     rows = [dict(r) for r in cur.fetchall()]
     conn.close()
 
     return {
-        "unit_id": unit_id,
         "total": len(rows),
         "serie": rows
     }
-    
 @app.route("/dashboard")
 def dashboard():
     return render_template("dashboard.html")    

@@ -291,56 +291,129 @@ async function mostrarGrafica(tipo) {
 
 async function graficarVariableSeleccionada() {
     const select = document.getElementById('selectVariable');
-    const unitId = select.value;
 
-    if (!unitId) return;
+    if (!select.value) {
+        alert('Seleccione una variable');
+        return;
+    }
 
-    destruirGraficaActual();
+    const opt = select.options[select.selectedIndex];
 
-    const texto = select.options[select.selectedIndex].text;
-    document.getElementById('tituloGrafica').innerText = texto;
+    const unitId = opt.dataset.unitId;
+    const gatewayId = opt.dataset.gatewayId;
+    const sourceType = opt.dataset.sourceType;
+    const deviceId = opt.dataset.deviceId;
+
+    const variableInfo = variablesDisponibles[Number(select.value)];
 
     const rango = obtenerRangoUnix();
 
-    const res = await fetch(
-        `/api/serie/${unitId}?inicio=${rango.inicio}&fin=${rango.fin}&limite=200`
-    );
-
-    const data = await res.json();
-    const ctx = document.getElementById('chartPrincipal');
-
-    chartPrincipal = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: data.serie.map(x => formatearHoraColombia(x.timestamp_utc)),
-            datasets: [{
-                label: texto,
-                data: data.serie.map(x => x.valor),
-                tension: 0.25
-            }]
-        }
+    const params = new URLSearchParams({
+        inicio: rango.inicio,
+        fin: rango.fin,
+        limite: 1000
     });
 
-    graficaActual = null;
-}
+    if (gatewayId) {
+        params.append('gateway_id', gatewayId);
+    }
 
+    if (sourceType) {
+        params.append('source_type', sourceType);
+    }
+
+    if (deviceId) {
+        params.append('device_id', deviceId);
+    }
+
+    const url = `/api/serie/${unitId}?${params.toString()}`;
+
+    try {
+        const res = await fetch(url);
+        const data = await res.json();
+
+        const serie = data.serie || [];
+
+        if (!serie.length) {
+            alert('No hay datos para la variable seleccionada en el periodo elegido');
+            return;
+        }
+
+        destruirGraficaActual();
+
+        const labels = serie.map(x => formatearHoraColombia(x.timestamp_utc));
+        const valores = serie.map(x => Number(x.valor));
+
+        const ctx = document.getElementById('chartPrincipal').getContext('2d');
+
+        chartPrincipal = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: `${variableInfo.dispositivo || variableInfo.gateway || 'Variable'} - ${variableInfo.variable}`,
+                    data: valores,
+                    borderWidth: 2,
+                    tension: 0.25,
+                    pointRadius: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+
+        document.getElementById('tituloGrafica').innerText =
+            `${variableInfo.gateway || ''} | ${variableInfo.dispositivo || 'Gateway'} | ${variableInfo.variable}`;
+
+    } catch (error) {
+        console.error('Error graficando variable:', error);
+        alert('Error al graficar la variable seleccionada');
+    }
+}
 /* =========================
    SELECTOR VARIABLE PARA GRÁFICA
 ========================= */
 
 async function cargarSelectorVariables() {
-    const res = await fetch('/api/variables');
-    const data = await res.json();
+    try {
+        const res = await fetch('/api/variables');
+        const data = await res.json();
 
-    const select = document.getElementById('selectVariable');
-    select.innerHTML = '';
+        variablesDisponibles = data.variables || [];
 
-    data.variables.forEach(v => {
-        const opt = document.createElement('option');
-        opt.value = v.unit_id;
-        opt.textContent = `${v.gateway || 'Gateway'} | ${v.dispositivo || 'Sin dispositivo'} | ${v.unit_id} - ${v.variable} (${v.simbolo || ''})`;
-        select.appendChild(opt);
-    });
+        const select = document.getElementById('selectVariable');
+        select.innerHTML = '';
+
+        if (!variablesDisponibles.length) {
+            select.innerHTML = '<option value="">No hay variables disponibles</option>';
+            return;
+        }
+
+        variablesDisponibles.forEach((v, index) => {
+            const opt = document.createElement('option');
+
+            opt.value = index;
+
+            opt.dataset.gatewayId = v.gateway_id || '';
+            opt.dataset.sourceType = v.source_type || '';
+            opt.dataset.deviceId = v.device_id || '';
+            opt.dataset.unitId = v.unit_id || '';
+
+            const gateway = v.gateway || `Gateway ${v.gateway_id || ''}`;
+            const origen = v.source_type === 'gateway' ? 'Gateway' : 'Dispositivo';
+            const dispositivo = v.dispositivo || origen;
+
+            opt.textContent =
+                `${gateway} | ${dispositivo} | ${v.unit_id} - ${v.variable} (${v.simbolo || ''})`;
+
+            select.appendChild(opt);
+        });
+
+    } catch (error) {
+        console.error('Error cargando variables:', error);
+    }
 }
 
 /* =========================
