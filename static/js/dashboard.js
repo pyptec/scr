@@ -2,6 +2,7 @@ let chartPrincipal = null;
 let graficaActual = 'potencia';
 let rangoActual = 'hoy';
 let ultimosValores = [];
+let variablesDisponibles = [];
 let variablesDisponiblesReporte = [];
 
 /* =========================
@@ -162,7 +163,7 @@ async function mostrarGrafica(tipo) {
     graficaActual = tipo;
     destruirGraficaActual();
 
-    const ctx = document.getElementById('chartPrincipal');
+    const ctx = document.getElementById('chartPrincipal').getContext('2d');
     const rango = obtenerRangoUnix();
 
     if (tipo === 'potencia') {
@@ -289,11 +290,15 @@ async function mostrarGrafica(tipo) {
     }
 }
 
-async function graficarVariableSeleccionada() {
+async function graficarVariableSeleccionada(mostrarAlertas = true) {
+    graficaActual = 'variable';
+
     const select = document.getElementById('selectVariable');
 
     if (!select.value) {
-        alert('Seleccione una variable');
+        if (mostrarAlertas) {
+            alert('Seleccione una variable');
+        }
         return;
     }
 
@@ -305,6 +310,13 @@ async function graficarVariableSeleccionada() {
     const deviceId = opt.dataset.deviceId;
 
     const variableInfo = variablesDisponibles[Number(select.value)];
+
+    if (!variableInfo) {
+        if (mostrarAlertas) {
+            alert('No se encontró la información de la variable seleccionada');
+        }
+        return;
+    }
 
     const rango = obtenerRangoUnix();
 
@@ -335,7 +347,9 @@ async function graficarVariableSeleccionada() {
         const serie = data.serie || [];
 
         if (!serie.length) {
-            alert('No hay datos para la variable seleccionada en el periodo elegido');
+            if (mostrarAlertas) {
+                alert('No hay datos para la variable seleccionada en el periodo elegido');
+            }
             return;
         }
 
@@ -344,14 +358,20 @@ async function graficarVariableSeleccionada() {
         const labels = serie.map(x => formatearHoraColombia(x.timestamp_utc));
         const valores = serie.map(x => Number(x.valor));
 
-        const ctx = document.getElementById('chartPrincipal').getContext('2d');
+        const canvas = document.getElementById('chartPrincipal');
+        const ctx = canvas.getContext('2d');
+
+        const nombreGateway = variableInfo.gateway || `Gateway ${variableInfo.gateway_id || ''}`;
+        const nombreDispositivo = variableInfo.dispositivo || 'Gateway';
+        const nombreVariable = variableInfo.variable || `Unit ID ${unitId}`;
+        const unidad = variableInfo.simbolo || '';
 
         chartPrincipal = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: labels,
                 datasets: [{
-                    label: `${variableInfo.dispositivo || variableInfo.gateway || 'Variable'} - ${variableInfo.variable}`,
+                    label: `${nombreDispositivo} - ${nombreVariable}`,
                     data: valores,
                     borderWidth: 2,
                     tension: 0.25,
@@ -360,16 +380,33 @@ async function graficarVariableSeleccionada() {
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: false
+                maintainAspectRatio: true,
+                animation: false,
+                plugins: {
+                    legend: {
+                        display: true
+                    }
+                },
+                scales: {
+                    y: {
+                        title: {
+                            display: unidad !== '',
+                            text: unidad
+                        }
+                    }
+                }
             }
         });
 
         document.getElementById('tituloGrafica').innerText =
-            `${variableInfo.gateway || ''} | ${variableInfo.dispositivo || 'Gateway'} | ${variableInfo.variable}`;
+            `${nombreGateway} | ${nombreDispositivo} | ${nombreVariable}`;
 
     } catch (error) {
         console.error('Error graficando variable:', error);
-        alert('Error al graficar la variable seleccionada');
+
+        if (mostrarAlertas) {
+            alert('Error al graficar la variable seleccionada');
+        }
     }
 }
 /* =========================
@@ -673,6 +710,11 @@ function exportarUltimosCSV() {
 async function actualizarTodo() {
     await cargarDashboard();
     await cargarUltimosValores();
+
+    if (graficaActual === 'variable') {
+        await graficarVariableSeleccionada(false);
+        return;
+    }
 
     if (graficaActual) {
         await mostrarGrafica(graficaActual);

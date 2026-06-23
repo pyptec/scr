@@ -469,3 +469,12 @@ button:hover,
         font-size: 26px;
     }
 }
+
+.chart-box {
+    position: relative;
+    height: 430px;
+}
+
+#chartPrincipal {
+    max-height: 360px;
+}
