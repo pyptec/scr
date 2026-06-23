@@ -9,6 +9,7 @@ from openpyxl.drawing.image import Image as XLImage
 
 from db.samee100_db import get_conn
 from db.kpi_solar import reporte_kpi_energetico, rango_real_datos
+from openpyxl.chart import LineChart, Reference
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 LOGO_PATH = BASE_DIR / "static" / "img" / "pyp_logo.jpg"
@@ -423,6 +424,7 @@ def crear_reporte_excel(inicio, fin, variables_param="61,104,100"):
 
     ajustar_columnas(ws5)
 
+    agregar_hoja_graficas(wb, inicio, fin)
     output = BytesIO()
     wb.save(output)
     output.seek(0)
@@ -438,3 +440,142 @@ def insertar_logo(ws, celda="A1"):
             ws.add_image(img, celda)
     except Exception as e:
         print(f"[REPORTE] No se pudo insertar logo: {e}")
+        
+def agregar_hoja_graficas(wb, inicio, fin):
+    ws_data = wb.create_sheet("Datos_Graficas")
+
+    ws_data.append([
+        "Hora Colombia",
+        "Potencia kW",
+        "Importada kWh",
+        "Exportada kWh"
+    ])
+
+    aplicar_header(ws_data, 1)
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT
+            timestamp_utc,
+            MAX(CASE WHEN unit_id = 61 THEN valor END) AS potencia_kw,
+            MAX(CASE WHEN unit_id = 100 THEN valor END) AS importada_kwh,
+            MAX(CASE WHEN unit_id = 104 THEN valor END) AS exportada_kwh
+        FROM mediciones_detalle
+        WHERE unit_id IN (61, 100, 104)
+          AND timestamp_utc >= ?
+          AND timestamp_utc <= ?
+        GROUP BY timestamp_utc
+        ORDER BY timestamp_utc ASC
+        LIMIT 1000
+    """, (inicio, fin))
+
+    rows = cur.fetchall()
+    conn.close()
+
+    for r in rows:
+        ws_data.append([
+            convertir_utc_a_colombia(r["timestamp_utc"]),
+            r["potencia_kw"],
+            r["importada_kwh"],
+            r["exportada_kwh"]
+        ])
+
+    ajustar_columnas(ws_data)
+
+    ws_chart = wb.create_sheet("Graficas")
+
+    ws_chart.merge_cells("A1:H1")
+    aplicar_estilo_titulo(ws_chart, "A1", "GRÁFICAS ENERGÉTICAS SAMEE100")
+
+    ws_chart["A3"] = "Potencia activa total"
+    ws_chart["A3"].font = Font(bold=True, size=13, color="0F3B63")
+
+    ws_chart["A22"] = "Energía importada de red"
+    ws_chart["A22"].font = Font(bold=True, size=13, color="0F3B63")
+
+    ws_chart["A41"] = "Energía exportada / generada"
+    ws_chart["A41"].font = Font(bold=True, size=13, color="0F3B63")
+
+    max_row = ws_data.max_row
+
+    if max_row < 3:
+        ws_chart["A5"] = "No hay suficientes datos para generar gráficas."
+        return
+
+    # =========================
+    # Gráfica 1: Potencia
+    # =========================
+    chart_potencia = LineChart()
+    chart_potencia.title = "Potencia activa total"
+    chart_potencia.y_axis.title = "kW"
+    chart_potencia.x_axis.title = "Hora Colombia"
+    chart_potencia.height = 9
+    chart_potencia.width = 24
+
+    data_potencia = Reference(
+        ws_data,
+        min_col=2,
+        min_row=1,
+        max_row=max_row
+    )
+
+    cats = Reference(
+        ws_data,
+        min_col=1,
+        min_row=2,
+        max_row=max_row
+    )
+
+    chart_potencia.add_data(data_potencia, titles_from_data=True)
+    chart_potencia.set_categories(cats)
+    chart_potencia.legend = None
+
+    ws_chart.add_chart(chart_potencia, "A4")
+
+    # =========================
+    # Gráfica 2: Importada
+    # =========================
+    chart_importada = LineChart()
+    chart_importada.title = "Energía importada de red"
+    chart_importada.y_axis.title = "kWh"
+    chart_importada.x_axis.title = "Hora Colombia"
+    chart_importada.height = 9
+    chart_importada.width = 24
+
+    data_importada = Reference(
+        ws_data,
+        min_col=3,
+        min_row=1,
+        max_row=max_row
+    )
+
+    chart_importada.add_data(data_importada, titles_from_data=True)
+    chart_importada.set_categories(cats)
+    chart_importada.legend = None
+
+    ws_chart.add_chart(chart_importada, "A23")
+
+    # =========================
+    # Gráfica 3: Exportada
+    # =========================
+    chart_exportada = LineChart()
+    chart_exportada.title = "Energía exportada / generada"
+    chart_exportada.y_axis.title = "kWh"
+    chart_exportada.x_axis.title = "Hora Colombia"
+    chart_exportada.height = 9
+    chart_exportada.width = 24
+
+    data_exportada = Reference(
+        ws_data,
+        min_col=4,
+        min_row=1,
+        max_row=max_row
+    )
+
+    chart_exportada.add_data(data_exportada, titles_from_data=True)
+    chart_exportada.set_categories(cats)
+    chart_exportada.legend = None
+
+    ws_chart.add_chart(chart_exportada, "A42")
