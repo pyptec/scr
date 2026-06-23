@@ -139,11 +139,31 @@
 
     </div>
 
-    <div class="chart-selector">
-        <button onclick="mostrarGrafica('potencia')">Potencia</button>
-        <button onclick="mostrarGrafica('energia')">Generación Diaria</button>
-        <button onclick="mostrarGrafica('voltajes')">Voltajes L-N</button>
-        <button onclick="mostrarGrafica('corrientes')">Corrientes</button>
+    <div class="panel-graficas">
+        <div class="panel-graficas-header">
+            <div>
+                <h3>Análisis gráfico</h3>
+                <p>Seleccione la vista que desea analizar en el periodo elegido.</p>
+            </div>
+        </div>
+
+        <div class="chart-selector">
+            <button onclick="mostrarGrafica('potencia')">
+                Potencia activa
+            </button>
+
+            <button onclick="mostrarGrafica('energia')">
+                Generación diaria
+            </button>
+
+            <button onclick="mostrarGrafica('voltajes')">
+                Voltajes L-N
+            </button>
+
+            <button onclick="mostrarGrafica('corrientes')">
+                Corrientes
+                </button>
+        </div>
     </div>
 
     <div class="chart-box mt">
