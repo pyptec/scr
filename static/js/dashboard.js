@@ -338,7 +338,7 @@ async function cargarSelectorVariables() {
     data.variables.forEach(v => {
         const opt = document.createElement('option');
         opt.value = v.unit_id;
-        opt.textContent = `${v.unit_id} - ${v.variable} (${v.simbolo || 'NA'})`;
+        opt.textContent = `${v.gateway || 'Gateway'} | ${v.dispositivo || 'Sin dispositivo'} | ${v.unit_id} - ${v.variable} (${v.simbolo || ''})`;
         select.appendChild(opt);
     });
 }
@@ -367,7 +367,8 @@ async function cargarVariablesReporte() {
                 value="${v.unit_id}"
             >
             <span>
-                <strong>${v.unit_id}</strong> - ${v.variable}
+                <strong>${v.gateway || 'Gateway'} / ${v.dispositivo || 'Sin dispositivo'}</strong><br>
+                ${v.unit_id} - ${v.variable}
                 ${v.simbolo ? `(${v.simbolo})` : ''}
             </span>
         `;
