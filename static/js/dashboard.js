@@ -2,6 +2,7 @@ let chartPrincipal = null;
 let graficaActual = 'potencia';
 let rangoActual = 'hoy';
 let ultimosValores = [];
+let variablesDisponiblesReporte = [];
 
 async function cargarDashboard() {
     const rango = obtenerRangoUnix();
@@ -523,6 +524,97 @@ function formatoDatetimeLocal(fecha) {
     return `${year}-${month}-${day}T${hour}:${minute}`;
 }
 
+async function cargarVariablesReporte() {
+    const res = await fetch('/api/variables');
+    const data = await res.json();
+
+    variablesDisponiblesReporte = data.variables || [];
+
+    const contenedor = document.getElementById('listaVariablesReporte');
+
+    contenedor.innerHTML = '';
+
+    variablesDisponiblesReporte.forEach(v => {
+        const label = document.createElement('label');
+        label.className = 'variable-reporte-item';
+
+        label.innerHTML = `
+            <input
+                type="checkbox"
+                class="chk-variable-reporte"
+                value="${v.unit_id}"
+            >
+            <span>
+                <strong>${v.unit_id}</strong> - ${v.variable}
+                ${v.simbolo ? `(${v.simbolo})` : ''}
+            </span>
+        `;
+
+        contenedor.appendChild(label);
+    });
+
+    seleccionarVariablesReporteBase();
+}
+function seleccionarVariablesReporteBase() {
+    const base = [
+        61,   // Potencia activa total
+        100,  // Energía importada total
+        104,  // Energía exportada total
+        58, 59, 60,   // Potencias por fase
+        97, 98, 99,   // Energía importada por fase
+        101, 102, 103, // Energía exportada por fase
+        7, 8, 9,      // Voltajes L-N
+        10, 11, 12,   // Corrientes
+        27            // Frecuencia
+    ];
+
+    document.querySelectorAll('.chk-variable-reporte').forEach(chk => {
+        chk.checked = base.includes(Number(chk.value));
+    });
+}
+
+function seleccionarTodasVariablesReporte() {
+    document.querySelectorAll('.chk-variable-reporte').forEach(chk => {
+        chk.checked = true;
+    });
+}
+function limpiarVariablesReporte() {
+    document.querySelectorAll('.chk-variable-reporte').forEach(chk => {
+        chk.checked = false;
+    });
+}
+
+function obtenerVariablesSeleccionadasReporte() {
+    const seleccionadas = [];
+
+    document.querySelectorAll('.chk-variable-reporte:checked').forEach(chk => {
+        seleccionadas.push(chk.value);
+    });
+
+    return seleccionadas;
+}
+function generarReporteExcelSeleccionadas() {
+    const rango = obtenerRangoReporte();
+
+    if (!rango) {
+        return;
+    }
+
+    const variables = obtenerVariablesSeleccionadasReporte();
+
+    if (variables.length === 0) {
+        alert('Seleccione al menos una variable para el reporte');
+        return;
+    }
+
+    const variablesParam = variables.join(',');
+
+    const url =
+        `/api/reporte/excel?inicio=${rango.inicio}&fin=${rango.fin}&variables=${variablesParam}`;
+
+    window.location.href = url;
+}
+inicializarFechasReporte();
 cargarSelectorVariables();
 actualizarTodo();
 

@@ -110,6 +110,33 @@
         </button>
     </div>
 
+    <div class="reporte-variables-box">
+    <div class="reporte-variables-header">
+        <h3>Variables para reporte</h3>
+
+        <div class="reporte-variables-actions">
+            <button onclick="seleccionarVariablesReporteBase()">
+                Selección base
+            </button>
+
+            <button onclick="seleccionarTodasVariablesReporte()">
+                Todas
+            </button>
+
+            <button onclick="limpiarVariablesReporte()">
+                Limpiar
+            </button>
+        </div>
+    </div>
+
+        <div id="listaVariablesReporte" class="lista-variables-reporte">
+            Cargando variables...
+        </div>
+
+        <button class="btn-reporte-principal" onclick="generarReporteExcelSeleccionadas()">
+            Reporte Excel variables seleccionadas
+        </button>
+    </div>
 
         </div>
 
