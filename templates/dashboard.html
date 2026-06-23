@@ -23,20 +23,20 @@
     </div>
 </header>
 
-<div class="filtro-tiempo">
-    <label for="rangoTiempo">Rango:</label>
-
-    <select id="rangoTiempo" onchange="cambiarRangoTiempo()">
-        <option value="hora">Última hora</option>
-        <option value="hoy" selected>Hoy</option>
-        <option value="semana">Semana</option>
-        <option value="mes">Mes</option>
-        <option value="anio">Año</option>
-        <option value="todo">Todo</option>
-    </select>
-</div>
-
 <div class="container">
+
+    <div class="filtro-tiempo">
+        <label for="rangoTiempo">Rango:</label>
+
+        <select id="rangoTiempo" onchange="cambiarRangoTiempo()">
+            <option value="hora">Última hora</option>
+            <option value="hoy" selected>Hoy</option>
+            <option value="semana">Semana</option>
+            <option value="mes">Mes</option>
+            <option value="anio">Año</option>
+            <option value="todo">Todo</option>
+        </select>
+    </div>
 
     <div class="cards">
 
@@ -79,111 +79,112 @@
             </div>
         </div>
 
-   <div class="variable-selector">
-        <label for="selectVariable">Variable personalizada:</label>
-
-        <select id="selectVariable">
-            <option value="">Cargando variables...</option>
-        </select>
-
-        <button onclick="graficarVariableSeleccionada()">
-            Graficar
-        </button>
     </div>
+
+    <div class="panel-reportes">
+
+        <div class="variable-selector">
+            <label for="selectVariable">Variable para graficar:</label>
+
+            <select id="selectVariable">
+                <option value="">Cargando variables...</option>
+            </select>
+
+            <button onclick="graficarVariableSeleccionada()">
+                Graficar
+            </button>
+        </div>
 
         <div class="reporte-selector">
-        <div>
-            <label for="fechaInicioReporte">Desde:</label>
-            <input type="datetime-local" id="fechaInicioReporte">
+            <div>
+                <label for="fechaInicioReporte">Desde:</label>
+                <input type="datetime-local" id="fechaInicioReporte">
+            </div>
+
+            <div>
+                <label for="fechaFinReporte">Hasta:</label>
+                <input type="datetime-local" id="fechaFinReporte">
+            </div>
         </div>
 
-        <div>
-            <label for="fechaFinReporte">Hasta:</label>
-            <input type="datetime-local" id="fechaFinReporte">
-        </div>
+        <div class="reporte-variables-box">
+            <div class="reporte-variables-header">
+                <h3>Variables para reporte</h3>
 
-        <button onclick="generarReporteExcelVariable()">
-            Reporte Excel variable
-        </button>
+                <div class="reporte-variables-actions">
+                    <button onclick="seleccionarVariablesReporteBase()">
+                        Selección base
+                    </button>
 
-        <button onclick="generarReporteExcelTodas()">
-            Reporte Excel todas
-        </button>
-    </div>
+                    <button onclick="seleccionarTodasVariablesReporte()">
+                        Todas
+                    </button>
 
-    <div class="reporte-variables-box">
-    <div class="reporte-variables-header">
-        <h3>Variables para reporte</h3>
+                    <button onclick="limpiarVariablesReporte()">
+                        Limpiar
+                    </button>
+                </div>
+            </div>
 
-        <div class="reporte-variables-actions">
-            <button onclick="seleccionarVariablesReporteBase()">
-                Selección base
+            <div id="listaVariablesReporte" class="lista-variables-reporte">
+                Cargando variables...
+            </div>
+
+            <button class="btn-reporte-principal" onclick="generarReporteExcelSeleccionadas()">
+                Generar reporte Excel
             </button>
-
-            <button onclick="seleccionarTodasVariablesReporte()">
-                Todas
-            </button>
-
-            <button onclick="limpiarVariablesReporte()">
-                Limpiar
-            </button>
-        </div>
-    </div>
-
-        <div id="listaVariablesReporte" class="lista-variables-reporte">
-            Cargando variables...
-        </div>
-
-        <button class="btn-reporte-principal" onclick="generarReporteExcelSeleccionadas()">
-            Reporte Excel variables seleccionadas
-        </button>
-    </div>
-
         </div>
 
     </div>
 
     <div class="chart-selector">
-    <button onclick="mostrarGrafica('potencia')">Potencia</button>
-    <button onclick="mostrarGrafica('energia')">Generación Diaria</button>
-    <button onclick="mostrarGrafica('voltajes')">Voltajes L-N</button>
-    <button onclick="mostrarGrafica('corrientes')">Corrientes</button>
-</div>
-
-<div class="chart-box mt">
-    <h3 id="tituloGrafica">Potencia Activa Total</h3>
-    <canvas id="chartPrincipal"></canvas>
-    
-</div>
-
-<div class="tabla-box mt">
-    <div class="tabla-header">
-        <h3>Últimos valores reportados</h3>
-
-        <input
-            type="text"
-            id="buscarTabla"
-            placeholder="Buscar por variable, unidad o Unit ID..."
-            onkeyup="filtrarTablaUltimos()"
-        >
+        <button onclick="mostrarGrafica('potencia')">Potencia</button>
+        <button onclick="mostrarGrafica('energia')">Generación Diaria</button>
+        <button onclick="mostrarGrafica('voltajes')">Voltajes L-N</button>
+        <button onclick="mostrarGrafica('corrientes')">Corrientes</button>
     </div>
-    <table class="tabla-valores">
-        <thead>
-            <tr>
-                <th>Unit ID</th>
-                <th>Variable</th>
-                <th>Valor</th>
-                <th>Unidad</th>
-                <th>Hora Colombia</th>
-            </tr>
-        </thead>
-        <tbody id="tablaUltimos">
-            <tr>
-                <td colspan="5">Cargando datos...</td>
-            </tr>
-        </tbody>
-    </table>
-</div>
+
+    <div class="chart-box mt">
+        <h3 id="tituloGrafica">Potencia Activa Total</h3>
+        <canvas id="chartPrincipal"></canvas>
+    </div>
+
+    <div class="tabla-box mt">
+        <div class="tabla-header">
+            <h3>Últimos valores reportados</h3>
+
+            <div class="tabla-actions">
+                <input
+                    type="text"
+                    id="buscarTabla"
+                    placeholder="Buscar por variable, unidad o Unit ID..."
+                    onkeyup="filtrarTablaUltimos()"
+                >
+
+                <button onclick="exportarUltimosCSV()">
+                    Exportar CSV
+                </button>
+            </div>
+        </div>
+
+        <table class="tabla-valores">
+            <thead>
+                <tr>
+                    <th>Unit ID</th>
+                    <th>Variable</th>
+                    <th>Valor</th>
+                    <th>Unidad</th>
+                    <th>Hora Colombia</th>
+                </tr>
+            </thead>
+
+            <tbody id="tablaUltimos">
+                <tr>
+                    <td colspan="5">Cargando datos...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
 
 </div>
 
