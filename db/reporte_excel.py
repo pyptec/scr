@@ -365,22 +365,14 @@ def crear_reporte_excel(inicio, fin, variables_param="61,104,100"):
     # =========================================================
     ws4 = wb.create_sheet("Variables")
 
-    ws4.merge_cells("A1:G1")
+    ws4.merge_cells("A1:K1")
     aplicar_estilo_titulo(ws4, "A1", "HISTÓRICO DE VARIABLES SELECCIONADAS")
 
     ws4.append([])
 
-    if variables_param == "all":
-        unit_ids = obtener_todas_las_variables_con_datos()
-    else:
-        unit_ids = [
-            int(x.strip())
-            for x in variables_param.split(",")
-            if x.strip().isdigit()
-        ]
-
-    if not unit_ids:
-        unit_ids = [61, 100, 104]
+    # Las variables del reporte se manejan con llave compuesta:
+    # gateway_id|source_type|device_id|unit_id.
+    # También se mantiene compatibilidad con el formato anterior: 61,104,100.
 
     ws4.append([
         "Timestamp UTC",
@@ -395,7 +387,7 @@ def crear_reporte_excel(inicio, fin, variables_param="61,104,100"):
         "Unidad",
         "Valor"
     ])
-    aplicar_header(ws4, 1)
+    aplicar_header(ws4, 3)
 
     filtros_variables = parsear_variables_reporte(variables_param)
 
@@ -522,12 +514,12 @@ def crear_reporte_excel(inicio, fin, variables_param="61,104,100"):
     ws5.append(["Inicio real Colombia", convertir_utc_a_colombia(inicio_real)])
     ws5.append(["Fin real Colombia", convertir_utc_a_colombia(fin_real)])
     ws5.append(["Variables incluidas", variables_param])
-    ws5.append(["Hojas", "Resumen_KPI, Energia_Fases, Potencia, Variables, Metadatos"])
+    ws5.append(["Hojas", "Resumen_KPI, Energia_Fases, Potencia, Variables, Metadatos, Datos_Graficas, Graficas, Calidad_Datos"])
 
     ajustar_columnas(ws5)
 
     agregar_hoja_graficas(wb, inicio, fin)
-    agregar_hoja_calidad_datos(wb, inicio, fin)
+    agregar_hoja_calidad_datos(wb, inicio, fin, variables_param)
     output = BytesIO()
     wb.save(output)
     output.seek(0)
@@ -683,14 +675,19 @@ def agregar_hoja_graficas(wb, inicio, fin):
 
     ws_chart.add_chart(chart_exportada, "A42")
     
-def agregar_hoja_calidad_datos(wb, inicio, fin):
+def agregar_hoja_calidad_datos(wb, inicio, fin, variables_param):
     ws = wb.create_sheet("Calidad_Datos")
 
-    ws.merge_cells("A1:G1")
+    ws.merge_cells("A1:L1")
     aplicar_estilo_titulo(ws, "A1", "CALIDAD DE DATOS DEL REPORTE")
 
     ws.append([])
     ws.append([
+        "Gateway ID",
+        "Gateway",
+        "Source Type",
+        "Device ID",
+        "Dispositivo",
         "Unit ID",
         "Variable",
         "Unidad",
@@ -701,37 +698,129 @@ def agregar_hoja_calidad_datos(wb, inicio, fin):
     ])
     aplicar_header(ws, 3)
 
-    variables_control = [
-        61,    # Potencia activa total
-        100,   # Energía importada total
-        104,   # Energía exportada total
-        97, 98, 99,
-        101, 102, 103,
-        7, 8, 9,
-        10, 11, 12,
-        27
-    ]
+    filtros_variables = parsear_variables_reporte(variables_param)
 
     conn = get_conn()
     cur = conn.cursor()
 
-    for unit_id in variables_control:
-        info = obtener_variable(unit_id)
+    for filtro in filtros_variables:
+        where_extra = """
+            md.unit_id = ?
+            AND md.timestamp_utc >= ?
+            AND md.timestamp_utc <= ?
+        """
 
-        cur.execute("""
+        params = [
+            filtro["unit_id"],
+            inicio,
+            fin
+        ]
+
+        if filtro["gateway_id"] is not None:
+            where_extra += """
+                AND COALESCE(md.gateway_id, d.gateway_id) = ?
+            """
+            params.append(filtro["gateway_id"])
+
+        if filtro["source_type"]:
+            where_extra += """
+                AND (
+                    md.source_type = ?
+                    OR (
+                        md.source_type IS NULL
+                        AND ? = 'device'
+                        AND md.device_id IS NOT NULL
+                        AND TRIM(md.device_id) <> ''
+                    )
+                )
+            """
+            params.extend([
+                filtro["source_type"],
+                filtro["source_type"]
+            ])
+
+        if filtro["device_id"]:
+            where_extra += """
+                AND TRIM(md.device_id) = ?
+            """
+            params.append(str(filtro["device_id"]))
+
+        if filtro["source_type"] == "gateway":
+            where_extra += """
+                AND (md.device_id IS NULL OR TRIM(md.device_id) = '')
+            """
+
+        cur.execute(f"""
             SELECT
+                COALESCE(md.gateway_id, d.gateway_id) AS gateway_id,
+                g.nombre AS gateway,
+
+                CASE
+                    WHEN md.source_type IS NOT NULL AND TRIM(md.source_type) <> ''
+                        THEN md.source_type
+                    WHEN md.gateway_id IS NOT NULL
+                         AND (md.device_id IS NULL OR TRIM(md.device_id) = '')
+                        THEN 'gateway'
+                    WHEN md.device_id IS NOT NULL
+                         AND TRIM(md.device_id) <> ''
+                        THEN 'device'
+                    ELSE 'unknown'
+                END AS source_type,
+
+                NULLIF(TRIM(md.device_id), '') AS device_id,
+                d.nombre AS dispositivo,
+                md.unit_id,
+                u.name AS variable,
+                u.simbol AS simbolo,
+
                 COUNT(*) AS muestras,
-                MIN(id) AS min_id,
-                MAX(id) AS max_id
-            FROM mediciones_detalle
-            WHERE unit_id = ?
-              AND timestamp_utc >= ?
-              AND timestamp_utc <= ?
-        """, (unit_id, inicio, fin))
+                MIN(md.id) AS min_id,
+                MAX(md.id) AS max_id
+
+            FROM mediciones_detalle md
+
+            LEFT JOIN dispositivos d
+                ON CAST(NULLIF(TRIM(md.device_id), '') AS INTEGER) = d.device_id
+
+            LEFT JOIN gateways g
+                ON COALESCE(md.gateway_id, d.gateway_id) = g.gateway_id
+
+            LEFT JOIN unidades u
+                ON md.unit_id = u.unit_id
+
+            WHERE {where_extra}
+
+            GROUP BY
+                COALESCE(md.gateway_id, d.gateway_id),
+                g.nombre,
+                source_type,
+                NULLIF(TRIM(md.device_id), ''),
+                d.nombre,
+                md.unit_id,
+                u.name,
+                u.simbol
+        """, params)
 
         row = cur.fetchone()
 
-        muestras = int(row["muestras"]) if row and row["muestras"] else 0
+        if not row:
+            ws.append([
+                filtro["gateway_id"],
+                "",
+                filtro["source_type"],
+                filtro["device_id"],
+                "",
+                filtro["unit_id"],
+                "",
+                "",
+                0,
+                "",
+                "",
+                "Sin datos en el periodo"
+            ])
+            continue
+
+        muestras = int(row["muestras"]) if row["muestras"] else 0
 
         valor_inicial = None
         valor_final = None
@@ -760,18 +849,24 @@ def agregar_hoja_calidad_datos(wb, inicio, fin):
             if final:
                 valor_final = float(final["valor"])
 
-            if unit_id in [97, 98, 99, 100, 101, 102, 103, 104]:
+            # Validación especial para contadores acumulados de energía
+            if row["unit_id"] in [97, 98, 99, 100, 101, 102, 103, 104, 152, 153, 154]:
                 if valor_inicial is not None and valor_final is not None:
                     if valor_final < valor_inicial:
-                        observacion = "Alerta: contador de energía disminuye; delta energético se reporta como 0"
+                        observacion = "Alerta: contador acumulado disminuye; revisar reinicio, simulación o lectura"
 
             if muestras == 1:
                 observacion = "Solo una muestra en el periodo"
 
         ws.append([
-            unit_id,
-            info["variable"],
-            info["simbolo"],
+            row["gateway_id"],
+            row["gateway"],
+            row["source_type"],
+            row["device_id"],
+            row["dispositivo"],
+            row["unit_id"],
+            row["variable"],
+            row["simbolo"],
             muestras,
             valor_inicial,
             valor_final,
@@ -783,7 +878,7 @@ def agregar_hoja_calidad_datos(wb, inicio, fin):
     
 def parsear_variables_reporte(variables_param):
     """
-    Recibe variables en dos formatos:
+    Recibe variables en tres formatos:
 
     Formato nuevo:
         8|device|31|61
@@ -794,12 +889,58 @@ def parsear_variables_reporte(variables_param):
     Formato viejo:
         61,104,100
 
-    Devuelve lista de filtros.
+    Formato especial:
+        all
+
+    Devuelve lista de filtros:
+        gateway_id, source_type, device_id, unit_id
     """
 
     filtros = []
 
     if not variables_param:
+        variables_param = "61,104,100"
+
+    # Todas las variables existentes, diferenciadas por gateway/dispositivo/unit_id
+    if str(variables_param).strip().lower() == "all":
+        conn = get_conn()
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT DISTINCT
+                COALESCE(md.gateway_id, d.gateway_id) AS gateway_id,
+                CASE
+                    WHEN md.source_type IS NOT NULL AND TRIM(md.source_type) <> ''
+                        THEN md.source_type
+                    WHEN md.gateway_id IS NOT NULL
+                         AND (md.device_id IS NULL OR TRIM(md.device_id) = '')
+                        THEN 'gateway'
+                    WHEN md.device_id IS NOT NULL
+                         AND TRIM(md.device_id) <> ''
+                        THEN 'device'
+                    ELSE 'unknown'
+                END AS source_type,
+                NULLIF(TRIM(md.device_id), '') AS device_id,
+                md.unit_id
+            FROM mediciones_detalle md
+            LEFT JOIN dispositivos d
+                ON CAST(NULLIF(TRIM(md.device_id), '') AS INTEGER) = d.device_id
+            ORDER BY
+                COALESCE(md.gateway_id, d.gateway_id),
+                source_type,
+                CAST(NULLIF(TRIM(md.device_id), '') AS INTEGER),
+                md.unit_id
+        """)
+
+        for r in cur.fetchall():
+            filtros.append({
+                "gateway_id": int(r["gateway_id"]) if r["gateway_id"] is not None else None,
+                "source_type": r["source_type"],
+                "device_id": r["device_id"],
+                "unit_id": int(r["unit_id"])
+            })
+
+        conn.close()
         return filtros
 
     for item in str(variables_param).split(","):
@@ -839,4 +980,12 @@ def parsear_variables_reporte(variables_param):
             except Exception:
                 continue
 
+    if not filtros:
+        filtros = [
+            {"gateway_id": None, "source_type": None, "device_id": None, "unit_id": 61},
+            {"gateway_id": None, "source_type": None, "device_id": None, "unit_id": 100},
+            {"gateway_id": None, "source_type": None, "device_id": None, "unit_id": 104},
+        ]
+
     return filtros
+
