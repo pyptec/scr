@@ -606,7 +606,7 @@ function pintarTablaUltimos(datos) {
             <td>${dispositivo}</td>
             <td>${item.unit_id}</td>
             <td>${item.variable || 'Sin nombre'}</td>
-            <td>${Number(item.valor).toLocaleString('es-CO')}</td>
+            <td>${formatearValorVariable(item)}</td>
             <td>${item.simbol || ''}</td>
             <td>${formatearHoraColombia(item.timestamp_utc)}</td>
         `;
@@ -724,7 +724,7 @@ function exportarUltimosCSV() {
         item.tipo_dispositivo || '',
         item.unit_id,
         item.variable || '',
-        item.valor,
+        formatearValorVariable(item),
         item.simbol || '',
         item.timestamp_utc || '',
         formatearHoraColombia(item.timestamp_utc)
@@ -779,6 +779,45 @@ async function actualizarTodo() {
     if (graficaActual) {
         await mostrarGrafica(graficaActual);
     }
+}
+
+function formatearValorVariable(item) {
+    const variable = String(item.variable || '').toLowerCase();
+    const unitId = Number(item.unit_id);
+    const valor = item.valor;
+
+    // Variables tipo IP
+    if (
+        unitId === 137 ||
+        unitId === 144 ||
+        variable.includes('ip_') ||
+        variable.includes('ip ')
+    ) {
+        const texto = String(valor).replace(/\D/g, '');
+
+        if (texto.length === 12) {
+            return `${texto.slice(0, 3)}.${texto.slice(3, 6)}.${texto.slice(6, 7)}.${texto.slice(7)}`;
+        }
+
+        if (texto.length === 10) {
+            return `${texto.slice(0, 3)}.${texto.slice(3, 6)}.${texto.slice(6, 7)}.${texto.slice(7)}`;
+        }
+
+        if (texto.length === 9) {
+            return `${texto.slice(0, 3)}.${texto.slice(3, 6)}.${texto.slice(6, 7)}.${texto.slice(7)}`;
+        }
+
+        return String(valor);
+    }
+
+    // Valores numéricos normales
+    const numero = Number(valor);
+
+    if (!Number.isNaN(numero)) {
+        return numero.toLocaleString('es-CO');
+    }
+
+    return String(valor ?? '');
 }
 
 /* =========================
