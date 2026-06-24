@@ -1,7 +1,7 @@
 from flask import Flask, request
 from db.kpi_solar import resumen_periodo
 from db.kpi_solar import potencia_actual_kw
-from db.samee100_db import get_conn
+from db.samee100_db import get_conn, init_db
 from flask import Flask, request, render_template
 from pathlib import Path
 from db.kpi_solar import energia_diaria_generada
@@ -18,6 +18,8 @@ app = Flask(
     template_folder=str(BASE_DIR / "templates"),
     static_folder=str(BASE_DIR / "static")
 )
+
+init_db()
 
 
 @app.route("/api/variable/<int:unit_id>")
