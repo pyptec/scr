@@ -150,7 +150,9 @@ ON aws_queue(status);
 -- Mantiene compatibilidad con consultas antiguas.
 -- Incluye gateway, dispositivo y unidad.
 -- =========================================================
-CREATE VIEW IF NOT EXISTS vw_mediciones AS
+DROP VIEW IF EXISTS vw_mediciones;
+
+CREATE VIEW vw_mediciones AS
 SELECT
     md.id,
     md.raw_id,
