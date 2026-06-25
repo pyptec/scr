@@ -969,6 +969,7 @@ function exportarUltimosCSV() {
 
 async function actualizarTodo() {
     await cargarDashboard();
+    await cargarEstadoGateway();
     await cargarUltimosValores();
 
     if (graficaActual === 'variable') {
@@ -1020,6 +1021,145 @@ function formatearValorVariable(item) {
     return String(valor ?? '');
 }
 
+/* =========================
+   ESTADO DEL GATEWAY
+========================= */
+
+function formatearEdadSegundos(segundos) {
+    if (segundos === null || segundos === undefined) {
+        return '--';
+    }
+
+    const s = Number(segundos);
+
+    if (s < 60) {
+        return `${s} s`;
+    }
+
+    if (s < 3600) {
+        return `${Math.floor(s / 60)} min`;
+    }
+
+    return `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min`;
+}
+
+function formatearIpDesdeValor(valor) {
+    if (valor === null || valor === undefined) {
+        return '--';
+    }
+
+    const texto = String(valor).replace(/\D/g, '');
+
+    if (texto.length === 10) {
+        return `${texto.slice(0, 3)}.${texto.slice(3, 6)}.${texto.slice(6, 7)}.${texto.slice(7)}`;
+    }
+
+    if (texto.length === 9) {
+        return `${texto.slice(0, 3)}.${texto.slice(3, 6)}.${texto.slice(6, 7)}.${texto.slice(7)}`;
+    }
+
+    if (texto.length === 12) {
+        return `${texto.slice(0, 3)}.${texto.slice(3, 6)}.${texto.slice(6, 7)}.${texto.slice(7)}`;
+    }
+
+    return String(valor);
+}
+
+function pintarEstadoTexto(id, valor, claseEstado = '') {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    el.innerText = valor ?? '--';
+
+    el.classList.remove('estado-ok', 'estado-alerta', 'estado-error');
+
+    if (claseEstado) {
+        el.classList.add(claseEstado);
+    }
+}
+
+async function cargarEstadoGateway() {
+    try {
+        const res = await fetch('/api/estado');
+
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+
+        const estadoDatosClase =
+            data.estado_datos === 'OK'
+                ? 'estado-ok'
+                : 'estado-alerta';
+
+        const estadoMedidorClase =
+            data.estado_medidor_31 === 'OK'
+                ? 'estado-ok'
+                : 'estado-alerta';
+
+        pintarEstadoTexto(
+            'estadoGateway',
+            `${data.gateway || 'Gateway'} ID ${data.gateway_id || ''}`
+        );
+
+        pintarEstadoTexto(
+            'estadoDatos',
+            data.estado_datos || '--',
+            estadoDatosClase
+        );
+
+        pintarEstadoTexto(
+            'estadoUltimaMedicion',
+            data.ultima_medicion_utc
+                ? formatearHoraColombia(data.ultima_medicion_utc)
+                : '--'
+        );
+
+        pintarEstadoTexto(
+            'estadoEdadDato',
+            formatearEdadSegundos(data.edad_segundos),
+            estadoDatosClase
+        );
+
+        pintarEstadoTexto(
+            'estadoMedidor31',
+            data.estado_medidor_31 || '--',
+            estadoMedidorClase
+        );
+
+        pintarEstadoTexto(
+            'estadoConnectedMeter',
+            data.connected_meter ?? '--'
+        );
+
+        pintarEstadoTexto(
+            'estadoRam',
+            data.ram !== null && data.ram !== undefined ? `${data.ram} %` : '--'
+        );
+
+        pintarEstadoTexto(
+            'estadoCpu',
+            data.cpu !== null && data.cpu !== undefined ? `${data.cpu} %` : '--'
+        );
+
+        pintarEstadoTexto(
+            'estadoIpUsb0',
+            formatearIpDesdeValor(data.ip_usb0)
+        );
+
+        pintarEstadoTexto(
+            'estadoIpEth',
+            formatearIpDesdeValor(data.ip_ethernet)
+        );
+
+    } catch (error) {
+        console.error('Error cargando estado del gateway:', error);
+
+        pintarEstadoTexto('estadoDatos', 'ERROR', 'estado-error');
+        pintarEstadoTexto('estadoMedidor31', 'ERROR', 'estado-error');
+    }
+}
 /* =========================
    INICIO
 ========================= */

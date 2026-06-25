@@ -9,7 +9,9 @@ from db.kpi_solar import reporte_kpi_energetico
 from db.kpi_solar import rango_real_datos
 from flask import send_file
 from db.reporte_excel import crear_reporte_excel
-
+import time
+import sqlite3
+from flask import jsonify
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -523,7 +525,143 @@ def api_reporte_excel():
         download_name=nombre_archivo,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )   
-    
+ 
+@app.route("/api/estado")
+def api_estado():
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    ahora = int(time.time())
+
+    estado = {
+        "timestamp_actual": ahora,
+        "db": "OK",
+        "gateway_id": 8,
+        "gateway": None,
+        "cliente": None,
+        "ultima_medicion_utc": None,
+        "ultima_medicion_colombia": None,
+        "edad_segundos": None,
+        "estado_datos": "SIN DATOS",
+        "ram": None,
+        "cpu": None,
+        "ip_usb0": None,
+        "ip_ethernet": None,
+        "connected_meter": None,
+        "ultimo_dato_medidor_31": None,
+        "edad_medidor_31_segundos": None,
+        "estado_medidor_31": "SIN DATOS",
+        "total_gateways": 0,
+        "total_dispositivos": 0,
+        "total_variables": 0
+    }
+
+    try:
+        # Datos del gateway principal
+        cur.execute("""
+            SELECT gateway_id, nombre, cliente
+            FROM gateways
+            WHERE gateway_id = 8
+            LIMIT 1
+        """)
+        row = cur.fetchone()
+        if row:
+            estado["gateway_id"] = row["gateway_id"]
+            estado["gateway"] = row["nombre"]
+            estado["cliente"] = row["cliente"]
+
+        # Conteos generales
+        cur.execute("SELECT COUNT(*) AS total FROM gateways")
+        estado["total_gateways"] = cur.fetchone()["total"]
+
+        cur.execute("SELECT COUNT(*) AS total FROM dispositivos")
+        estado["total_dispositivos"] = cur.fetchone()["total"]
+
+        cur.execute("SELECT COUNT(*) AS total FROM unidades")
+        estado["total_variables"] = cur.fetchone()["total"]
+
+        # Última medición general
+        cur.execute("""
+            SELECT MAX(CAST(timestamp_utc AS INTEGER)) AS ts
+            FROM mediciones_detalle
+        """)
+        row = cur.fetchone()
+        ts = row["ts"] if row else None
+
+        if ts:
+            ts = int(ts)
+            estado["ultima_medicion_utc"] = ts
+            estado["edad_segundos"] = ahora - ts
+
+            if estado["edad_segundos"] <= 900:
+                estado["estado_datos"] = "OK"
+            else:
+                estado["estado_datos"] = "SIN DATOS RECIENTES"
+
+        # Última medición del medidor principal Eastron SDM630 device_id 31
+        cur.execute("""
+            SELECT MAX(CAST(timestamp_utc AS INTEGER)) AS ts
+            FROM mediciones_detalle
+            WHERE TRIM(device_id) = '31'
+        """)
+        row = cur.fetchone()
+        ts_medidor = row["ts"] if row else None
+
+        if ts_medidor:
+            ts_medidor = int(ts_medidor)
+            estado["ultimo_dato_medidor_31"] = ts_medidor
+            estado["edad_medidor_31_segundos"] = ahora - ts_medidor
+
+            if estado["edad_medidor_31_segundos"] <= 900:
+                estado["estado_medidor_31"] = "OK"
+            else:
+                estado["estado_medidor_31"] = "SIN DATOS RECIENTES"
+
+        def ultimo_valor(unit_id, source_type=None, device_id=None):
+            sql = """
+                SELECT valor, timestamp_utc
+                FROM mediciones_detalle
+                WHERE unit_id = ?
+            """
+            params = [unit_id]
+
+            if source_type:
+                sql += " AND source_type = ?"
+                params.append(source_type)
+
+            if device_id:
+                sql += " AND TRIM(device_id) = ?"
+                params.append(str(device_id))
+
+            sql += " ORDER BY CAST(timestamp_utc AS INTEGER) DESC LIMIT 1"
+
+            cur.execute(sql, params)
+            r = cur.fetchone()
+
+            if not r:
+                return None
+
+            return r["valor"]
+
+        # Variables internas conocidas
+        estado["ram"] = ultimo_valor(135)
+        estado["cpu"] = ultimo_valor(136)
+        estado["ip_usb0"] = ultimo_valor(137)
+        estado["ip_ethernet"] = ultimo_valor(144)
+
+        # Variable gateway Connected_Meter
+        estado["connected_meter"] = ultimo_valor(53, source_type="gateway")
+
+        conn.close()
+        return jsonify(estado)
+
+    except Exception as e:
+        conn.close()
+        return jsonify({
+            "db": "ERROR",
+            "error": str(e)
+        }), 500   
     
 if __name__ == "__main__":
 

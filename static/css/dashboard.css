@@ -527,3 +527,54 @@ button:hover,
 .chk-variable-reporte {
     margin-right: 6px;
 }
+
+.estado-gateway-box {
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 18px;
+    margin: 18px 0;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+.estado-gateway-box h2 {
+    margin: 0 0 14px 0;
+    font-size: 18px;
+    color: #0f3d66;
+}
+
+.estado-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+}
+
+.estado-card {
+    background: #f7f9fc;
+    border: 1px solid #dce3ec;
+    border-radius: 10px;
+    padding: 12px;
+}
+
+.estado-label {
+    display: block;
+    font-size: 12px;
+    color: #5d6d7e;
+    margin-bottom: 6px;
+}
+
+.estado-card strong {
+    font-size: 15px;
+    color: #123f67;
+}
+
+.estado-ok {
+    color: #16803c !important;
+}
+
+.estado-alerta {
+    color: #c77700 !important;
+}
+
+.estado-error {
+    color: #b00020 !important;
+}
