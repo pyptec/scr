@@ -415,80 +415,41 @@ async function graficarVariableSeleccionada(mostrarAlertas = true) {
 
 async function cargarSelectorVariables() {
     try {
-        const resp = await fetch('/api/variables');
-        variablesDisponibles = await resp.json();
+        const res = await fetch('/api/variables');
+        const data = await res.json();
 
-        const selector = document.getElementById('selectorVariable');
-        if (!selector) return;
+        variablesDisponibles = data.variables || [];
 
-        selector.innerHTML = '';
+        const select = document.getElementById('selectVariable');
+        select.innerHTML = '';
 
-        const optDefault = document.createElement('option');
-        optDefault.value = '';
-        optDefault.textContent = 'Seleccione una variable...';
-        selector.appendChild(optDefault);
+        if (!variablesDisponibles.length) {
+            select.innerHTML = '<option value="">No hay variables disponibles</option>';
+            return;
+        }
 
-        const grupos = {};
+        variablesDisponibles.forEach((v, index) => {
+            const opt = document.createElement('option');
 
-        variablesDisponibles.forEach(v => {
+            opt.value = index;
+
+            opt.dataset.gatewayId = v.gateway_id || '';
+            opt.dataset.sourceType = v.source_type || '';
+            opt.dataset.deviceId = v.device_id || '';
+            opt.dataset.unitId = v.unit_id || '';
+
             const gateway = v.gateway || `Gateway ${v.gateway_id || ''}`;
+            const origen = v.source_type === 'gateway' ? 'Gateway' : 'Dispositivo';
+            const dispositivo = v.dispositivo || origen;
 
-            let origen = '';
-            if (v.source_type === 'gateway') {
-                origen = 'Gateway';
-            } else {
-                origen = v.dispositivo || `Dispositivo ${v.device_id || ''}`;
-            }
+            opt.textContent =
+                `${gateway} | ${dispositivo} | Unit ID ${v.unit_id} | ${v.variable} ${v.simbolo ? '(' + v.simbolo + ')' : ''}`;
 
-            const grupoNombre = `${gateway} / ${origen}`;
-
-            if (!grupos[grupoNombre]) {
-                grupos[grupoNombre] = [];
-            }
-
-            grupos[grupoNombre].push(v);
-        });
-
-        Object.keys(grupos).sort().forEach(nombreGrupo => {
-            const optgroup = document.createElement('optgroup');
-            optgroup.label = nombreGrupo;
-
-            grupos[nombreGrupo]
-                .sort((a, b) => {
-                    const ua = Number(a.unit_id || 0);
-                    const ub = Number(b.unit_id || 0);
-                    return ua - ub;
-                })
-                .forEach(v => {
-                    const option = document.createElement('option');
-
-                    const gatewayId = v.gateway_id || '';
-                    const sourceType = v.source_type || '';
-                    const deviceId = v.device_id || '';
-                    const unitId = v.unit_id;
-
-                    option.value = `${gatewayId}|${sourceType}|${deviceId}|${unitId}`;
-
-                    option.dataset.gatewayId = gatewayId;
-                    option.dataset.sourceType = sourceType;
-                    option.dataset.deviceId = deviceId;
-                    option.dataset.unitId = unitId;
-
-                    const unidad = v.simbolo ? ` ${v.simbolo}` : '';
-                    const deviceTxt = v.source_type === 'gateway'
-                        ? 'Gateway'
-                        : `Device ${deviceId}`;
-
-                    option.textContent = `Unit ${unitId} | ${v.variable || 'Variable'}${unidad} | ${deviceTxt}`;
-
-                    optgroup.appendChild(option);
-                });
-
-            selector.appendChild(optgroup);
+            select.appendChild(opt);
         });
 
     } catch (error) {
-        console.error('Error cargando selector de variables:', error);
+        console.error('Error cargando variables:', error);
     }
 }
 
@@ -497,82 +458,39 @@ async function cargarSelectorVariables() {
 ========================= */
 
 async function cargarVariablesReporte() {
-    try {
-        const resp = await fetch('/api/variables');
-        const variables = await resp.json();
+    const res = await fetch('/api/variables');
+    const data = await res.json();
 
-        const contenedor = document.getElementById('variablesReporte');
-        if (!contenedor) return;
+    variablesDisponiblesReporte = data.variables || [];
 
-        contenedor.innerHTML = '';
+    const contenedor = document.getElementById('listaVariablesReporte');
+    contenedor.innerHTML = '';
 
-        const grupos = {};
+    variablesDisponiblesReporte.forEach(v => {
+        const label = document.createElement('label');
+        label.className = 'variable-reporte-item';
 
-        variables.forEach(v => {
-            const gateway = v.gateway || `Gateway ${v.gateway_id || ''}`;
+        label.innerHTML = `
+            <input
+                type="checkbox"
+                class="chk-variable-reporte"
+                value="${v.gateway_id || ''}|${v.source_type || ''}|${v.device_id || ''}|${v.unit_id}"
+                data-unit-id="${v.unit_id}"
+                data-device-id="${v.device_id || ''}"
+                data-gateway-id="${v.gateway_id || ''}"
+                data-source-type="${v.source_type || ''}"
+            >
+            <span>
+                <strong>${v.gateway || 'Gateway'} / ${v.dispositivo || 'Sin dispositivo'}</strong><br>
+                ${v.unit_id} - ${v.variable}
+                ${v.simbolo ? `(${v.simbolo})` : ''}
+            </span>
+        `;
 
-            let origen = '';
-            if (v.source_type === 'gateway') {
-                origen = 'Gateway';
-            } else {
-                origen = v.dispositivo || `Dispositivo ${v.device_id || ''}`;
-            }
+        contenedor.appendChild(label);
+    });
 
-            const grupoNombre = `${gateway} / ${origen}`;
-
-            if (!grupos[grupoNombre]) {
-                grupos[grupoNombre] = [];
-            }
-
-            grupos[grupoNombre].push(v);
-        });
-
-        Object.keys(grupos).sort().forEach(nombreGrupo => {
-            const bloque = document.createElement('div');
-            bloque.className = 'grupo-variables-reporte';
-
-            const titulo = document.createElement('h4');
-            titulo.textContent = nombreGrupo;
-            bloque.appendChild(titulo);
-
-            grupos[nombreGrupo]
-                .sort((a, b) => Number(a.unit_id || 0) - Number(b.unit_id || 0))
-                .forEach(v => {
-                    const gatewayId = v.gateway_id || '';
-                    const sourceType = v.source_type || '';
-                    const deviceId = v.device_id || '';
-                    const unitId = v.unit_id;
-
-                    const label = document.createElement('label');
-                    label.className = 'chk-variable-reporte';
-
-                    const chk = document.createElement('input');
-                    chk.type = 'checkbox';
-                    chk.name = 'variables_reporte';
-                    chk.value = `${gatewayId}|${sourceType}|${deviceId}|${unitId}`;
-
-                    chk.dataset.gatewayId = gatewayId;
-                    chk.dataset.sourceType = sourceType;
-                    chk.dataset.deviceId = deviceId;
-                    chk.dataset.unitId = unitId;
-
-                    const unidad = v.simbolo ? ` ${v.simbolo}` : '';
-                    const deviceTxt = sourceType === 'gateway' ? 'Gateway' : `Device ${deviceId}`;
-
-                    label.appendChild(chk);
-                    label.appendChild(
-                        document.createTextNode(` Unit ${unitId} | ${v.variable || 'Variable'}${unidad} | ${deviceTxt}`)
-                    );
-
-                    bloque.appendChild(label);
-                });
-
-            contenedor.appendChild(bloque);
-        });
-
-    } catch (error) {
-        console.error('Error cargando variables para reporte:', error);
-    }
+    seleccionarVariablesReporteBase();
 }
 
 function seleccionarVariablesReporteBase() {

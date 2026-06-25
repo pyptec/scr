@@ -478,3 +478,27 @@ button:hover,
 #chartPrincipal {
     max-height: 360px;
 }
+
+.grupo-variables-reporte {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    background: #fafafa;
+}
+
+.grupo-variables-reporte h4 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    color: #2c3e50;
+}
+
+.chk-variable-reporte {
+    display: block;
+    margin: 4px 0;
+    font-size: 13px;
+}
+
+.chk-variable-reporte input {
+    margin-right: 6px;
+}
