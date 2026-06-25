@@ -1,0 +1,78 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+# =========================
+# Entornos virtuales
+# =========================
+venv/
+env/
+.venv/
+medidorsamee100/
+
+# =========================
+# Variables de entorno / secretos
+# =========================
+.env
+*.env
+
+# =========================
+# Certificados y llaves AWS / TLS
+# =========================
+*.pem
+*.key
+*.crt
+*.cert
+*.csr
+
+# =========================
+# Base de datos SQLite local
+# =========================
+data/*.db
+data/*.db-wal
+data/*.db-shm
+*.db
+*.db-wal
+*.db-shm
+
+# =========================
+# Backups locales
+# =========================
+backup/
+backups/
+*.bak
+
+# =========================
+# Reportes generados
+# =========================
+*.xlsx
+*.csv
+
+# =========================
+# Logs
+# =========================
+app.log
+eventos.txt
+log_eventos.txt
+*.out
+*.err
+
+# =========================
+# Sistema operativo / editores
+# =========================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# =========================
+# Temporales
+# =========================
+tmp/
+temp/
+*.tmp
