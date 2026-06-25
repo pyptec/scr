@@ -322,3 +322,158 @@ def marcar_error(queue_id, error):
 
     conn.commit()
     conn.close()
+    
+    
+def contar_pendientes():
+    """
+    Cuenta eventos pendientes en la cola AWS.
+    """
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+    SELECT COUNT(*) AS total
+    FROM aws_queue
+    WHERE status = 'pending'
+    """)
+
+    row = cur.fetchone()
+    conn.close()
+
+    return row["total"] if row else 0
+
+
+def resumen_cola_aws():
+    """
+    Retorna un resumen de la cola AWS agrupado por estado.
+    Útil para diagnóstico, dashboard o logs.
+    """
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+    SELECT
+        status,
+        COUNT(*) AS total
+    FROM aws_queue
+    GROUP BY status
+    ORDER BY status
+    """)
+
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+
+    return rows
+
+
+def obtener_pendientes_reintento(limit=50, max_attempts=20):
+    """
+    Obtiene eventos pendientes que todavía no superan el máximo
+    de intentos permitidos.
+    """
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+    SELECT *
+    FROM aws_queue
+    WHERE status = 'pending'
+      AND attempts < ?
+    ORDER BY id ASC
+    LIMIT ?
+    """, (
+        max_attempts,
+        limit
+    ))
+
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+
+    return rows
+
+
+def descartar_eventos_agotados(max_attempts=20):
+    """
+    Marca como descartados los eventos que ya superaron el número
+    máximo de intentos de envío.
+    No los elimina, solo cambia el estado a discarded.
+    """
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+    UPDATE aws_queue
+    SET status = 'discarded',
+        last_error = COALESCE(last_error, 'Máximo número de intentos alcanzado')
+    WHERE status = 'pending'
+      AND attempts >= ?
+    """, (
+        max_attempts,
+    ))
+
+    afectados = cur.rowcount
+
+    conn.commit()
+    conn.close()
+
+    return afectados
+
+
+def limpiar_enviados_antiguos(dias=7):
+    """
+    Elimina eventos enviados antiguos para evitar crecimiento excesivo
+    de la base local.
+
+    Por defecto elimina eventos con status='sent' enviados hace más de 7 días.
+    """
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+    DELETE FROM aws_queue
+    WHERE status = 'sent'
+      AND sent_at IS NOT NULL
+      AND datetime(sent_at) < datetime('now', ?)
+    """, (
+        f'-{int(dias)} days',
+    ))
+
+    eliminados = cur.rowcount
+
+    conn.commit()
+    conn.close()
+
+    return eliminados
+
+
+def obtener_ultimo_error_cola():
+    """
+    Retorna el último error registrado en la cola AWS.
+    """
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+    SELECT
+        id,
+        topic,
+        attempts,
+        last_error,
+        created_at
+    FROM aws_queue
+    WHERE last_error IS NOT NULL
+      AND TRIM(last_error) <> ''
+    ORDER BY id DESC
+    LIMIT 1
+    """)
+
+    row = cur.fetchone()
+    conn.close()
+
+    return dict(row) if row else None
