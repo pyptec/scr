@@ -293,9 +293,10 @@ async function mostrarGrafica(tipo) {
 async function graficarVariableSeleccionada(mostrarAlertas = true) {
     graficaActual = 'variable';
 
-    const select =
-        document.getElementById('selectVariable') ||
-        document.getElementById('selectorVariable');
+    const select = obtenerElementoPorIds([
+        'selectVariable',
+        'selectorVariable'
+    ]);
 
     if (!select || !select.value) {
         if (mostrarAlertas) {
@@ -344,8 +345,12 @@ async function graficarVariableSeleccionada(mostrarAlertas = true) {
 
     try {
         const res = await fetch(url);
-        const data = await res.json();
 
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status} consultando ${url}`);
+        }
+
+        const data = await res.json();
         const serie = data.serie || [];
 
         if (!serie.length) {
@@ -422,19 +427,56 @@ async function graficarVariableSeleccionada(mostrarAlertas = true) {
 /* =========================
    SELECTOR VARIABLE PARA GRÁFICA
 ========================= */
+function normalizarRespuestaVariables(data) {
+    if (Array.isArray(data)) {
+        return data;
+    }
+
+    if (data && Array.isArray(data.variables)) {
+        return data.variables;
+    }
+
+    if (data && Array.isArray(data.datos)) {
+        return data.datos;
+    }
+
+    if (data && Array.isArray(data.data)) {
+        return data.data;
+    }
+
+    console.error('Formato inesperado en /api/variables:', data);
+    return [];
+}
+
+function obtenerElementoPorIds(ids) {
+    for (const id of ids) {
+        const elemento = document.getElementById(id);
+        if (elemento) {
+            return elemento;
+        }
+    }
+
+    return null;
+}
 
 async function cargarSelectorVariables() {
     try {
         const resp = await fetch('/api/variables');
-        variablesDisponibles = await resp.json();
 
-        // Soporta cualquiera de los dos ID que puedas tener en el HTML
-        const selector =
-            document.getElementById('selectVariable') ||
-            document.getElementById('selectorVariable');
+        if (!resp.ok) {
+            throw new Error(`HTTP ${resp.status} al consultar /api/variables`);
+        }
+
+        const data = await resp.json();
+        variablesDisponibles = normalizarRespuestaVariables(data);
+
+        const selector = obtenerElementoPorIds([
+            'selectVariable',
+            'selectorVariable'
+        ]);
 
         if (!selector) {
-            console.error('No existe el selector de variables: selectVariable o selectorVariable');
+            console.error('No existe el selector de variables. Revise el id en dashboard.html');
             return;
         }
 
@@ -444,6 +486,14 @@ async function cargarSelectorVariables() {
         optDefault.value = '';
         optDefault.textContent = 'Seleccione una variable...';
         selector.appendChild(optDefault);
+
+        if (!variablesDisponibles.length) {
+            const optVacio = document.createElement('option');
+            optVacio.value = '';
+            optVacio.textContent = 'No hay variables disponibles';
+            selector.appendChild(optVacio);
+            return;
+        }
 
         const grupos = {};
 
@@ -483,7 +533,6 @@ async function cargarSelectorVariables() {
                     const deviceId = v.device_id || '';
                     const unitId = v.unit_id || '';
 
-                    // Dejamos el value como índice para poder recuperar variableInfo fácil
                     option.value = String(v.index);
 
                     option.dataset.gatewayId = gatewayId;
@@ -505,6 +554,8 @@ async function cargarSelectorVariables() {
             selector.appendChild(optgroup);
         });
 
+        console.log(`Selector de variables cargado: ${variablesDisponibles.length} variables`);
+
     } catch (error) {
         console.error('Error cargando selector de variables:', error);
     }
@@ -513,16 +564,42 @@ async function cargarSelectorVariables() {
    VARIABLES PARA REPORTE
 ========================= */
 async function cargarVariablesReporte() {
+    const contenedor = obtenerElementoPorIds([
+        'variablesReporte',
+        'contenedorVariablesReporte',
+        'listaVariablesReporte',
+        'variablesReporteLista'
+    ]);
+
     try {
+        if (!contenedor) {
+            console.error('No existe el contenedor de variables para reporte. Revise el id en dashboard.html');
+            return;
+        }
+
+        contenedor.innerHTML = 'Cargando variables...';
+
         const resp = await fetch('/api/variables');
-        const variables = await resp.json();
+
+        if (!resp.ok) {
+            throw new Error(`HTTP ${resp.status} al consultar /api/variables`);
+        }
+
+        const data = await resp.json();
+        const variables = normalizarRespuestaVariables(data);
 
         variablesDisponiblesReporte = variables;
 
-        const contenedor = document.getElementById('variablesReporte');
-        if (!contenedor) return;
-
         contenedor.innerHTML = '';
+
+        if (!variables.length) {
+            contenedor.innerHTML = `
+                <div class="mensaje-reporte">
+                    No hay variables disponibles para reporte.
+                </div>
+            `;
+            return;
+        }
 
         const grupos = {};
 
@@ -594,8 +671,18 @@ async function cargarVariablesReporte() {
             contenedor.appendChild(bloque);
         });
 
+        console.log(`Variables de reporte cargadas: ${variables.length} variables`);
+
     } catch (error) {
         console.error('Error cargando variables para reporte:', error);
+
+        if (contenedor) {
+            contenedor.innerHTML = `
+                <div class="mensaje-error-reporte">
+                    Error cargando variables. Revise la consola del navegador o el endpoint /api/variables.
+                </div>
+            `;
+        }
     }
 }
 
