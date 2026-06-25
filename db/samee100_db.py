@@ -13,9 +13,34 @@ def utc_now():
 
 
 def get_conn():
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    """
+    Abre la conexión SQLite oficial del proyecto SAMEE100/SAMEE200.
+
+    La base oficial debe estar en:
+        /home/pi/SAMEE100/scr/data/samee100.db
+
+    Se activa WAL para permitir que el recolector escriba mientras
+    el dashboard consulta datos o genera reportes Excel.
+    """
+
+    conn = sqlite3.connect(DB_PATH, timeout=30)
+
+    # Permite acceder a columnas por nombre: row["campo"]
     conn.row_factory = sqlite3.Row
+
+    # Modo recomendado para un sistema con un proceso escribiendo
+    # y otro proceso leyendo/reportando.
+    conn.execute("PRAGMA journal_mode=WAL;")
+
+    # Reduce bloqueos y mejora desempeño en Raspberry.
+    conn.execute("PRAGMA synchronous=NORMAL;")
+
+    # Espera hasta 30 segundos si la base está ocupada.
+    conn.execute("PRAGMA busy_timeout=30000;")
+
+    # Activa llaves foráneas si el esquema las usa.
+    conn.execute("PRAGMA foreign_keys=ON;")
+
     return conn
 
 
