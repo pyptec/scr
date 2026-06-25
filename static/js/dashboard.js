@@ -293,9 +293,11 @@ async function mostrarGrafica(tipo) {
 async function graficarVariableSeleccionada(mostrarAlertas = true) {
     graficaActual = 'variable';
 
-    const select = document.getElementById('selectVariable');
+    const select =
+        document.getElementById('selectVariable') ||
+        document.getElementById('selectorVariable');
 
-    if (!select.value) {
+    if (!select || !select.value) {
         if (mostrarAlertas) {
             alert('Seleccione una variable');
         }
@@ -361,9 +363,17 @@ async function graficarVariableSeleccionada(mostrarAlertas = true) {
         const canvas = document.getElementById('chartPrincipal');
         const ctx = canvas.getContext('2d');
 
-        const nombreGateway = variableInfo.gateway || `Gateway ${variableInfo.gateway_id || ''}`;
-        const nombreDispositivo = variableInfo.dispositivo || 'Gateway';
-        const nombreVariable = variableInfo.variable || `Unit ID ${unitId}`;
+        const nombreGateway =
+            variableInfo.gateway || `Gateway ${variableInfo.gateway_id || ''}`;
+
+        const nombreDispositivo =
+            variableInfo.source_type === 'gateway'
+                ? 'Gateway'
+                : (variableInfo.dispositivo || `Device ${deviceId || ''}`);
+
+        const nombreVariable =
+            variableInfo.variable || `Unit ID ${unitId}`;
+
         const unidad = variableInfo.simbolo || '';
 
         chartPrincipal = new Chart(ctx, {
@@ -418,8 +428,15 @@ async function cargarSelectorVariables() {
         const resp = await fetch('/api/variables');
         variablesDisponibles = await resp.json();
 
-        const selector = document.getElementById('selectorVariable');
-        if (!selector) return;
+        // Soporta cualquiera de los dos ID que puedas tener en el HTML
+        const selector =
+            document.getElementById('selectVariable') ||
+            document.getElementById('selectorVariable');
+
+        if (!selector) {
+            console.error('No existe el selector de variables: selectVariable o selectorVariable');
+            return;
+        }
 
         selector.innerHTML = '';
 
@@ -430,7 +447,7 @@ async function cargarSelectorVariables() {
 
         const grupos = {};
 
-        variablesDisponibles.forEach(v => {
+        variablesDisponibles.forEach((v, index) => {
             const gateway = v.gateway || `Gateway ${v.gateway_id || ''}`;
 
             let origen = '';
@@ -446,7 +463,10 @@ async function cargarSelectorVariables() {
                 grupos[grupoNombre] = [];
             }
 
-            grupos[grupoNombre].push(v);
+            grupos[grupoNombre].push({
+                ...v,
+                index: index
+            });
         });
 
         Object.keys(grupos).sort().forEach(nombreGrupo => {
@@ -454,20 +474,17 @@ async function cargarSelectorVariables() {
             optgroup.label = nombreGrupo;
 
             grupos[nombreGrupo]
-                .sort((a, b) => {
-                    const ua = Number(a.unit_id || 0);
-                    const ub = Number(b.unit_id || 0);
-                    return ua - ub;
-                })
+                .sort((a, b) => Number(a.unit_id || 0) - Number(b.unit_id || 0))
                 .forEach(v => {
                     const option = document.createElement('option');
 
                     const gatewayId = v.gateway_id || '';
                     const sourceType = v.source_type || '';
                     const deviceId = v.device_id || '';
-                    const unitId = v.unit_id;
+                    const unitId = v.unit_id || '';
 
-                    option.value = `${gatewayId}|${sourceType}|${deviceId}|${unitId}`;
+                    // Dejamos el value como índice para poder recuperar variableInfo fácil
+                    option.value = String(v.index);
 
                     option.dataset.gatewayId = gatewayId;
                     option.dataset.sourceType = sourceType;
@@ -475,11 +492,12 @@ async function cargarSelectorVariables() {
                     option.dataset.unitId = unitId;
 
                     const unidad = v.simbolo ? ` ${v.simbolo}` : '';
-                    const deviceTxt = v.source_type === 'gateway'
+                    const deviceTxt = sourceType === 'gateway'
                         ? 'Gateway'
                         : `Device ${deviceId}`;
 
-                    option.textContent = `Unit ${unitId} | ${v.variable || 'Variable'}${unidad} | ${deviceTxt}`;
+                    option.textContent =
+                        `Unit ${unitId} | ${v.variable || 'Variable'}${unidad} | ${deviceTxt}`;
 
                     optgroup.appendChild(option);
                 });
@@ -491,15 +509,15 @@ async function cargarSelectorVariables() {
         console.error('Error cargando selector de variables:', error);
     }
 }
-
 /* =========================
    VARIABLES PARA REPORTE
 ========================= */
-
 async function cargarVariablesReporte() {
     try {
         const resp = await fetch('/api/variables');
         const variables = await resp.json();
+
+        variablesDisponiblesReporte = variables;
 
         const contenedor = document.getElementById('variablesReporte');
         if (!contenedor) return;
@@ -541,14 +559,16 @@ async function cargarVariablesReporte() {
                     const gatewayId = v.gateway_id || '';
                     const sourceType = v.source_type || '';
                     const deviceId = v.device_id || '';
-                    const unitId = v.unit_id;
+                    const unitId = v.unit_id || '';
 
                     const label = document.createElement('label');
-                    label.className = 'chk-variable-reporte';
+                    label.className = 'label-variable-reporte';
 
                     const chk = document.createElement('input');
                     chk.type = 'checkbox';
                     chk.name = 'variables_reporte';
+                    chk.className = 'chk-variable-reporte';
+
                     chk.value = `${gatewayId}|${sourceType}|${deviceId}|${unitId}`;
 
                     chk.dataset.gatewayId = gatewayId;
@@ -557,11 +577,15 @@ async function cargarVariablesReporte() {
                     chk.dataset.unitId = unitId;
 
                     const unidad = v.simbolo ? ` ${v.simbolo}` : '';
-                    const deviceTxt = sourceType === 'gateway' ? 'Gateway' : `Device ${deviceId}`;
+                    const deviceTxt = sourceType === 'gateway'
+                        ? 'Gateway'
+                        : `Device ${deviceId}`;
 
                     label.appendChild(chk);
                     label.appendChild(
-                        document.createTextNode(` Unit ${unitId} | ${v.variable || 'Variable'}${unidad} | ${deviceTxt}`)
+                        document.createTextNode(
+                            ` Unit ${unitId} | ${v.variable || 'Variable'}${unidad} | ${deviceTxt}`
+                        )
                     );
 
                     bloque.appendChild(label);
@@ -590,34 +614,41 @@ function seleccionarVariablesReporteBase() {
         53
     ];
 
-    document.querySelectorAll('.chk-variable-reporte').forEach(chk => {
-        const unitId = Number(chk.dataset.unitId);
-        chk.checked = base.includes(unitId);
-    });
+    document
+        .querySelectorAll('input.chk-variable-reporte')
+        .forEach(chk => {
+            const unitId = Number(chk.dataset.unitId);
+            chk.checked = base.includes(unitId);
+        });
 }
 
 function seleccionarTodasVariablesReporte() {
-    document.querySelectorAll('.chk-variable-reporte').forEach(chk => {
-        chk.checked = true;
-    });
+    document
+        .querySelectorAll('input.chk-variable-reporte')
+        .forEach(chk => {
+            chk.checked = true;
+        });
 }
 
 function limpiarVariablesReporte() {
-    document.querySelectorAll('.chk-variable-reporte').forEach(chk => {
-        chk.checked = false;
-    });
+    document
+        .querySelectorAll('input.chk-variable-reporte')
+        .forEach(chk => {
+            chk.checked = false;
+        });
 }
 
 function obtenerVariablesSeleccionadasReporte() {
     const seleccionadas = [];
 
-    document.querySelectorAll('.chk-variable-reporte:checked').forEach(chk => {
-        seleccionadas.push(chk.value);
-    });
+    document
+        .querySelectorAll('input.chk-variable-reporte:checked')
+        .forEach(chk => {
+            seleccionadas.push(chk.value);
+        });
 
     return seleccionadas;
 }
-
 function generarReporteExcelSeleccionadas() {
     const rango = obtenerRangoReporte();
 
