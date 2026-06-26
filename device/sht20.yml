@@ -1,7 +1,7 @@
 medidores:  
   sht20_sensor:
     device_name: "SHT20"
-    id_device: 7  #26
+    id_device: 26 #7  #26
     port: "/dev/ttyUSB0"
     debug: False #True #False #
     slave_id: 8

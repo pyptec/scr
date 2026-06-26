@@ -1,7 +1,7 @@
 medidores:
   samee100:
     device_name: "SDM630MCT"
-    id_device: 31
+    id_device: 39  #31
     port: "/dev/ttyUSB0"
     debug: False
     slave_id: 1
