@@ -371,39 +371,53 @@ def main_loop():
         hilo_medidor_10min.start()
         util.logging.info("[HILO_MEDIDOR_10MIN] Hilo de medición periódica iniciado.")
         
-    if  util.check_internet_connection():
+    #if  util.check_internet_connection():
          # Conectar al cliente MQTT
-        mqtt_client = awsaccess.connect_to_mqtt()
-        if mqtt_client:
+    #    mqtt_client = awsaccess.connect_to_mqtt()
+    #    if mqtt_client:
                                         
-            awsaccess.publish_mediciones(mqtt_client, conneced_meter)
-            guardar_medicion(conneced_meter, sent_aws=1)
+    #        awsaccess.publish_mediciones(mqtt_client, conneced_meter)
+    #        guardar_medicion(conneced_meter, sent_aws=1)
             #util.logging.INFO("[SQLITE] Conectado a AWS:")
-            for payload in datos.values():
-                guardar_medicion(payload, sent_aws=1)
-                awsaccess.publish_mediciones(mqtt_client, payload)
-            awsaccess.disconnect_from_aws_iot(mqtt_client)# Mantener la conexión activa y recibir mensajes
+    #        for payload in datos.values():
+    #            guardar_medicion(payload, sent_aws=1)
+    #            awsaccess.publish_mediciones(mqtt_client, payload)
+    #        awsaccess.disconnect_from_aws_iot(mqtt_client)# Mantener la conexión activa y recibir mensajes
             
             
-        else:
+    #    else:
             # Hay internet, pero falla conectar MQTT:
-            util.logging.error("No hay Conexion a AWS, almacena en la cola, las mediciones del medidor, Temp, Humedad y la hora de encendido.")
-            guardar_medicion(conneced_meter, sent_aws=0)
+    #        util.logging.error("No hay Conexion a AWS, almacena en la cola, las mediciones del medidor, Temp, Humedad y la hora de encendido.")
+    #        guardar_medicion(conneced_meter, sent_aws=0)
             #util.logging.INFO("[SQLITE] NO Conectado a AWS:")
-            fileventqueue.agregar_evento(conneced_meter)
-            for payload in datos.values():
-                guardar_medicion(payload, sent_aws=0)
-                fileventqueue.agregar_evento(payload)
+    #        fileventqueue.agregar_evento(conneced_meter)
+    #        for payload in datos.values():
+    #            guardar_medicion(payload, sent_aws=0)
+    #            fileventqueue.agregar_evento(payload)
             
-    else:
+    #else:
         # No hay internet:
-        util.logging.error("No hay internet, almacena en la cola, las mediciones del medidor, Temp, Humedad y la hora de encendido.")
-        guardar_medicion(conneced_meter, sent_aws=0)
-        fileventqueue.agregar_evento(conneced_meter)
+    #    util.logging.error("No hay internet, almacena en la cola, las mediciones del medidor, Temp, Humedad y la hora de encendido.")
+    #    guardar_medicion(conneced_meter, sent_aws=0)
+    #    fileventqueue.agregar_evento(conneced_meter)
         
-        for payload in datos.values():
-            guardar_medicion(payload, sent_aws=0)
-            fileventqueue.agregar_evento(payload)
+    #    for payload in datos.values():
+    #        guardar_medicion(payload, sent_aws=0)
+    #        fileventqueue.agregar_evento(payload)
+    
+            # Mediciones cada 10 minutos usando temporizador anterior.
+        # Si USAR_HILO_MEDIDOR_10MIN=True, este bloque queda desactivado
+        # para evitar duplicar mediciones.
+    if (not USAR_HILO_MEDIDOR_10MIN) and tempMedidor == 0:
+        tempMedidor = TIMERMEDICION
+
+        datos = obtener_datos_medidores_y_sensor()
+
+        for nombre, payload in datos.items():
+            publicar_o_encolar_payload(
+                payload,
+                origen=f"TEMPORIZADOR_MEDIDOR/{nombre}"
+            )
         
     # Verificar la temperatura al inicio
     #Temp.check_temp()
@@ -424,54 +438,75 @@ def main_loop():
             # lógica normal de envío cada 3 ciclos
             contador_envio += 1
             if contador_envio >= 3:
-                contador_envio = 0  # Reiniciar después de enviar
-                if  util.check_internet_connection():
-                    mqtt_client = awsaccess.connect_to_mqtt()
-                    if mqtt_client:
-                        try:
-                            awsaccess.publish_mediciones(mqtt_client, Sistema)
-                            guardar_medicion(Sistema, sent_aws=1)
+                contador_envio = 0
+
+                publicar_o_encolar_payload(
+                    Sistema,
+                    origen="SISTEMA"
+                )
+            #if contador_envio >= 3:
+            #    contador_envio = 0  # Reiniciar después de enviar
+            #    if  util.check_internet_connection():
+            #        mqtt_client = awsaccess.connect_to_mqtt()
+            #        if mqtt_client:
+            #            try:
+            #                awsaccess.publish_mediciones(mqtt_client, Sistema)
+            #                guardar_medicion(Sistema, sent_aws=1)
                             
-                        except Exception as e:
-                            guardar_medicion(Sistema, sent_aws=0)
-                            fileventqueue.agregar_evento(Sistema)
-                            util.logging.error(f"[SISTEMA] Error al publicar AWS: {e}")
+            #            except Exception as e:
+            #                guardar_medicion(Sistema, sent_aws=0)
+            #                fileventqueue.agregar_evento(Sistema)
+            #                util.logging.error(f"[SISTEMA] Error al publicar AWS: {e}")
                             
-                        awsaccess.disconnect_from_aws_iot(mqtt_client)
-                    else:
-                        guardar_medicion(Sistema, sent_aws=0)
-                        fileventqueue.agregar_evento(Sistema)
-                else:
-                    guardar_medicion(Sistema, sent_aws=0)
-                    fileventqueue.agregar_evento(Sistema)    
+            #            awsaccess.disconnect_from_aws_iot(mqtt_client)
+            #        else:
+            #            guardar_medicion(Sistema, sent_aws=0)
+            #            fileventqueue.agregar_evento(Sistema)
+            #    else:
+            #        guardar_medicion(Sistema, sent_aws=0)
+            #        fileventqueue.agregar_evento(Sistema)    
              
         # Mediciones cada 10 minutos
-        #if tempMedidor == 0:
+                # Mediciones cada 10 minutos usando temporizador anterior.
+        # Si USAR_HILO_MEDIDOR_10MIN=True, este bloque queda desactivado
+        # para evitar duplicar mediciones.
         if (not USAR_HILO_MEDIDOR_10MIN) and tempMedidor == 0:
             tempMedidor = TIMERMEDICION
-            # mediciones de los medidores ME337 y el  sensor SHT20
+
             datos = obtener_datos_medidores_y_sensor()
-            if  util.check_internet_connection():
-                mqtt_client = awsaccess.connect_to_mqtt()
-                if mqtt_client:
-                    for payload in datos.values():
-                        awsaccess.publish_mediciones(mqtt_client, payload)
-                        guardar_medicion(payload, sent_aws=1)
+
+            for nombre, payload in datos.items():
+                publicar_o_encolar_payload(
+                    payload,
+                    origen=f"TEMPORIZADOR_MEDIDOR/{nombre}"
+                )
+        
+        #if tempMedidor == 0:
+        #if (not USAR_HILO_MEDIDOR_10MIN) and tempMedidor == 0:
+        #    tempMedidor = TIMERMEDICION
+            # mediciones de los medidores ME337 y el  sensor SHT20
+        #    datos = obtener_datos_medidores_y_sensor()
+        #    if  util.check_internet_connection():
+        #        mqtt_client = awsaccess.connect_to_mqtt()
+        #        if mqtt_client:
+        #            for payload in datos.values():
+        #                awsaccess.publish_mediciones(mqtt_client, payload)
+        #                guardar_medicion(payload, sent_aws=1)
                     
-                    awsaccess.disconnect_from_aws_iot(mqtt_client)
+        #            awsaccess.disconnect_from_aws_iot(mqtt_client)
                    
-                else:
+        #        else:
                     # Hay internet, pero falla conectar MQTT:
-                    for payload in datos.values():
-                        guardar_medicion(payload, sent_aws=0)
-                        fileventqueue.agregar_evento(payload)
-            else:
+        #            for payload in datos.values():
+        #                guardar_medicion(payload, sent_aws=0)
+        #                fileventqueue.agregar_evento(payload)
+        #    else:
                 # No hay internet:
                 #for key in ('medidor_1', 'medidor_2', 'sensor_sht20'):
                 #    fileventqueue.agregar_evento(datos[key])
-                for payload in datos.values():
-                    guardar_medicion(payload, sent_aws=0)
-                    fileventqueue.agregar_evento(payload)
+        #        for payload in datos.values():
+        #            guardar_medicion(payload, sent_aws=0)
+        #            fileventqueue.agregar_evento(payload)
                
         if tempQueue == 0:
             tempQueue = TIMERCOLAEVENTOS
