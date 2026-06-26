@@ -261,16 +261,17 @@ def _publish_ivu(i_value: int, v_list, u_list):
         if util.ensure_internet_failover():
             cli = awsaccess.connect_to_mqtt()
             if cli:
+                guardar_medicion(msg, sent_aws=1)
                 awsaccess.publish_mediciones(cli, msg)
                 awsaccess.disconnect_from_aws_iot(cli)
                 util.logging.info(f"[DOOR] Dato enviado (i={i_value}, v={v_list}, u={u_list})")
             else:
                 #util.logging.error("[DOOR] MQTT no disponible. Cola local.")
-                guardar_medicion(msg, sent_aws=1)
+                guardar_medicion(msg, sent_aws=0)
                 fileventqueue.agregar_evento(msg)
         else:
             #util.logging.error("[DOOR] Sin internet. Cola local.")
-            guardar_medicion(msg, sent_aws=1)
+            guardar_medicion(msg, sent_aws=0)
             fileventqueue.agregar_evento(msg)
     except Exception as e:
         util.logging.error(f"[DOOR] Error publicando IVU: {type(e).__name__}: {e}")
