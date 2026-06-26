@@ -38,6 +38,10 @@ TIMECHECKUSBETHERNET = int(os.getenv('TIMECHECKUSBETHERNET', 600))
 TIMECHECK_USB_ETHERNET_TIME = int(os.getenv('TIMECHECK_USB_ETHERNET_TIME', 6))
 
 
+USAR_HILO_MEDIDOR_10MIN = os.getenv("USAR_HILO_MEDIDOR_10MIN", "true").lower() in ["true", "1", "yes", "si"]
+
+
+
 #---------------------------------------------------------------------------------------------------    
 # Función para procesar eventos en la cola
 #---------------------------------------------------------------------------------------------------
@@ -161,7 +165,110 @@ def obtener_datos_medidores_y_sensor():
     # Devolver los tres JSON en un diccionario
     return datos
     
+#---------------------------------------------------------------------------------------------------
+# Publicación/almacenamiento ordenado usando SQLite + cola AWS
+#---------------------------------------------------------------------------------------------------
+def publicar_o_encolar_payload(payload, origen="medicion"):
+    """
+    Guarda la medición en SQLite y publica a AWS si hay conexión.
 
+    Si no hay internet o no se puede conectar a AWS IoT:
+        - Guarda la medición con sent_aws=0.
+        - Envía el payload a awsaccess.publish_mediciones(None, payload),
+          que lo guarda en aws_queue SQLite.
+
+    Si hay conexión MQTT:
+        - Publica con awsaccess.publish_mediciones().
+        - Guarda la medición con sent_aws=1.
+    """
+
+    mqtt_client = None
+
+    try:
+        if util.check_internet_connection():
+            mqtt_client = awsaccess.connect_to_mqtt()
+
+        if mqtt_client:
+            awsaccess.publish_mediciones(mqtt_client, payload)
+            guardar_medicion(payload, sent_aws=1)
+            util.logging.info(f"[{origen}] Publicado en AWS y guardado en SQLite.")
+        else:
+            guardar_medicion(payload, sent_aws=0)
+            awsaccess.publish_mediciones(None, payload)
+            util.logging.warning(f"[{origen}] Sin conexión MQTT. Guardado en SQLite y enviado a cola AWS.")
+
+    except Exception as e:
+        util.logging.error(f"[{origen}] Error publicando/encolando payload: {str(e)}")
+
+        try:
+            guardar_medicion(payload, sent_aws=0)
+        except Exception as db_error:
+            util.logging.error(f"[{origen}] Error guardando medición SQLite: {str(db_error)}")
+
+        try:
+            awsaccess.publish_mediciones(None, payload)
+        except Exception as cola_error:
+            util.logging.error(f"[{origen}] Error guardando en cola AWS SQLite: {str(cola_error)}")
+
+    finally:
+        if mqtt_client:
+            try:
+                awsaccess.disconnect_from_aws_iot(mqtt_client)
+            except Exception as e:
+                util.logging.error(f"[{origen}] Error desconectando MQTT: {str(e)}")
+
+
+#---------------------------------------------------------------------------------------------------
+# Hilo independiente para mediciones de medidor y SHT20 cada TIMERMEDICION
+#---------------------------------------------------------------------------------------------------
+def hilo_mediciones_medidor_10min():
+    """
+    Hilo dedicado para enviar medidor/SHT20 cada TIMERMEDICION segundos.
+
+    Ventaja:
+        - No depende del ciclo principal ni de otros temporizadores.
+        - Evita que la lectura del medidor se retrase por otras tareas.
+        - Usa la misma función obtener_datos_medidores_y_sensor().
+        - Guarda en SQLite y usa cola AWS si no hay conexión.
+    """
+
+    util.logging.info(
+        f"[HILO_MEDIDOR_10MIN] Iniciado. Periodo: {TIMERMEDICION} segundos."
+    )
+
+    # Espera el primer periodo para no duplicar la medición inicial del arranque
+    time.sleep(TIMERMEDICION)
+
+    while True:
+        inicio_ciclo = time.time()
+
+        try:
+            util.logging.info("[HILO_MEDIDOR_10MIN] Iniciando lectura periódica de medidor/SHT20.")
+
+            datos = obtener_datos_medidores_y_sensor()
+
+            if not datos:
+                util.logging.warning("[HILO_MEDIDOR_10MIN] No se obtuvieron datos de medidor/SHT20.")
+            else:
+                for nombre, payload in datos.items():
+                    publicar_o_encolar_payload(
+                        payload,
+                        origen=f"HILO_MEDIDOR_10MIN/{nombre}"
+                    )
+
+            util.logging.info("[HILO_MEDIDOR_10MIN] Ciclo de medición finalizado.")
+
+        except Exception as e:
+            util.logging.error(f"[HILO_MEDIDOR_10MIN] Error general en ciclo: {str(e)}")
+
+        duracion = time.time() - inicio_ciclo
+        espera = max(5, TIMERMEDICION - duracion)
+
+        util.logging.info(
+            f"[HILO_MEDIDOR_10MIN] Próxima medición en {round(espera, 1)} segundos."
+        )
+
+        time.sleep(espera)
 # Lógica principal
 def main_loop():
     #global ssh_process  
@@ -182,6 +289,15 @@ def main_loop():
     # mediciones de los medidores ME337 y el  sensor SHT20
     datos = obtener_datos_medidores_y_sensor()
     Temp.iniciar_wdt()
+        # Hilo independiente para mediciones cada 10 minutos
+    if USAR_HILO_MEDIDOR_10MIN:
+        hilo_medidor_10min = threading.Thread(
+            target=hilo_mediciones_medidor_10min,
+            daemon=True
+        )
+        hilo_medidor_10min.start()
+        util.logging.info("[HILO_MEDIDOR_10MIN] Hilo de medición periódica iniciado.")
+        
     if  util.check_internet_connection():
          # Conectar al cliente MQTT
         mqtt_client = awsaccess.connect_to_mqtt()
@@ -257,7 +373,8 @@ def main_loop():
                     fileventqueue.agregar_evento(Sistema)    
              
         # Mediciones cada 10 minutos
-        if tempMedidor == 0:
+        #if tempMedidor == 0:
+        if (not USAR_HILO_MEDIDOR_10MIN) and tempMedidor == 0:
             tempMedidor = TIMERMEDICION
             # mediciones de los medidores ME337 y el  sensor SHT20
             datos = obtener_datos_medidores_y_sensor()
