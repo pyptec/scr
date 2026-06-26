@@ -6,6 +6,7 @@ import util
 import threading
 import signal
 import  awsaccess, fileventqueue, modbusdevices
+from db.samee100_db import guardar_medicion
 # constantes de programa
 FORMATO_DATE="%d/%m/%Y %H:%M "
 GPIO11_VENTILADOR=11 #11 18
@@ -265,9 +266,11 @@ def _publish_ivu(i_value: int, v_list, u_list):
                 util.logging.info(f"[DOOR] Dato enviado (i={i_value}, v={v_list}, u={u_list})")
             else:
                 #util.logging.error("[DOOR] MQTT no disponible. Cola local.")
+                guardar_medicion(msg, sent_aws=1)
                 fileventqueue.agregar_evento(msg)
         else:
             #util.logging.error("[DOOR] Sin internet. Cola local.")
+            guardar_medicion(msg, sent_aws=1)
             fileventqueue.agregar_evento(msg)
     except Exception as e:
         util.logging.error(f"[DOOR] Error publicando IVU: {type(e).__name__}: {e}")
