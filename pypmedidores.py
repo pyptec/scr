@@ -47,17 +47,12 @@ USAR_HILO_MEDIDOR_10MIN = os.getenv("USAR_HILO_MEDIDOR_10MIN", "true").lower() i
 #---------------------------------------------------------------------------------------------------
 def process_event_queue():
     """
-    Procesa la cola de eventos AWS almacenada en SQLite.
+    Procesa únicamente la cola AWS en SQLite.
 
-    Flujo:
-    - Si no hay eventos pendientes, no hace nada.
-    - Si hay internet, intenta conectar a AWS IoT.
-    - Si conecta, reenvía eventos pendientes desde aws_queue.
-    - Si publica correctamente, awsaccess.reenviar_pendientes_aws()
-      marca los eventos como sent.
-    - Si falla, quedan como pending y aumenta attempts.
+    Cola oficial:
+        data/samee100.db -> tabla aws_queue
 
-    Se deja compatibilidad con fileventqueue como respaldo antiguo.
+    La cola antigua fileventqueue queda deshabilitada en flujo normal.
     """
 
     try:
@@ -66,79 +61,36 @@ def process_event_queue():
         pendientes = contar_pendientes()
         util.logging.info(f"[AWS_QUEUE] Eventos pendientes SQLite: {pendientes}")
 
-        if pendientes > 0:
-            if util.check_internet_connection():
-                mqtt_client = awsaccess.connect_to_mqtt()
-
-                if mqtt_client:
-                    enviados = awsaccess.reenviar_pendientes_aws(
-                        mqtt_client,
-                        limit=50
-                    )
-
-                    util.logging.info(
-                        f"[AWS_QUEUE] Reenvío finalizado. "
-                        f"Eventos enviados: {enviados}. "
-                        f"Resumen cola: {resumen_cola_aws()}"
-                    )
-
-                    awsaccess.disconnect_from_aws_iot(mqtt_client)
-
-                else:
-                    util.logging.info(
-                        "[AWS_QUEUE] Hay internet, pero no se pudo conectar a AWS IoT."
-                    )
-            else:
-                util.logging.info(
-                    "[AWS_QUEUE] No hay internet. La cola SQLite queda pendiente."
-                )
-        else:
+        if pendientes <= 0:
             util.logging.info("[AWS_QUEUE] No hay eventos pendientes en SQLite.")
+            return
 
-        # Respaldo antiguo: procesar fileventqueue solo si todavía tiene eventos.
-        try:
-            if fileventqueue.contar_eventos() != 0:
-                util.logging.info(
-                    "[FILE_QUEUE] Hay eventos en cola antigua. Intentando procesar respaldo."
-                )
+        if not util.check_internet_connection():
+            util.logging.info("[AWS_QUEUE] No hay internet. La cola SQLite queda pendiente.")
+            return
 
-                if util.check_internet_connection():
-                    mqtt_client = awsaccess.connect_to_mqtt()
+        mqtt_client = awsaccess.connect_to_mqtt()
 
-                    if mqtt_client:
-                        eventos = fileventqueue.procesar_eventos_de_uno_en_uno()
+        if not mqtt_client:
+            util.logging.info("[AWS_QUEUE] Hay internet, pero no se pudo conectar a AWS IoT.")
+            return
 
-                        for evento in eventos:
-                            hilo_queue = threading.Thread(
-                                target=Temp.parpadear_led_500ms
-                            )
-                            hilo_queue.start()
+        enviados = awsaccess.reenviar_pendientes_aws(
+            mqtt_client,
+            limit=50
+        )
 
-                            awsaccess.publish_to_topic(
-                                mqtt_client,
-                                os.getenv('TOPIC'),
-                                evento
-                            )
+        util.logging.info(
+            f"[AWS_QUEUE] Reenvío finalizado. "
+            f"Eventos enviados: {enviados}. "
+            f"Resumen cola: {resumen_cola_aws()}"
+        )
 
-                            time.sleep(0.2)
-                            hilo_queue.join()
-
-                        awsaccess.disconnect_from_aws_iot(mqtt_client)
-                    else:
-                        util.logging.info(
-                            "[FILE_QUEUE] No se pudo conectar a AWS IoT para procesar cola antigua."
-                        )
-                else:
-                    util.logging.info(
-                        "[FILE_QUEUE] No hay internet para procesar cola antigua."
-                    )
-
-        except Exception as e:
-            util.logging.error(f"[FILE_QUEUE] Error procesando respaldo antiguo: {str(e)}")
+        awsaccess.disconnect_from_aws_iot(mqtt_client)
 
     except Exception as e:
         util.logging.error(f"[AWS_QUEUE] Error general procesando cola SQLite: {str(e)}")
- 
+        
 #---------------------------------------------------------------------------------------------------    
 # simulador de datos del medidor eastron
 #---------------------------------------------------------------------------------------------------  
@@ -370,6 +322,12 @@ def main_loop():
         )
         hilo_medidor_10min.start()
         util.logging.info("[HILO_MEDIDOR_10MIN] Hilo de medición periódica iniciado.")
+        
+        # Publicación inicial usando flujo unificado SQLite + AWS_QUEUE
+    publicar_o_encolar_payload(conneced_meter, origen="ARRANQUE/connected_meter")
+
+    for nombre, payload in datos.items():
+        publicar_o_encolar_payload(payload, origen=f"ARRANQUE/{nombre}")
         
     #if  util.check_internet_connection():
          # Conectar al cliente MQTT
