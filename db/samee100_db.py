@@ -47,6 +47,33 @@ def get_conn():
 
     return conn
 
+def asegurar_columnas_unidades(conn):
+    """
+    Asegura compatibilidad con bases antiguas donde la tabla unidades
+    no tenía la columna description.
+    """
+
+    cur = conn.cursor()
+
+    cur.execute("PRAGMA table_info(unidades)")
+    columnas = [row["name"] for row in cur.fetchall()]
+
+    if "description" not in columnas:
+        cur.execute("""
+        ALTER TABLE unidades
+        ADD COLUMN description TEXT
+        """)
+
+        cur.execute("""
+        UPDATE unidades
+        SET description = name
+        WHERE description IS NULL
+           OR TRIM(description) = ''
+        """)
+
+        print("[SQLITE] Columna description agregada a tabla unidades.")
+
+
 def cargar_unidades_desde_csv(conn):
     """
     Carga el catálogo de unidades desde:
@@ -231,6 +258,7 @@ def init_db():
 
     - Crea carpeta data/ si no existe.
     - Ejecuta schema.sql.
+    - Aplica migraciones compatibles con bases antiguas.
     - Carga gateways, dispositivos y unidades desde catálogo CSV.
     """
 
@@ -241,11 +269,13 @@ def init_db():
 
     conn.executescript(schema_sql)
 
+    asegurar_columnas_unidades(conn)
+
     cargar_catalogos_base(conn)
 
     conn.commit()
     conn.close()
-
+    
 def extraer_origen_item(item, device_id_respaldo=None):
     """
     Detecta el origen de una medición.
