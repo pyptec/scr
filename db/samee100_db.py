@@ -432,6 +432,7 @@ def guardar_medicion(payload, device_id=None, sent_aws=0):
 
 
 def agregar_a_cola(payload, topic=None, medicion_id=None):
+    
     if isinstance(payload, dict):
         payload_json = json.dumps(payload)
     else:
@@ -465,6 +466,7 @@ def agregar_a_cola(payload, topic=None, medicion_id=None):
 
 
 def obtener_pendientes(limit=50):
+    
     conn = get_conn()
     cur = conn.cursor()
 
