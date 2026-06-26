@@ -1,12 +1,13 @@
 import sqlite3
 import json
+import csv
 from datetime import datetime, timezone
 from pathlib import Path
 
 
 DB_PATH = Path("data/samee100.db")
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
-
+UNIDADES_CSV_PATH = Path(__file__).with_name("catalogos_unidades.csv")
 
 def utc_now():
     return datetime.now(timezone.utc).isoformat()
@@ -22,6 +23,9 @@ def get_conn():
     Se activa WAL para permitir que el recolector escriba mientras
     el dashboard consulta datos o genera reportes Excel.
     """
+
+    # Asegura que exista la carpeta data/
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     conn = sqlite3.connect(DB_PATH, timeout=30)
 
@@ -43,8 +47,193 @@ def get_conn():
 
     return conn
 
+def cargar_unidades_desde_csv(conn):
+    """
+    Carga el catálogo de unidades desde:
+        db/catalogos_unidades.csv
+
+    Formato esperado:
+        UnitId;Name;Simbol
+
+    No borra datos existentes.
+    Si una unidad ya existe, actualiza nombre, símbolo y descripción.
+    """
+
+    if not UNIDADES_CSV_PATH.exists():
+        print(f"[SQLITE] No existe catálogo de unidades: {UNIDADES_CSV_PATH}")
+        return
+
+    cur = conn.cursor()
+
+    with open(UNIDADES_CSV_PATH, "r", encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f, delimiter=";")
+
+        for row in reader:
+            try:
+                unit_id = int(str(row.get("UnitId", "")).strip())
+            except Exception:
+                continue
+
+            name = str(row.get("Name", "")).strip()
+            simbol = str(row.get("Simbol", "")).strip()
+
+            if not name:
+                name = f"Unit {unit_id}"
+
+            cur.execute("""
+            INSERT INTO unidades (
+                unit_id,
+                name,
+                simbol,
+                description
+            )
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(unit_id) DO UPDATE SET
+                name = excluded.name,
+                simbol = excluded.simbol,
+                description = excluded.description
+            """, (
+                unit_id,
+                name,
+                simbol,
+                name
+            ))
+
+
+def cargar_catalogos_base(conn):
+    """
+    Carga catálogos base necesarios para operar.
+
+    - Gateways conocidos.
+    - Dispositivos conocidos.
+    - Unidades desde db/catalogos_unidades.csv.
+    """
+
+    cur = conn.cursor()
+
+    cur.execute("""
+    INSERT OR IGNORE INTO gateways (
+        gateway_id,
+        nombre,
+        tipo,
+        ubicacion,
+        cliente
+    )
+    VALUES (
+        8,
+        'SAMEE100-ALKOSTO',
+        'Gateway energético',
+        'Tablero solar',
+        'ALKOSTO'
+    )
+    """)
+
+    cur.executemany("""
+    INSERT OR IGNORE INTO dispositivos (
+        device_id,
+        gateway_id,
+        nombre,
+        tipo,
+        ubicacion
+    )
+    VALUES (?, ?, ?, ?, ?)
+    """, [
+        (31, 8, 'Eastron SDM630', 'Medidor eléctrico trifásico', 'Tablero solar'),
+        (7,  8, 'SHT20', 'Sensor temperatura y humedad', 'Gabinete SAMEE100'),
+        (13, 8, 'Sistema SAMEE100', 'Variables internas del gateway', 'Raspberry Pi / Gateway')
+    ])
+
+    cargar_unidades_desde_csv(conn)
+
+
+def asegurar_catalogos_detalle(cur, gateway_id=None, device_id=None, unit_id=None):
+    """
+    Asegura las referencias antes de insertar en mediciones_detalle.
+
+    Evita:
+        FOREIGN KEY constraint failed
+
+    Si llega una unidad nueva no incluida en el CSV, se crea como Unit <id>.
+    Si llega un gateway nuevo, se crea automáticamente.
+    Si llega un device nuevo, se crea automáticamente.
+    """
+
+    if gateway_id not in [None, "", "None"]:
+        try:
+            gateway_id_int = int(gateway_id)
+
+            cur.execute("""
+            INSERT OR IGNORE INTO gateways (
+                gateway_id,
+                nombre,
+                tipo,
+                ubicacion,
+                cliente
+            )
+            VALUES (?, ?, ?, ?, ?)
+            """, (
+                gateway_id_int,
+                f"Gateway {gateway_id_int}",
+                "Gateway detectado automáticamente",
+                "Sin ubicación",
+                "Sin cliente"
+            ))
+        except Exception:
+            pass
+
+    if device_id not in [None, "", "None"]:
+        try:
+            device_id_int = int(device_id)
+
+            cur.execute("""
+            INSERT OR IGNORE INTO dispositivos (
+                device_id,
+                gateway_id,
+                nombre,
+                tipo,
+                ubicacion
+            )
+            VALUES (?, ?, ?, ?, ?)
+            """, (
+                device_id_int,
+                None,
+                f"Device {device_id_int}",
+                "Dispositivo detectado automáticamente",
+                "Sin ubicación"
+            ))
+        except Exception:
+            pass
+
+    if unit_id not in [None, "", "None"]:
+        try:
+            unit_id_int = int(unit_id)
+
+            cur.execute("""
+            INSERT OR IGNORE INTO unidades (
+                unit_id,
+                name,
+                simbol,
+                description
+            )
+            VALUES (?, ?, ?, ?)
+            """, (
+                unit_id_int,
+                f"Unit {unit_id_int}",
+                "",
+                "Unidad detectada automáticamente"
+            ))
+        except Exception:
+            pass
 
 def init_db():
+    """
+    Inicializa la base local.
+
+    - Crea carpeta data/ si no existe.
+    - Ejecuta schema.sql.
+    - Carga gateways, dispositivos y unidades desde catálogo CSV.
+    """
+
     conn = get_conn()
 
     with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
@@ -52,9 +241,10 @@ def init_db():
 
     conn.executescript(schema_sql)
 
+    cargar_catalogos_base(conn)
+
     conn.commit()
     conn.close()
-
 
 def extraer_origen_item(item, device_id_respaldo=None):
     """
@@ -201,6 +391,13 @@ def guardar_medicion(payload, device_id=None, sent_aws=0):
                     unit_id_int = int(unit_id)
                 except Exception:
                     continue
+
+                asegurar_catalogos_detalle(
+                    cur,
+                    gateway_id=gateway_det,
+                    device_id=device_det,
+                    unit_id=unit_id_int
+                )
 
                 cur.execute("""
                 INSERT INTO mediciones_detalle (
@@ -477,3 +674,4 @@ def obtener_ultimo_error_cola():
     conn.close()
 
     return dict(row) if row else None
+

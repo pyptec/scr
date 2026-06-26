@@ -18,7 +18,8 @@ medidorsamee100/
 # =========================
 # Variables de entorno / secretos
 # =========================
-
+#.env
+# *.env
 
 # =========================
 # Certificados y llaves AWS / TLS
