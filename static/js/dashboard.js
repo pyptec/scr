@@ -4,6 +4,7 @@ let rangoActual = 'hoy';
 let ultimosValores = [];
 let variablesDisponibles = [];
 let variablesDisponiblesReporte = [];
+
 let configDashboard = {
     gateway_id: null,
     device_id: "",
@@ -11,6 +12,68 @@ let configDashboard = {
     medidor_nombre: "Medidor principal",
     gateway_nombre: "Gateway"
 };
+
+async function cargarConfigDashboard() {
+    try {
+        const resp = await fetch("/api/config_dashboard");
+
+        if (!resp.ok) {
+            throw new Error("No se pudo cargar /api/config_dashboard");
+        }
+
+        const data = await resp.json();
+
+        configDashboard.gateway_id = data.gateway_id ?? null;
+        configDashboard.device_id = String(data.device_id ?? "");
+        configDashboard.source_type = data.source_type || "device";
+        configDashboard.medidor_nombre = data.medidor_nombre || "Medidor principal";
+        configDashboard.gateway_nombre = data.gateway_nombre || "Gateway";
+
+        console.log("[CONFIG DASHBOARD]", configDashboard);
+
+    } catch (error) {
+        console.warn("[CONFIG DASHBOARD] No se pudo cargar configuración desde YAML", error);
+    }
+}
+
+function urlSerieMedidorPrincipal(unitId, rango, limite = 200) {
+    const params = new URLSearchParams({
+        inicio: rango.inicio,
+        fin: rango.fin,
+        limite: limite,
+        source_type: configDashboard.source_type
+    });
+
+    if (configDashboard.gateway_id !== null && configDashboard.gateway_id !== undefined) {
+        params.append("gateway_id", configDashboard.gateway_id);
+    }
+
+    if (configDashboard.device_id) {
+        params.append("device_id", configDashboard.device_id);
+    }
+
+    return `/api/serie/${unitId}?${params.toString()}`;
+}
+
+function urlSeriesMedidorPrincipal(ids, rango, limite = 200) {
+    const params = new URLSearchParams({
+        ids: ids,
+        inicio: rango.inicio,
+        fin: rango.fin,
+        limite: limite,
+        source_type: configDashboard.source_type
+    });
+
+    if (configDashboard.gateway_id !== null && configDashboard.gateway_id !== undefined) {
+        params.append("gateway_id", configDashboard.gateway_id);
+    }
+
+    if (configDashboard.device_id) {
+        params.append("device_id", configDashboard.device_id);
+    }
+
+    return `/api/series?${params.toString()}`;
+}
 
 /* =========================
    FORMATO DE FECHAS
@@ -175,10 +238,10 @@ async function mostrarGrafica(tipo) {
 
     if (tipo === 'potencia') {
         document.getElementById('tituloGrafica').innerText =
-            'Potencia Activa Total';
+            `Potencia Activa Total - ${configDashboard.medidor_nombre}`;
 
         const res = await fetch(
-            `/api/serie/61?inicio=${rango.inicio}&fin=${rango.fin}&limite=200&gateway_id=8&source_type=device&device_id=31`
+            urlSerieMedidorPrincipal(61, rango, 200)
         );
 
         const data = await res.json();
@@ -220,10 +283,10 @@ async function mostrarGrafica(tipo) {
 
     if (tipo === 'voltajes') {
         document.getElementById('tituloGrafica').innerText =
-            'Voltajes Línea-Neutro';
+            `Voltajes Línea-Neutro - ${configDashboard.medidor_nombre}`;
 
         const res = await fetch(
-            `/api/series?ids=7,8,9&inicio=${rango.inicio}&fin=${rango.fin}&limite=200&gateway_id=8&source_type=device&device_id=31`
+            urlSeriesMedidorPrincipal("7,8,9", rango, 200)
         );
 
         const data = await res.json();
@@ -259,10 +322,10 @@ async function mostrarGrafica(tipo) {
 
     if (tipo === 'corrientes') {
         document.getElementById('tituloGrafica').innerText =
-            'Corrientes por Fase';
+            `Corrientes por Fase - ${configDashboard.medidor_nombre}`;
 
         const res = await fetch(
-            `/api/series?ids=10,11,12&inicio=${rango.inicio}&fin=${rango.fin}&limite=200&gateway_id=8&source_type=device&device_id=31`
+            urlSeriesMedidorPrincipal("10,11,12", rango, 200)
         );
 
         const data = await res.json();
@@ -1100,14 +1163,17 @@ async function cargarEstadoGateway() {
                 ? 'estado-ok'
                 : 'estado-alerta';
 
+        const estadoMedidor =
+            data.estado_medidor_principal || data.estado_medidor_31 || 'SIN DATOS';
+
         const estadoMedidorClase =
-            data.estado_medidor_31 === 'OK'
+            estadoMedidor === 'OK'
                 ? 'estado-ok'
                 : 'estado-alerta';
 
         pintarEstadoTexto(
             'estadoGateway',
-            `${data.gateway || 'Gateway'} ID ${data.gateway_id || ''}`
+            `${data.gateway || data.gateway_nombre || 'Gateway'} ID ${data.gateway_id || ''}`
         );
 
         pintarEstadoTexto(
@@ -1131,7 +1197,7 @@ async function cargarEstadoGateway() {
 
         pintarEstadoTexto(
             'estadoMedidor31',
-            data.estado_medidor_31 || '--',
+            estadoMedidor,
             estadoMedidorClase
         );
 
