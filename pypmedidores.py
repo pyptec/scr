@@ -16,6 +16,7 @@ import subprocess
 import modbusdevices
 from db.samee100_db import init_db
 from db.samee100_db import guardar_medicion
+from db.samee100_db import registrar_gateway_dispositivo_desde_config
 import random
    
 
@@ -156,6 +157,7 @@ def obtener_datos_medidores_y_sensor():
         cfg_path = os.getenv("CFG_EASTRON")
         cfg_section = os.getenv("CFG_EASTRON_SECTION")
         config = util.cargar_configuracion(cfg_path, cfg_section)
+        registrar_gateway_dispositivo_desde_config(config)
         simular = str(config.get("simular", False)).lower() == "true"
         
         if simular:
@@ -166,12 +168,14 @@ def obtener_datos_medidores_y_sensor():
     elif medidor_activo == "meatrol":
         # PRIMER medidor ME337
         config = util.cargar_configuracion(os.getenv("CFG_MEATROL1"), os.getenv("CFG_MEATROL1_SECTION"))
+        registrar_gateway_dispositivo_desde_config(config)
         medicion = modbusdevices.payload_event_modbus(config)  # Obtener la medición como JSON
         datos ['medicionME337'] = json.dumps(medicion)  # Convertir a JSON con formato legible
         #print(medicionME337)
 
         # Configurar el segundo medidor ME3372
         config2 = util.cargar_configuracion(os.getenv("CFG_MEATROL2"), os.getenv("CFG_MEATROL2_SECTION"))
+        registrar_gateway_dispositivo_desde_config(config2)
         medicion2 = modbusdevices.payload_event_modbus(config2)  # Obtener la medición como JSON
         datos ['medicionME3372'] = json.dumps(medicion2)  # Convertir a JSON con formato legible
         #print(medicionME3372)
@@ -180,6 +184,7 @@ def obtener_datos_medidores_y_sensor():
     
     # Configurar el sensor SHT20
     config_sht20 = util.cargar_configuracion(os.getenv("CFG_SHT20"),os.getenv("CFG_SHT20_SECTION"))
+    registrar_gateway_dispositivo_desde_config(config_sht20)
     simular_sht20 = str(config_sht20.get("simular", False)).lower() == "true"
     if simular_sht20:
         medicion_sht20 = payload_event_modbus_simulado(config_sht20)

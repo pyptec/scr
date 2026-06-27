@@ -3,6 +3,20 @@ medidores:
   meatrolME337_2:
     device_name: "ME337"
     id_device: 30 #25
+
+    gateway:
+      gateway_id: 10
+      nombre: "SAMEE100-PANELES"
+      tipo: "Gateway energético"
+      ubicacion: "Tablero solar"
+      cliente: "PANELES"
+
+    device:
+      device_id: 30
+      nombre: "Meatrol ME337-2"
+      tipo: "Medidor eléctrico trifásico"
+      ubicacion: "Tablero secundario"
+      
     port: "/dev/ttyS0"
     debug: False 
     slave_id: 46

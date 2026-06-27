@@ -2,6 +2,14 @@ medidores:
   pyp_connect:
     id_device: 1
     i: 10 #8  #10
+
+    gateway:
+      gateway_id: 10
+      nombre: "SAMEE100-PANELES"
+      tipo: "Gateway energético"
+      ubicacion: "Tablero solar"
+      cliente: "PANELES"
+      
     registers:
       - name: conexion
         alias: connect

@@ -2,6 +2,21 @@ medidores:
   sht20_sensor:
     device_name: "SHT20"
     id_device: 26 #7  #26
+
+    gateway:
+      gateway_id: 10
+      nombre: "SAMEE100-PANELES"
+      tipo: "Gateway energético"
+      ubicacion: "Tablero solar"
+      cliente: "PANELES"
+
+    device:
+      device_id: 26
+      nombre: "SHT20"
+      tipo: "Sensor temperatura y humedad"
+      ubicacion: "Gabinete SAMEE100"
+      cliente: "PANELES"
+      
     port: "/dev/ttyUSB0"
     debug: False #True #False #
     slave_id: 8

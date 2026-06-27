@@ -1,6 +1,19 @@
 medidores:
   variables_del_sistema:
     id_device:  15 #13     #15  debuger es 15 en plataforma      # <- este será tu "g"
+    gateway:
+      gateway_id: 10
+      nombre: "SAMEE100-PANELES"
+      tipo: "Gateway energético"
+      ubicacion: "Tablero solar"
+      cliente: "PANELES"
+
+    device:
+      device_id: 15
+      nombre: "Sistema SAMEE100"
+      tipo: "Variables internas del gateway"
+      ubicacion: "Raspberry Pi / Gateway"
+    
     unidades: 
       - codigo: 1
         descripcion: "Temperatura CPU (°C)"

@@ -2,6 +2,21 @@ medidores:
   samee100:
     device_name: "SDM630MCT"
     id_device: 39  #31
+    
+    gateway:
+      gateway_id: 10
+      nombre: "SAMEE100-PANELES"
+      tipo: "Gateway energético"
+      ubicacion: "Tablero solar"
+      cliente: "PANELES"
+
+    device:
+      device_id: 39
+      nombre: "Eastron SDM630"
+      tipo: "Medidor eléctrico trifásico"
+      ubicacion: "Tablero solar"
+      cliente: "PANELES"
+      
     port: "/dev/ttyUSB0"
     debug: False
     slave_id: 1
