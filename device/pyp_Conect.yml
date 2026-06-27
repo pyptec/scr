@@ -1,6 +1,9 @@
 medidores:
   pyp_connect:
-    id_device: 1
+    enabled: true
+    source_type: gateway
+
+    
     i: 10 #8  #10
 
     gateway:

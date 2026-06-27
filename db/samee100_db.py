@@ -131,44 +131,11 @@ def cargar_catalogos_base(conn):
     """
     Carga catálogos base necesarios para operar.
 
-    - Gateways conocidos.
-    - Dispositivos conocidos.
-    - Unidades desde db/catalogos_unidades.csv.
+    Importante:
+    - Las unidades se cargan desde db/catalogos_unidades.csv.
+    - Los gateways y dispositivos NO se queman aquí.
+    - Los gateways/dispositivos se cargan dinámicamente desde los YAML.
     """
-
-    cur = conn.cursor()
-
-    cur.execute("""
-    INSERT OR IGNORE INTO gateways (
-        gateway_id,
-        nombre,
-        tipo,
-        ubicacion,
-        cliente
-    )
-    VALUES (
-        8,
-        'SAMEE100-ALKOSTO',
-        'Gateway energético',
-        'Tablero solar',
-        'ALKOSTO'
-    )
-    """)
-
-    cur.executemany("""
-    INSERT OR IGNORE INTO dispositivos (
-        device_id,
-        gateway_id,
-        nombre,
-        tipo,
-        ubicacion
-    )
-    VALUES (?, ?, ?, ?, ?)
-    """, [
-        (31, 8, 'Eastron SDM630', 'Medidor eléctrico trifásico', 'Tablero solar'),
-        (7,  8, 'SHT20', 'Sensor temperatura y humedad', 'Gabinete SAMEE100'),
-        (13, 8, 'Sistema SAMEE100', 'Variables internas del gateway', 'Raspberry Pi / Gateway')
-    ])
 
     cargar_unidades_desde_csv(conn)
 
@@ -709,31 +676,23 @@ def obtener_ultimo_error_cola():
 
 def registrar_gateway_dispositivo_desde_config(config):
     """
-    Registra o actualiza gateway y dispositivo desde una configuración YAML.
+    Registra o actualiza gateway y dispositivo desde configuración YAML.
 
-    Estructura esperada dentro del YAML:
-
-        gateway:
-          gateway_id: 10
-          nombre: SAMEE100-PANELES
-          tipo: Gateway energético
-          ubicacion: Tablero solar
-          cliente: PANELES
-
-        device:
-          device_id: 39
-          nombre: Eastron SDM630
-          tipo: Medidor eléctrico trifásico
-          ubicacion: Tablero solar
-
-    También acepta compatibilidad con:
-        id_device
-        device_id
-        gateway_id
+    Reglas:
+    - enabled: false no registra nada.
+    - source_type: gateway registra solo gateway.
+    - source_type: device registra gateway y device.
+    - Si tiene i y source_type=gateway, NO crea dispositivo.
     """
 
     if not isinstance(config, dict):
         return
+
+    enabled = config.get("enabled", True)
+    if str(enabled).lower() in ["false", "0", "no", "off"]:
+        return
+
+    source_type = str(config.get("source_type", "")).lower().strip()
 
     gateway_cfg = config.get("gateway", {}) or {}
     device_cfg = config.get("device", {}) or {}
@@ -744,11 +703,16 @@ def registrar_gateway_dispositivo_desde_config(config):
         or config.get("i")
     )
 
-    device_id = (
-        device_cfg.get("device_id")
-        or config.get("id_device")
-        or config.get("device_id")
-    )
+    # Regla principal:
+    # Si es gateway, no crear dispositivo aunque exista id_device accidental.
+    if source_type == "gateway":
+        device_id = None
+    else:
+        device_id = (
+            device_cfg.get("device_id")
+            or config.get("id_device")
+            or config.get("device_id")
+        )
 
     conn = get_conn()
     cur = conn.cursor()
@@ -756,7 +720,6 @@ def registrar_gateway_dispositivo_desde_config(config):
     try:
         gateway_id_int = None
 
-        # Registrar / actualizar gateway
         if gateway_id not in [None, "", "None"]:
             gateway_id_int = int(gateway_id)
 
@@ -782,7 +745,6 @@ def registrar_gateway_dispositivo_desde_config(config):
                 gateway_cfg.get("cliente", "")
             ))
 
-        # Registrar / actualizar dispositivo
         if device_id not in [None, "", "None"]:
             device_id_int = int(device_id)
 

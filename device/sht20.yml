@@ -1,5 +1,9 @@
 medidores:  
   sht20_sensor:
+
+    enabled: true
+    source_type: device
+
     device_name: "SHT20"
     id_device: 26 #7  #26
 

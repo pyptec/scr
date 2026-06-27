@@ -299,10 +299,77 @@ def hilo_mediciones_medidor_10min():
         )
 
         time.sleep(espera)
+        
+def registrar_catalogos_iniciales_desde_env():
+    """
+    Registra solo los YAML activos para este equipo.
+
+    La lista activa se define en .env:
+
+        CONFIGS_ACTIVAS=CFG_EASTRON,CFG_SHT20,CFG_SISTEMA,CFG_PYP_CONNECT
+
+    Cada CFG debe tener su SECTION:
+        CFG_EASTRON
+        CFG_EASTRON_SECTION
+    """
+
+    configs_activas = os.getenv("CONFIGS_ACTIVAS", "")
+
+    if not configs_activas.strip():
+        util.logging.warning("[CATALOGO] CONFIGS_ACTIVAS no está definido en .env")
+        return
+
+    for cfg_name in configs_activas.split(","):
+        cfg_name = cfg_name.strip()
+
+        if not cfg_name:
+            continue
+
+        section_name = f"{cfg_name}_SECTION"
+
+        cfg_path = os.getenv(cfg_name)
+        cfg_section = os.getenv(section_name)
+
+        if not cfg_path or not cfg_section:
+            util.logging.warning(
+                f"[CATALOGO] Config incompleta: {cfg_name}={cfg_path}, {section_name}={cfg_section}"
+            )
+            continue
+
+        try:
+            config = util.cargar_configuracion(cfg_path, cfg_section)
+
+            if not config:
+                util.logging.warning(
+                    f"[CATALOGO] YAML vacío o sección no encontrada: {cfg_path} / {cfg_section}"
+                )
+                continue
+
+            enabled = config.get("enabled", True)
+            if str(enabled).lower() in ["false", "0", "no", "off"]:
+                util.logging.info(
+                    f"[CATALOGO] YAML deshabilitado: {cfg_path} / {cfg_section}"
+                )
+                continue
+
+            registrar_gateway_dispositivo_desde_config(config)
+
+            util.logging.info(
+                f"[CATALOGO] Registrado: {cfg_name}={cfg_path}, section={cfg_section}"
+            )
+
+        except Exception as e:
+            util.logging.error(
+                f"[CATALOGO] Error cargando {cfg_name}/{section_name}: {str(e)}"
+            )     
+        
+        
 # Lógica principal
 def main_loop():
     #global ssh_process  
     init_db()
+    registrar_catalogos_iniciales_desde_env()
+    
     tempRaspberry = TIMERCHEQUEOTEMPERATURA
     tempMedidor   = TIMERMEDICION
     tempQueue     = TIMERCOLAEVENTOS

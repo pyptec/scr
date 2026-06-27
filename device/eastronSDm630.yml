@@ -1,5 +1,9 @@
 medidores:
   samee100:
+
+    enabled: true
+    source_type: device
+
     device_name: "SDM630MCT"
     id_device: 39  #31
     
@@ -8,14 +12,14 @@ medidores:
       nombre: "SAMEE100-ALKOSTO"
       tipo: "Gateway energético"
       ubicacion: "Tablero solar"
-      cliente: "PANELES"
+      cliente: "ALKOSTO"
 
     device:
       device_id: 39
       nombre: "Eastron SDM630"
       tipo: "Medidor eléctrico trifásico"
       ubicacion: "Tablero solar"
-      cliente: "PANELES"
+     
       
     port: "/dev/ttyUSB0"
     debug: False
