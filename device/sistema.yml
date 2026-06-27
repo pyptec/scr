@@ -1,5 +1,6 @@
 medidores:
   variables_del_sistema:
+    device_name: "SISTEMA"
     id_device:  15 #13     #15  debuger es 15 en plataforma      # <- este será tu "g"
     gateway:
       gateway_id: 10
