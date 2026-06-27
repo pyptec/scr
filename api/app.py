@@ -12,6 +12,11 @@ from db.reporte_excel import crear_reporte_excel
 import time
 import sqlite3
 from flask import jsonify
+import os
+from dotenv import load_dotenv
+import util
+
+load_dotenv("/home/pi/SAMEE100/scr/.env")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -22,6 +27,101 @@ app = Flask(
 )
 
 init_db()
+
+
+def obtener_config_dashboard_desde_yml():
+    """
+    Lee la configuración activa del dashboard desde el YAML indicado en .env.
+
+    .env:
+        DASHBOARD_MEDIDOR_CONFIG=CFG_EASTRON
+
+    Luego usa:
+        CFG_EASTRON=/ruta/eastronSDm630.yml
+        CFG_EASTRON_SECTION=samee100
+
+    El YAML debe traer:
+        gateway:
+          gateway_id: 10
+          nombre: SAMEE100-PANELES
+
+        device:
+          device_id: 39
+          nombre: Eastron SDM630
+    """
+
+    cfg_name = os.getenv("DASHBOARD_MEDIDOR_CONFIG", "CFG_EASTRON").strip()
+
+    cfg_path = os.getenv(cfg_name)
+    cfg_section = os.getenv(f"{cfg_name}_SECTION")
+
+    if not cfg_path or not cfg_section:
+        return {
+            "gateway_id": None,
+            "device_id": "",
+            "source_type": "device",
+            "medidor_nombre": "Medidor principal",
+            "gateway_nombre": "Gateway",
+            "cliente": "",
+            "ubicacion": "",
+            "config_origen": cfg_name,
+            "error": f"Config incompleta: {cfg_name}={cfg_path}, {cfg_name}_SECTION={cfg_section}"
+        }
+
+    try:
+        config = util.cargar_configuracion(cfg_path, cfg_section)
+
+        if not isinstance(config, dict):
+            raise ValueError(f"Config YAML inválida: {cfg_path} / {cfg_section}")
+
+        gateway_cfg = config.get("gateway", {}) or {}
+        device_cfg = config.get("device", {}) or {}
+
+        source_type = str(config.get("source_type", "device")).lower().strip()
+
+        gateway_id = (
+            gateway_cfg.get("gateway_id")
+            or config.get("gateway_id")
+            or config.get("i")
+        )
+
+        device_id = None
+
+        if source_type != "gateway":
+            device_id = (
+                device_cfg.get("device_id")
+                or config.get("id_device")
+                or config.get("device_id")
+            )
+
+        return {
+            "gateway_id": int(gateway_id) if gateway_id not in [None, "", "None"] else None,
+            "device_id": str(device_id) if device_id not in [None, "", "None"] else "",
+            "source_type": source_type,
+            "medidor_nombre": device_cfg.get("nombre", config.get("device_name", "Medidor principal")),
+            "gateway_nombre": gateway_cfg.get("nombre", f"Gateway {gateway_id}"),
+            "cliente": gateway_cfg.get("cliente", ""),
+            "ubicacion": device_cfg.get("ubicacion", gateway_cfg.get("ubicacion", "")),
+            "config_origen": cfg_name,
+            "cfg_path": cfg_path,
+            "cfg_section": cfg_section
+        }
+
+    except Exception as e:
+        return {
+            "gateway_id": None,
+            "device_id": "",
+            "source_type": "device",
+            "medidor_nombre": "Medidor principal",
+            "gateway_nombre": "Gateway",
+            "cliente": "",
+            "ubicacion": "",
+            "config_origen": cfg_name,
+            "cfg_path": cfg_path,
+            "cfg_section": cfg_section,
+            "error": str(e)
+        }
+
 
 
 @app.route("/api/variable/<int:unit_id>")
@@ -534,42 +634,67 @@ def api_estado():
 
     ahora = int(time.time())
 
+    cfg_dashboard = obtener_config_dashboard_desde_yml()
+
+    gateway_activo = cfg_dashboard.get("gateway_id")
+    device_principal = str(cfg_dashboard.get("device_id") or "")
+    source_type_principal = cfg_dashboard.get("source_type", "device")
+    nombre_medidor_principal = cfg_dashboard.get("medidor_nombre", "Medidor principal")
+
     estado = {
         "timestamp_actual": ahora,
         "db": "OK",
-        "gateway_id": 8,
-        "gateway": None,
-        "cliente": None,
+
+        "config_dashboard": cfg_dashboard,
+
+        "gateway_id": gateway_activo,
+        "gateway": cfg_dashboard.get("gateway_nombre"),
+        "cliente": cfg_dashboard.get("cliente"),
+
+        "medidor_principal_id": device_principal,
+        "medidor_principal_nombre": nombre_medidor_principal,
+        "medidor_principal_source_type": source_type_principal,
+
         "ultima_medicion_utc": None,
         "ultima_medicion_colombia": None,
         "edad_segundos": None,
         "estado_datos": "SIN DATOS",
+
         "ram": None,
         "cpu": None,
         "ip_usb0": None,
         "ip_ethernet": None,
         "connected_meter": None,
+
+        "ultimo_dato_medidor_principal": None,
+        "edad_medidor_principal_segundos": None,
+        "estado_medidor_principal": "SIN DATOS",
+
+        # Alias temporales para compatibilidad con dashboard.js viejo
         "ultimo_dato_medidor_31": None,
         "edad_medidor_31_segundos": None,
         "estado_medidor_31": "SIN DATOS",
+
         "total_gateways": 0,
         "total_dispositivos": 0,
         "total_variables": 0
     }
 
     try:
-        # Datos del gateway principal
-        cur.execute("""
-            SELECT gateway_id, nombre, cliente
-            FROM gateways
-            WHERE gateway_id = 8
-            LIMIT 1
-        """)
-        row = cur.fetchone()
-        if row:
-            estado["gateway_id"] = row["gateway_id"]
-            estado["gateway"] = row["nombre"]
-            estado["cliente"] = row["cliente"]
+        # Datos del gateway activo, leído desde YAML
+        if gateway_activo is not None:
+            cur.execute("""
+                SELECT gateway_id, nombre, cliente
+                FROM gateways
+                WHERE gateway_id = ?
+                LIMIT 1
+            """, (gateway_activo,))
+
+            row = cur.fetchone()
+            if row:
+                estado["gateway_id"] = row["gateway_id"]
+                estado["gateway"] = row["nombre"]
+                estado["cliente"] = row["cliente"]
 
         # Conteos generales
         cur.execute("SELECT COUNT(*) AS total FROM gateways")
@@ -586,12 +711,14 @@ def api_estado():
             SELECT MAX(CAST(timestamp_utc AS INTEGER)) AS ts
             FROM mediciones_detalle
         """)
+
         row = cur.fetchone()
         ts = row["ts"] if row else None
 
         if ts:
             ts = int(ts)
             estado["ultima_medicion_utc"] = ts
+            estado["ultima_medicion_colombia"] = convertir_utc_a_colombia(ts)
             estado["edad_segundos"] = ahora - ts
 
             if estado["edad_segundos"] <= 900:
@@ -599,42 +726,66 @@ def api_estado():
             else:
                 estado["estado_datos"] = "SIN DATOS RECIENTES"
 
-        # Última medición del medidor principal Eastron SDM630 device_id 31
-        cur.execute("""
-            SELECT MAX(CAST(timestamp_utc AS INTEGER)) AS ts
-            FROM mediciones_detalle
-            WHERE TRIM(device_id) = '31'
-        """)
-        row = cur.fetchone()
-        ts_medidor = row["ts"] if row else None
+        # Última medición del medidor principal configurado por YAML
+        ts_medidor = None
+
+        if gateway_activo is not None and device_principal:
+            cur.execute("""
+                SELECT MAX(CAST(md.timestamp_utc AS INTEGER)) AS ts
+                FROM mediciones_detalle md
+                LEFT JOIN dispositivos d
+                    ON CAST(NULLIF(TRIM(md.device_id), '') AS INTEGER) = d.device_id
+                WHERE COALESCE(md.gateway_id, d.gateway_id) = ?
+                  AND md.source_type = ?
+                  AND TRIM(md.device_id) = ?
+            """, (
+                gateway_activo,
+                source_type_principal,
+                device_principal
+            ))
+
+            row = cur.fetchone()
+            ts_medidor = row["ts"] if row else None
 
         if ts_medidor:
             ts_medidor = int(ts_medidor)
-            estado["ultimo_dato_medidor_31"] = ts_medidor
-            estado["edad_medidor_31_segundos"] = ahora - ts_medidor
 
-            if estado["edad_medidor_31_segundos"] <= 900:
-                estado["estado_medidor_31"] = "OK"
+            estado["ultimo_dato_medidor_principal"] = ts_medidor
+            estado["edad_medidor_principal_segundos"] = ahora - ts_medidor
+
+            if estado["edad_medidor_principal_segundos"] <= 900:
+                estado["estado_medidor_principal"] = "OK"
             else:
-                estado["estado_medidor_31"] = "SIN DATOS RECIENTES"
+                estado["estado_medidor_principal"] = "SIN DATOS RECIENTES"
 
-        def ultimo_valor(unit_id, source_type=None, device_id=None):
+        # Alias de compatibilidad para frontend viejo
+        estado["ultimo_dato_medidor_31"] = estado["ultimo_dato_medidor_principal"]
+        estado["edad_medidor_31_segundos"] = estado["edad_medidor_principal_segundos"]
+        estado["estado_medidor_31"] = estado["estado_medidor_principal"]
+
+        def ultimo_valor(unit_id, source_type=None, device_id=None, gateway_id=None):
             sql = """
-                SELECT valor, timestamp_utc
-                FROM mediciones_detalle
-                WHERE unit_id = ?
+                SELECT md.valor, md.timestamp_utc
+                FROM mediciones_detalle md
+                LEFT JOIN dispositivos d
+                    ON CAST(NULLIF(TRIM(md.device_id), '') AS INTEGER) = d.device_id
+                WHERE md.unit_id = ?
             """
             params = [unit_id]
 
+            if gateway_id is not None:
+                sql += " AND COALESCE(md.gateway_id, d.gateway_id) = ?"
+                params.append(int(gateway_id))
+
             if source_type:
-                sql += " AND source_type = ?"
+                sql += " AND md.source_type = ?"
                 params.append(source_type)
 
             if device_id:
-                sql += " AND TRIM(device_id) = ?"
+                sql += " AND TRIM(md.device_id) = ?"
                 params.append(str(device_id))
 
-            sql += " ORDER BY CAST(timestamp_utc AS INTEGER) DESC LIMIT 1"
+            sql += " ORDER BY CAST(md.timestamp_utc AS INTEGER) DESC LIMIT 1"
 
             cur.execute(sql, params)
             r = cur.fetchone()
@@ -644,14 +795,18 @@ def api_estado():
 
             return r["valor"]
 
-        # Variables internas conocidas
-        estado["ram"] = ultimo_valor(135)
-        estado["cpu"] = ultimo_valor(136)
-        estado["ip_usb0"] = ultimo_valor(137)
-        estado["ip_ethernet"] = ultimo_valor(144)
+        # Variables internas del sistema. Se toman del gateway activo.
+        estado["ram"] = ultimo_valor(135, gateway_id=gateway_activo)
+        estado["cpu"] = ultimo_valor(136, gateway_id=gateway_activo)
+        estado["ip_usb0"] = ultimo_valor(137, gateway_id=gateway_activo)
+        estado["ip_ethernet"] = ultimo_valor(144, gateway_id=gateway_activo)
 
         # Variable gateway Connected_Meter
-        estado["connected_meter"] = ultimo_valor(53, source_type="gateway")
+        estado["connected_meter"] = ultimo_valor(
+            53,
+            source_type="gateway",
+            gateway_id=gateway_activo
+        )
 
         conn.close()
         return jsonify(estado)
@@ -660,8 +815,23 @@ def api_estado():
         conn.close()
         return jsonify({
             "db": "ERROR",
-            "error": str(e)
-        }), 500   
+            "error": str(e),
+            "config_dashboard": cfg_dashboard
+        }), 500
+
+
+@app.route("/api/config_dashboard")
+def api_config_dashboard():
+    """
+    Configuración activa del dashboard leída desde YAML.
+
+    El .env solo indica cuál configuración YAML se usa como medidor principal:
+        DASHBOARD_MEDIDOR_CONFIG=CFG_EASTRON
+    """
+
+    return jsonify(obtener_config_dashboard_desde_yml())
+
+
     
 if __name__ == "__main__":
 

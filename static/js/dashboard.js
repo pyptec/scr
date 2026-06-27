@@ -4,6 +4,13 @@ let rangoActual = 'hoy';
 let ultimosValores = [];
 let variablesDisponibles = [];
 let variablesDisponiblesReporte = [];
+let configDashboard = {
+    gateway_id: null,
+    device_id: "",
+    source_type: "device",
+    medidor_nombre: "Medidor principal",
+    gateway_nombre: "Gateway"
+};
 
 /* =========================
    FORMATO DE FECHAS
@@ -1160,6 +1167,7 @@ async function cargarEstadoGateway() {
         pintarEstadoTexto('estadoMedidor31', 'ERROR', 'estado-error');
     }
 }
+
 /* =========================
    INICIO
 ========================= */
