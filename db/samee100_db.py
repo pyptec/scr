@@ -707,3 +707,111 @@ def obtener_ultimo_error_cola():
 
     return dict(row) if row else None
 
+def registrar_gateway_dispositivo_desde_config(config):
+    """
+    Registra o actualiza gateway y dispositivo desde una configuración YAML.
+
+    Estructura esperada dentro del YAML:
+
+        gateway:
+          gateway_id: 10
+          nombre: SAMEE100-PANELES
+          tipo: Gateway energético
+          ubicacion: Tablero solar
+          cliente: PANELES
+
+        device:
+          device_id: 39
+          nombre: Eastron SDM630
+          tipo: Medidor eléctrico trifásico
+          ubicacion: Tablero solar
+
+    También acepta compatibilidad con:
+        id_device
+        device_id
+        gateway_id
+    """
+
+    if not isinstance(config, dict):
+        return
+
+    gateway_cfg = config.get("gateway", {}) or {}
+    device_cfg = config.get("device", {}) or {}
+
+    gateway_id = (
+        gateway_cfg.get("gateway_id")
+        or config.get("gateway_id")
+        or config.get("i")
+    )
+
+    device_id = (
+        device_cfg.get("device_id")
+        or config.get("id_device")
+        or config.get("device_id")
+    )
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    try:
+        gateway_id_int = None
+
+        # Registrar / actualizar gateway
+        if gateway_id not in [None, "", "None"]:
+            gateway_id_int = int(gateway_id)
+
+            cur.execute("""
+            INSERT INTO gateways (
+                gateway_id,
+                nombre,
+                tipo,
+                ubicacion,
+                cliente
+            )
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(gateway_id) DO UPDATE SET
+                nombre = excluded.nombre,
+                tipo = excluded.tipo,
+                ubicacion = excluded.ubicacion,
+                cliente = excluded.cliente
+            """, (
+                gateway_id_int,
+                gateway_cfg.get("nombre", f"Gateway {gateway_id_int}"),
+                gateway_cfg.get("tipo", "Gateway"),
+                gateway_cfg.get("ubicacion", ""),
+                gateway_cfg.get("cliente", "")
+            ))
+
+        # Registrar / actualizar dispositivo
+        if device_id not in [None, "", "None"]:
+            device_id_int = int(device_id)
+
+            cur.execute("""
+            INSERT INTO dispositivos (
+                device_id,
+                gateway_id,
+                nombre,
+                tipo,
+                ubicacion
+            )
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(device_id) DO UPDATE SET
+                gateway_id = excluded.gateway_id,
+                nombre = excluded.nombre,
+                tipo = excluded.tipo,
+                ubicacion = excluded.ubicacion
+            """, (
+                device_id_int,
+                gateway_id_int,
+                device_cfg.get("nombre", f"Device {device_id_int}"),
+                device_cfg.get("tipo", "Dispositivo"),
+                device_cfg.get("ubicacion", "")
+            ))
+
+        conn.commit()
+
+    except Exception as e:
+        print(f"[SQLITE] Error registrando gateway/dispositivo desde YAML: {e}")
+
+    finally:
+        conn.close()
