@@ -1,3 +1,6 @@
+from db.samee100_db import init_db
+from db.samee100_db import guardar_medicion
+from db.samee100_db import registrar_gateway_dispositivo_desde_config
 from dotenv import load_dotenv
 import os
 import minimalmodbus
@@ -14,9 +17,6 @@ import eventHandler
 import shared
 import subprocess
 import modbusdevices
-from db.samee100_db import init_db
-from db.samee100_db import guardar_medicion
-from db.samee100_db import registrar_gateway_dispositivo_desde_config
 import random
    
 
