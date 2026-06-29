@@ -5,17 +5,17 @@ medidores:
     source_type: device
 
     device_name: "SDM630MCT"
-    id_device: 39  #31
+    id_device: 31  #31
     
     gateway:
-      gateway_id: 10
+      gateway_id: 8
       nombre: "SAMEE100-ALKOSTO"
       tipo: "Gateway energético"
       ubicacion: "Tablero solar"
       cliente: "ALKOSTO"
 
     device:
-      device_id: 39
+      device_id: 31
       nombre: "Eastron SDM630"
       tipo: "Medidor eléctrico trifásico"
       ubicacion: "Tablero solar"

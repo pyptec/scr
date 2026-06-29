@@ -4,10 +4,10 @@ medidores:
     source_type: gateway
 
     
-    i: 10 #8  #10
+    i: 8 #8  #10
 
     gateway:
-      gateway_id: 10
+      gateway_id: 8
       nombre: "SAMEE100-ALKOSTO"
       tipo: "Gateway energético"
       ubicacion: "Tablero solar"
