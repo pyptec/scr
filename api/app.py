@@ -166,16 +166,119 @@ def api_variable(unit_id):
 
 @app.route("/api/dashboard")
 def api_dashboard():
+    """
+    KPIs principales del dashboard.
 
-    fecha_inicio = request.args.get("inicio", "0")
-    fecha_fin = request.args.get("fin", "9999999999")
+    Correcciones:
+    - Energía importada/exportada se calcula como delta del acumulado.
+    - Potencia se convierte de W a kW.
+    - Se filtra por gateway usando COALESCE(md.gateway_id, d.gateway_id).
+    """
 
-    from db.kpi_solar import resumen_periodo
+    inicio = request.args.get("inicio", type=int)
+    fin = request.args.get("fin", type=int)
 
-    return resumen_periodo(
-        fecha_inicio,
-        fecha_fin
-    )
+    if not inicio:
+        inicio = 0
+
+    if not fin:
+        fin = int(time.time())
+
+    cfg_dashboard = obtener_config_dashboard_desde_yml()
+
+    gateway_id = cfg_dashboard.get("gateway_id")
+    device_id = str(cfg_dashboard.get("device_id") or "")
+    source_type = cfg_dashboard.get("source_type", "device")
+
+    tarifa_kwh = float(os.getenv("TARIFA_KWH", "950"))
+    factor_co2 = float(os.getenv("FACTOR_CO2_KG_KWH", "0.164"))
+
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    try:
+        if gateway_id is None or not device_id:
+            return jsonify({
+                "potencia_actual_kw": 0,
+                "generacion_kwh": 0,
+                "consumo_kwh": 0,
+                "ahorro_cop": 0,
+                "co2_evitado_kg": 0,
+                "error": "No hay gateway_id/device_id configurado para dashboard"
+            })
+
+        # unit_id 61 = potencia activa total.
+        # En este medidor el valor viene en W, por eso se divide entre 1000.
+        potencia_w = obtener_ultimo_valor_periodo(
+            cur=cur,
+            unit_id=61,
+            inicio=inicio,
+            fin=fin,
+            gateway_id=gateway_id,
+            device_id=device_id,
+            source_type=source_type
+        )
+
+        potencia_actual_kw = 0.0
+
+        if potencia_w is not None:
+            potencia_actual_kw = round(potencia_w / 1000.0, 3)
+
+        # unit_id 100 = energía importada acumulada
+        consumo_kwh = calcular_delta_acumulado(
+            cur=cur,
+            unit_id=100,
+            inicio=inicio,
+            fin=fin,
+            gateway_id=gateway_id,
+            device_id=device_id,
+            source_type=source_type
+        )
+
+        # unit_id 104 = energía exportada/generada acumulada
+        generacion_kwh = calcular_delta_acumulado(
+            cur=cur,
+            unit_id=104,
+            inicio=inicio,
+            fin=fin,
+            gateway_id=gateway_id,
+            device_id=device_id,
+            source_type=source_type
+        )
+
+        ahorro_cop = round(generacion_kwh * tarifa_kwh, 0)
+        co2_evitado_kg = round(generacion_kwh * factor_co2, 2)
+
+        conn.close()
+
+        return jsonify({
+            "potencia_actual_kw": potencia_actual_kw,
+            "generacion_kwh": generacion_kwh,
+            "consumo_kwh": consumo_kwh,
+            "ahorro_cop": ahorro_cop,
+            "co2_evitado_kg": co2_evitado_kg,
+            "tarifa_kwh": tarifa_kwh,
+            "factor_co2_kg_kwh": factor_co2,
+            "gateway_id": gateway_id,
+            "device_id": device_id,
+            "source_type": source_type,
+            "inicio": inicio,
+            "fin": fin
+        })
+
+    except Exception as e:
+        conn.close()
+
+        return jsonify({
+            "error": str(e),
+            "potencia_actual_kw": 0,
+            "generacion_kwh": 0,
+            "consumo_kwh": 0,
+            "ahorro_cop": 0,
+            "co2_evitado_kg": 0
+        }), 500
+        
 @app.route("/")
 def home():
 
@@ -831,7 +934,131 @@ def api_config_dashboard():
 
     return jsonify(obtener_config_dashboard_desde_yml())
 
+def obtener_primer_ultimo_valor(cur, unit_id, inicio, fin, gateway_id, device_id, source_type="device"):
+    """
+    Obtiene primer y último valor de una variable acumulativa dentro del periodo.
 
+    Se usa para energía acumulada:
+        energia_periodo = ultimo - primero
+
+    Usa COALESCE(md.gateway_id, d.gateway_id) porque en mediciones_detalle
+    algunos registros de device tienen gateway_id vacío.
+    """
+
+    params = [
+        int(unit_id),
+        int(gateway_id),
+        str(source_type),
+        str(device_id),
+        int(inicio),
+        int(fin)
+    ]
+
+    cur.execute("""
+        SELECT
+            CAST(md.valor AS REAL) AS valor,
+            CAST(md.timestamp_utc AS INTEGER) AS ts
+        FROM mediciones_detalle md
+        LEFT JOIN dispositivos d
+            ON CAST(NULLIF(TRIM(md.device_id), '') AS INTEGER) = d.device_id
+        WHERE md.unit_id = ?
+          AND COALESCE(md.gateway_id, d.gateway_id) = ?
+          AND md.source_type = ?
+          AND TRIM(md.device_id) = ?
+          AND CAST(md.timestamp_utc AS INTEGER) BETWEEN ? AND ?
+        ORDER BY CAST(md.timestamp_utc AS INTEGER) ASC
+        LIMIT 1
+    """, params)
+
+    primero = cur.fetchone()
+
+    cur.execute("""
+        SELECT
+            CAST(md.valor AS REAL) AS valor,
+            CAST(md.timestamp_utc AS INTEGER) AS ts
+        FROM mediciones_detalle md
+        LEFT JOIN dispositivos d
+            ON CAST(NULLIF(TRIM(md.device_id), '') AS INTEGER) = d.device_id
+        WHERE md.unit_id = ?
+          AND COALESCE(md.gateway_id, d.gateway_id) = ?
+          AND md.source_type = ?
+          AND TRIM(md.device_id) = ?
+          AND CAST(md.timestamp_utc AS INTEGER) BETWEEN ? AND ?
+        ORDER BY CAST(md.timestamp_utc AS INTEGER) DESC
+        LIMIT 1
+    """, params)
+
+    ultimo = cur.fetchone()
+
+    return primero, ultimo
+
+
+def calcular_delta_acumulado(cur, unit_id, inicio, fin, gateway_id, device_id, source_type="device"):
+    """
+    Calcula delta de una variable acumulativa.
+
+    Si el medidor se reinicia y el delta da negativo, retorna 0 para evitar
+    mostrar valores absurdos en el dashboard.
+    """
+
+    primero, ultimo = obtener_primer_ultimo_valor(
+        cur=cur,
+        unit_id=unit_id,
+        inicio=inicio,
+        fin=fin,
+        gateway_id=gateway_id,
+        device_id=device_id,
+        source_type=source_type
+    )
+
+    if not primero or not ultimo:
+        return 0.0
+
+    valor_inicial = float(primero["valor"])
+    valor_final = float(ultimo["valor"])
+
+    delta = valor_final - valor_inicial
+
+    if delta < 0:
+        delta = 0.0
+
+    return round(delta, 3)
+
+
+def obtener_ultimo_valor_periodo(cur, unit_id, inicio, fin, gateway_id, device_id, source_type="device"):
+    """
+    Obtiene el último valor de una variable dentro del periodo.
+    """
+
+    cur.execute("""
+        SELECT
+            CAST(md.valor AS REAL) AS valor,
+            CAST(md.timestamp_utc AS INTEGER) AS ts
+        FROM mediciones_detalle md
+        LEFT JOIN dispositivos d
+            ON CAST(NULLIF(TRIM(md.device_id), '') AS INTEGER) = d.device_id
+        WHERE md.unit_id = ?
+          AND COALESCE(md.gateway_id, d.gateway_id) = ?
+          AND md.source_type = ?
+          AND TRIM(md.device_id) = ?
+          AND CAST(md.timestamp_utc AS INTEGER) BETWEEN ? AND ?
+        ORDER BY CAST(md.timestamp_utc AS INTEGER) DESC
+        LIMIT 1
+    """, (
+        int(unit_id),
+        int(gateway_id),
+        str(source_type),
+        str(device_id),
+        int(inicio),
+        int(fin)
+    ))
+
+    row = cur.fetchone()
+
+    if not row:
+        return None
+
+    return float(row["valor"])
     
 if __name__ == "__main__":
 

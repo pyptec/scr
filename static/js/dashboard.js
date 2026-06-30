@@ -203,19 +203,39 @@ async function cargarDashboard() {
     const data = await res.json();
 
     document.getElementById('potencia').innerText =
-        data.potencia_actual_kw ?? '--';
+        data.potencia_actual_kw !== null && data.potencia_actual_kw !== undefined
+            ? Number(data.potencia_actual_kw).toLocaleString('es-CO', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            })
+            : '--';
 
     document.getElementById('generacion').innerText =
-        data.generacion_kwh ?? '--';
+        data.generacion_kwh !== null && data.generacion_kwh !== undefined
+            ? Number(data.generacion_kwh).toLocaleString('es-CO', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            })
+            : '--';
 
     document.getElementById('consumo').innerText =
-        data.consumo_kwh ?? '--';
+        data.consumo_kwh !== null && data.consumo_kwh !== undefined
+            ? Number(data.consumo_kwh).toLocaleString('es-CO', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            })
+            : '--';
 
     document.getElementById('ahorro').innerText =
         Number(data.ahorro_cop ?? 0).toLocaleString('es-CO');
 
     document.getElementById('co2').innerText =
-        data.co2_evitado_kg ?? '--';
+        data.co2_evitado_kg !== null && data.co2_evitado_kg !== undefined
+            ? Number(data.co2_evitado_kg).toLocaleString('es-CO', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            })
+            : '--';
 }
 
 /* =========================
@@ -252,7 +272,7 @@ async function mostrarGrafica(tipo) {
                 labels: data.serie.map(x => formatearHoraColombia(x.timestamp_utc)),
                 datasets: [{
                     label: 'Potencia kW',
-                    data: data.serie.map(x => x.valor),
+                    data: data.serie.map(x => Number(x.valor) / 1000),
                     tension: 0.25
                 }]
             }
