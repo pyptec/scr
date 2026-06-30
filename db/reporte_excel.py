@@ -272,10 +272,13 @@ def crear_reporte_excel(inicio, fin, variables_param="61,104,100"):
         ["Balance neto", energia["balance_neto_kwh"], "kWh", "Exportada - Importada"],
         ["Ahorro estimado", impacto["ahorro_cop"], "COP", "Cálculo con tarifa configurada"],
         ["CO₂ evitado", impacto["co2_evitado_kg"], "kg", "Factor de emisión configurado"],
-        ["Potencia actual", potencia["actual_kw"], "kW", "Último valor PTotal"],
-        ["Potencia máxima", potencia["maxima_kw"], "kW", "Máximo PTotal en el periodo"],
-        ["Potencia mínima", potencia["minima_kw"], "kW", "Mínimo PTotal en el periodo"],
-        ["Potencia promedio", potencia["promedio_kw"], "kW", "Promedio PTotal en el periodo"],
+
+        # db.kpi_solar está entregando PTotal en W, aquí se presenta en kW.
+        ["Potencia actual", escalar_variable_reporte(61, potencia["actual_kw"]), "kW", "Último valor PTotal escalado de W a kW"],
+        ["Potencia máxima", escalar_variable_reporte(61, potencia["maxima_kw"]), "kW", "Máximo PTotal escalado de W a kW"],
+        ["Potencia mínima", escalar_variable_reporte(61, potencia["minima_kw"]), "kW", "Mínimo PTotal escalado de W a kW"],
+        ["Potencia promedio", escalar_variable_reporte(61, potencia["promedio_kw"]), "kW", "Promedio PTotal escalado de W a kW"],
+
         ["Muestras potencia", potencia["muestras"], "registros", "Cantidad de muestras PTotal"]
     ]
 
@@ -352,10 +355,10 @@ def crear_reporte_excel(inicio, fin, variables_param="61,104,100"):
     ws3.append(["Indicador", "Valor", "Unidad"])
     aplicar_header(ws3, 3)
 
-    ws3.append(["Potencia actual", potencia["actual_kw"], "kW"])
-    ws3.append(["Potencia máxima", potencia["maxima_kw"], "kW"])
-    ws3.append(["Potencia mínima", potencia["minima_kw"], "kW"])
-    ws3.append(["Potencia promedio", potencia["promedio_kw"], "kW"])
+    ws3.append(["Potencia actual", escalar_variable_reporte(61, potencia["actual_kw"]), "kW"])
+    ws3.append(["Potencia máxima", escalar_variable_reporte(61, potencia["maxima_kw"]), "kW"])
+    ws3.append(["Potencia mínima", escalar_variable_reporte(61, potencia["minima_kw"]), "kW"])
+    ws3.append(["Potencia promedio", escalar_variable_reporte(61, potencia["promedio_kw"]), "kW"])
     ws3.append(["Muestras", potencia["muestras"], "registros"])
 
     ajustar_columnas(ws3)
