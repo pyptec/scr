@@ -398,13 +398,133 @@ def dashboard():
 
 @app.route("/api/energia/dia")
 def api_energia_dia():
-    limite = int(request.args.get("limite", 30))
+    """
+    Generación diaria calculada desde el contador acumulado unit_id 104.
 
-    return {
-        "unit_id": 104,
-        "total": limite,
-        "datos": energia_diaria_generada(limite_dias=limite)
-    }
+    Corrección:
+    - No usa MAX - MIN directo.
+    - No usa acumulado bruto.
+    - Usa calcular_delta_acumulado(), que suma incrementos válidos
+      y descarta saltos anómalos.
+    """
+
+    inicio = request.args.get("inicio", type=int)
+    fin = request.args.get("fin", type=int)
+    limite = request.args.get("limite", default=30, type=int)
+
+    if not inicio:
+        inicio = 0
+
+    if not fin:
+        fin = int(time.time())
+
+    cfg_dashboard = obtener_config_dashboard_desde_yml()
+
+    gateway_id = cfg_dashboard.get("gateway_id")
+    device_id = str(cfg_dashboard.get("device_id") or "")
+    source_type = cfg_dashboard.get("source_type", "device")
+
+    if gateway_id is None or not device_id:
+        return jsonify({
+            "unit_id": 104,
+            "total": 0,
+            "datos": [],
+            "error": "No hay gateway_id/device_id configurado para dashboard"
+        })
+
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    try:
+        # Obtener días reales con datos dentro del rango consultado.
+        cur.execute("""
+            SELECT DISTINCT
+                date(datetime(CAST(md.timestamp_utc AS INTEGER), 'unixepoch', '-5 hours')) AS dia
+            FROM mediciones_detalle md
+            LEFT JOIN dispositivos d
+                ON CAST(NULLIF(TRIM(md.device_id), '') AS INTEGER) = d.device_id
+            WHERE md.unit_id = 104
+              AND COALESCE(md.gateway_id, d.gateway_id) = ?
+              AND md.source_type = ?
+              AND TRIM(md.device_id) = ?
+              AND CAST(md.timestamp_utc AS INTEGER) BETWEEN ? AND ?
+            ORDER BY dia DESC
+            LIMIT ?
+        """, (
+            int(gateway_id),
+            str(source_type),
+            str(device_id),
+            int(inicio),
+            int(fin),
+            int(limite)
+        ))
+
+        dias = [row["dia"] for row in cur.fetchall()]
+        dias = list(reversed(dias))
+
+        datos = []
+
+        tz_colombia = timezone(timedelta(hours=-5))
+
+        for dia in dias:
+            inicio_dia_col = datetime.fromisoformat(
+                f"{dia}T00:00:00"
+            ).replace(tzinfo=tz_colombia)
+
+            fin_dia_col = datetime.fromisoformat(
+                f"{dia}T23:59:59"
+            ).replace(tzinfo=tz_colombia)
+
+            inicio_dia_utc = int(
+                inicio_dia_col.astimezone(timezone.utc).timestamp()
+            )
+
+            fin_dia_utc = int(
+                fin_dia_col.astimezone(timezone.utc).timestamp()
+            )
+
+            # Recortar contra el rango solicitado por el usuario.
+            inicio_periodo = max(inicio_dia_utc, int(inicio))
+            fin_periodo = min(fin_dia_utc, int(fin))
+
+            kwh = calcular_delta_acumulado(
+                cur=cur,
+                unit_id=104,
+                inicio=inicio_periodo,
+                fin=fin_periodo,
+                gateway_id=gateway_id,
+                device_id=device_id,
+                source_type=source_type
+            )
+
+            datos.append({
+                "dia": dia,
+                "kwh": round(kwh, 3),
+                "inicio": inicio_periodo,
+                "fin": fin_periodo
+            })
+
+        conn.close()
+
+        return jsonify({
+            "unit_id": 104,
+            "gateway_id": gateway_id,
+            "device_id": device_id,
+            "source_type": source_type,
+            "total": len(datos),
+            "datos": datos
+        })
+
+    except Exception as e:
+        conn.close()
+
+        return jsonify({
+            "unit_id": 104,
+            "total": 0,
+            "datos": [],
+            "error": str(e)
+        }), 500
    
 @app.route("/api/series")
 def api_series():

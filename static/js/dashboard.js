@@ -1078,28 +1078,14 @@ function formatearValorVariable(item) {
     const valor = item.valor;
 
     // Variables tipo IP
-    if (
-        unitId === 137 ||
-        unitId === 144 ||
-        variable.includes('ip_') ||
-        variable.includes('ip ')
-    ) {
-        const texto = String(valor).replace(/\D/g, '');
-
-        if (texto.length === 12) {
-            return `${texto.slice(0, 3)}.${texto.slice(3, 6)}.${texto.slice(6, 7)}.${texto.slice(7)}`;
-        }
-
-        if (texto.length === 10) {
-            return `${texto.slice(0, 3)}.${texto.slice(3, 6)}.${texto.slice(6, 7)}.${texto.slice(7)}`;
-        }
-
-        if (texto.length === 9) {
-            return `${texto.slice(0, 3)}.${texto.slice(3, 6)}.${texto.slice(6, 7)}.${texto.slice(7)}`;
-        }
-
-        return String(valor);
-    }
+if (
+    unitId === 137 ||
+    unitId === 144 ||
+    variable.includes('ip_') ||
+    variable.includes('ip ')
+) {
+    return formatearIpDesdeValor(valor);
+}
 
     // Valores numéricos normales
     const numero = Number(valor);
@@ -1133,23 +1119,95 @@ function formatearEdadSegundos(segundos) {
     return `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min`;
 }
 
+function limpiarDigitosIp(valor) {
+    if (valor === null || valor === undefined) {
+        return '';
+    }
+
+    let texto = String(valor).trim();
+
+    const numero = Number(texto);
+
+    if (Number.isFinite(numero)) {
+        texto = String(Math.trunc(numero));
+    }
+
+    return texto.replace(/\D/g, '');
+}
+
+function reconstruirIpv4DesdeDigitos(digitos) {
+    const resultados = [];
+
+    function backtrack(pos, partes) {
+        if (partes.length === 4) {
+            if (pos === digitos.length) {
+                resultados.push(partes.join('.'));
+            }
+            return;
+        }
+
+        const restantes = digitos.length - pos;
+        const partesRestantes = 4 - partes.length;
+
+        if (restantes < partesRestantes || restantes > partesRestantes * 3) {
+            return;
+        }
+
+        for (let len = 1; len <= 3; len++) {
+            const segmento = digitos.slice(pos, pos + len);
+
+            if (!segmento) {
+                continue;
+            }
+
+            if (segmento.length > 1 && segmento.startsWith('0')) {
+                continue;
+            }
+
+            const numero = Number(segmento);
+
+            if (numero < 0 || numero > 255) {
+                continue;
+            }
+
+            backtrack(pos + len, [...partes, segmento]);
+        }
+    }
+
+    backtrack(0, []);
+
+    if (!resultados.length) {
+        return null;
+    }
+
+    const privadas = resultados.filter(ip =>
+        ip.startsWith('192.168.') ||
+        ip.startsWith('10.') ||
+        /^172\.(1[6-9]|2\d|3[0-1])\./.test(ip)
+    );
+
+    return privadas[0] || resultados[0];
+}
+
 function formatearIpDesdeValor(valor) {
     if (valor === null || valor === undefined) {
         return '--';
     }
 
-    const texto = String(valor).replace(/\D/g, '');
+    const digitos = limpiarDigitosIp(valor);
 
-    if (texto.length === 10) {
-        return `${texto.slice(0, 3)}.${texto.slice(3, 6)}.${texto.slice(6, 7)}.${texto.slice(7)}`;
+    if (!digitos) {
+        return '--';
     }
 
-    if (texto.length === 9) {
-        return `${texto.slice(0, 3)}.${texto.slice(3, 6)}.${texto.slice(6, 7)}.${texto.slice(7)}`;
+    if (digitos === '0') {
+        return '0';
     }
 
-    if (texto.length === 12) {
-        return `${texto.slice(0, 3)}.${texto.slice(3, 6)}.${texto.slice(6, 7)}.${texto.slice(7)}`;
+    const ip = reconstruirIpv4DesdeDigitos(digitos);
+
+    if (ip) {
+        return ip;
     }
 
     return String(valor);
