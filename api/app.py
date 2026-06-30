@@ -995,35 +995,69 @@ def obtener_primer_ultimo_valor(cur, unit_id, inicio, fin, gateway_id, device_id
 
 def calcular_delta_acumulado(cur, unit_id, inicio, fin, gateway_id, device_id, source_type="device"):
     """
-    Calcula delta de una variable acumulativa.
+    Calcula energía de periodo a partir de un contador acumulado.
 
-    Si el medidor se reinicia y el delta da negativo, retorna 0 para evitar
-    mostrar valores absurdos en el dashboard.
+    No usa simplemente último - primero, porque si el rango incluye una
+    lectura inicial errónea o una mala decodificación antigua, el KPI se infla.
+
+    Estrategia:
+    - Lee todas las muestras del periodo.
+    - Suma incrementos positivos entre muestras consecutivas.
+    - Ignora deltas negativos.
+    - Ignora saltos absurdos configurables.
     """
 
-    primero, ultimo = obtener_primer_ultimo_valor(
-        cur=cur,
-        unit_id=unit_id,
-        inicio=inicio,
-        fin=fin,
-        gateway_id=gateway_id,
-        device_id=device_id,
-        source_type=source_type
-    )
+    max_delta_kwh = float(os.getenv("MAX_DELTA_KWH_MUESTRA", "50"))
 
-    if not primero or not ultimo:
+    cur.execute("""
+        SELECT
+            CAST(md.valor AS REAL) AS valor,
+            CAST(md.timestamp_utc AS INTEGER) AS ts
+        FROM mediciones_detalle md
+        LEFT JOIN dispositivos d
+            ON CAST(NULLIF(TRIM(md.device_id), '') AS INTEGER) = d.device_id
+        WHERE md.unit_id = ?
+          AND COALESCE(md.gateway_id, d.gateway_id) = ?
+          AND md.source_type = ?
+          AND TRIM(md.device_id) = ?
+          AND CAST(md.timestamp_utc AS INTEGER) BETWEEN ? AND ?
+        ORDER BY CAST(md.timestamp_utc AS INTEGER) ASC
+    """, (
+        int(unit_id),
+        int(gateway_id),
+        str(source_type),
+        str(device_id),
+        int(inicio),
+        int(fin)
+    ))
+
+    filas = cur.fetchall()
+
+    if len(filas) < 2:
         return 0.0
 
-    valor_inicial = float(primero["valor"])
-    valor_final = float(ultimo["valor"])
+    total = 0.0
+    valor_anterior = None
 
-    delta = valor_final - valor_inicial
+    for fila in filas:
+        valor_actual = float(fila["valor"])
 
-    if delta < 0:
-        delta = 0.0
+        if valor_anterior is None:
+            valor_anterior = valor_actual
+            continue
 
-    return round(delta, 3)
+        delta = valor_actual - valor_anterior
 
+        # Contador normal: suma incremento positivo razonable
+        if 0 <= delta <= max_delta_kwh:
+            total += delta
+
+        # Si delta es negativo, puede ser reset o dato malo: se ignora.
+        # Si delta es muy grande, puede ser salto por mala decodificación: se ignora.
+
+        valor_anterior = valor_actual
+
+    return round(total, 3)
 
 def obtener_ultimo_valor_periodo(cur, unit_id, inicio, fin, gateway_id, device_id, source_type="device"):
     """
