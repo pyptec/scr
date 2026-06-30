@@ -477,6 +477,16 @@ def crear_reporte_excel(inicio, fin, variables_param="61,104,100"):
         rows = cur.fetchall()
 
         for r in rows:
+            valor_reporte = escalar_variable_reporte(
+                r["unit_id"],
+                r["valor"]
+            )
+
+            unidad_reporte = unidad_visual_reporte(
+                r["unit_id"],
+                r["simbolo"]
+            )
+
             ws4.append([
                 r["timestamp_utc"],
                 convertir_utc_a_colombia(r["timestamp_utc"]),
@@ -487,8 +497,8 @@ def crear_reporte_excel(inicio, fin, variables_param="61,104,100"):
                 r["dispositivo"],
                 r["unit_id"],
                 r["variable"],
-                r["simbolo"],
-                r["valor"]
+                unidad_reporte,
+                valor_reporte
             ])
 
     conn.close()
@@ -592,9 +602,14 @@ def agregar_hoja_graficas(wb, inicio, fin, gateway_id=8, device_id=31):
     conn.close()
 
     for r in rows:
+        potencia_kw = escalar_variable_reporte(
+            61,
+            r["potencia_kw"]
+        )
+
         ws_data.append([
             convertir_utc_a_colombia(r["timestamp_utc"]),
-            r["potencia_kw"],
+            potencia_kw,
             r["importada_kwh"],
             r["exportada_kwh"]
         ])
@@ -884,6 +899,21 @@ def agregar_hoja_calidad_datos(wb, inicio, fin, variables_param):
             if muestras == 1:
                 observacion = "Solo una muestra en el periodo"
 
+        valor_inicial_reporte = escalar_variable_reporte(
+            row["unit_id"],
+            valor_inicial
+        )
+
+        valor_final_reporte = escalar_variable_reporte(
+            row["unit_id"],
+            valor_final
+        )
+
+        unidad_reporte = unidad_visual_reporte(
+            row["unit_id"],
+            row["simbolo"]
+        )
+
         ws.append([
             row["gateway_id"],
             row["gateway"],
@@ -892,10 +922,10 @@ def agregar_hoja_calidad_datos(wb, inicio, fin, variables_param):
             row["dispositivo"],
             row["unit_id"],
             row["variable"],
-            row["simbolo"],
+            unidad_reporte,
             muestras,
-            valor_inicial,
-            valor_final,
+            valor_inicial_reporte,
+            valor_final_reporte,
             observacion
         ])
 
@@ -1015,3 +1045,52 @@ def parsear_variables_reporte(variables_param):
 
     return filtros
 
+def escalar_variable_reporte(unit_id, valor):
+    """
+    Escala variables eléctricas para presentación en el reporte.
+
+    Los medidores Eastron entregan algunas potencias en W, VA o VAr.
+    Para el reporte se presentan en kW, kVA o kVAr.
+    """
+
+    if valor is None:
+        return None
+
+    try:
+        valor_num = float(valor)
+    except Exception:
+        return valor
+
+    unit_id = int(unit_id)
+
+    # Potencia activa por fase y total: W -> kW
+    if unit_id in [58, 59, 60, 61, 25]:
+        return round(valor_num / 1000.0, 3)
+
+    # Potencia aparente: VA -> kVA
+    if unit_id in [148]:
+        return round(valor_num / 1000.0, 3)
+
+    # Potencia reactiva: VAr -> kVAr
+    if unit_id in [149, 150]:
+        return round(valor_num / 1000.0, 3)
+
+    return valor_num
+
+def unidad_visual_reporte(unit_id, unidad_original):
+    """
+    Ajusta la unidad mostrada en el Excel después de escalar valores.
+    """
+
+    unit_id = int(unit_id)
+
+    if unit_id in [58, 59, 60, 61, 25]:
+        return "kW"
+
+    if unit_id in [148]:
+        return "kVA"
+
+    if unit_id in [149, 150]:
+        return "kVAr"
+
+    return unidad_original
