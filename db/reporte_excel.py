@@ -1067,15 +1067,15 @@ def escalar_variable_reporte(unit_id, valor):
     unit_id = int(unit_id)
 
     # Potencia activa por fase y total: W -> kW
-    if unit_id in [58, 59, 60, 61, 25]:
+    if unit_id in [25, 58, 59, 60, 61, 147]:
         return round(valor_num / 1000.0, 3)
 
     # Potencia aparente: VA -> kVA
-    if unit_id in [148]:
+    if unit_id in [148, 149]:
         return round(valor_num / 1000.0, 3)
 
     # Potencia reactiva: VAr -> kVAr
-    if unit_id in [149, 150]:
+    if unit_id in [150, 151]:
         return round(valor_num / 1000.0, 3)
 
     return valor_num
@@ -1087,13 +1087,13 @@ def unidad_visual_reporte(unit_id, unidad_original):
 
     unit_id = int(unit_id)
 
-    if unit_id in [58, 59, 60, 61, 25]:
+    if unit_id in [25, 58, 59, 60, 61, 147]:
         return "kW"
 
-    if unit_id in [148]:
+    if unit_id in [148, 149]:
         return "kVA"
 
-    if unit_id in [149, 150]:
+    if unit_id in [150, 151]:
         return "kVAr"
 
     return unidad_original
