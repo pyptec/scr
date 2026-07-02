@@ -4,17 +4,17 @@ medidores:
     source_type: device
 
     device_name: "Sistema Raspberry Pi"
-    id_device: 27
+    id_device: 15 #27
 
     gateway:
-      gateway_id: 14
+      gateway_id: 10 #14
       nombre: "SAMEE200-LPS-AOKI"
       tipo: "Gateway energético industrial"
       ubicacion: "Planta LPS"
       cliente: "LPS"
 
     device:
-      device_id: 27
+      device_id: 15 #27
       nombre: "Sistema Raspberry Pi"
       tipo: "Variables internas gateway"
       ubicacion: "Gateway SAMEE200"

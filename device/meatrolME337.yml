@@ -6,24 +6,24 @@ medidores:
     source_type: device
 
     device_name: "ME337 Proceso"
-    id_device: 29 #24
+    id_device: 24 #29
 
     
 
     gateway:
-      gateway_id: 14
+      gateway_id: 10 #14
       nombre: "SAMEE200-LPS-AOKI"
       tipo: "Gateway energético industrial"
       ubicacion: "Planta LPS"
       cliente: "LPS"
 
     device:
-      device_id: 29
+      device_id: 24 #29
       nombre: "Proceso Aoki / compresor"
       tipo: "Medidor eléctrico trifásico ME337"
       ubicacion: "Máquina inyecto-soplado Aoki / compresor"
       rol: "Proceso"
-      
+
     port: "/dev/ttyS0"
     debug: False 
     slave_id: 1

@@ -6,23 +6,23 @@ medidores:
     source_type: device
     
     device_name: "ME337 Totalizador"
-    id_device: 30 #25
+    id_device: 25 #30
     enabled: true
     
 
     gateway:
-      gateway_id: 14
+      gateway_id: 10 #14
       nombre: "SAMEE200-LPS-AOKI"
       tipo: "Gateway energético industrial"
       ubicacion: "Planta LPS"
       cliente: "LPS"
     device:
-      device_id: 30
+      device_id: 25 #30
       nombre: "Totalizador general"
       tipo: "Medidor eléctrico trifásico ME337"
       ubicacion: "Tablero general / alimentación principal"
       rol: "Totalizador"
-      
+
     port: "/dev/ttyS0"
     debug: False 
     slave_id: 46
