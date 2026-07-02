@@ -1,7 +1,17 @@
 medidores:
   pyp_connect:
-    id_device: 1
-    i: 14  #10
+    enabled: true
+    source_type: gateway
+
+    i: 14
+
+    gateway:
+      gateway_id: 14
+      nombre: "SAMEE200-LPS-AOKI"
+      tipo: "Gateway energético industrial"
+      ubicacion: "Planta LPS"
+      cliente: "LPS"
+
     registers:
       - name: conexion
         alias: connect

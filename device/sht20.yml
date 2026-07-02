@@ -2,14 +2,32 @@ medidores:
   sht20_sensor:
     device_name: "SHT20"
     id_device: 28  #26
+    enabled: true
+    source_type: device
+
+    gateway:
+      gateway_id: 14
+      nombre: "SAMEE200-LPS-AOKI"
+      tipo: "Gateway energético industrial"
+      ubicacion: "Planta LPS"
+      cliente: "LPS"
+    device:
+      device_id: 28
+      nombre: "Sensor ambiente SHT20"
+      tipo: "Sensor temperatura y humedad"
+      ubicacion: "Gabinete SAMEE200"
+      
     port: "/dev/ttyS0"
-    debug: False #True
+    debug: False #True debuger modbus
     slave_id: 8
     baudrate: 19200
     bytesize: 8
     parity: N
     stopbits: 1
     timeout: 1
+    tipo: "g"
+    simular: False
+
     registers:
       - name: Temperature
         address: 1

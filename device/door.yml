@@ -1,15 +1,27 @@
 medidores:
   door_sensor:
-    i: 14  #10                  # identificador lógico del grupo o área (igual que en otros)15 es el de prueba
+    enabled: true
+    source_type: gateway
+
+    i: 14
+
+    gateway:
+      gateway_id: 14
+      nombre: "SAMEE200-LPS-AOKI"
+      tipo: "Gateway energético industrial"
+      ubicacion: "Planta LPS"
+      cliente: "LPS"
+
     name: "door_chamber"
     invert_active_low: true
     debounce_ms: 80
+
     registers:
       - name: estado_puerta
         alias: door_open
-        v: 1                # 1 = abierta
+        v: 1
         u: 138
       - name: duracion_abierta
         alias: door_open_duration_s
-        v: 0                # segundos que ha estado abierta 
+        v: 0
         u: 145

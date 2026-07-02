@@ -1,0 +1,166 @@
+UnitId;Name;Simbol
+1;Temperatura;ºC
+2;Humedad Relativa;%
+3;Voltaje Fase1;V
+4;Voltaje Fase2;V
+5;Voltaje Fase3;V
+6;Succion;kPa
+7;Voltaje Fase 1 neutro;VL1
+8;Voltaje Fase  2 neutro;VL2
+9;Voltaje Fase 3  neutro;VL3
+10;Corriente Fase 1;A1
+11;Corriente Fase 2;A2
+12;Corriente Fase 3;A3
+13;Potencia Activa Fase 1 (FAP1);W1
+14;Potencia Activa Fase 2 (FAP2);W2
+15;Potencia Activa Fase 3 (FAP3);W3
+16;Potencia Aparente Fase 1 (FAPP1);VA1
+17;Potencia Aparente Fase 2 (FAPP2);VA2
+18;Potencia Aparente Fase 3 (FAPP3);VA3
+19;Potencia Reactiva 1 (FRP1);VAr1
+20;Potencia Reactiva 2 (FRP2);VAr2
+21;Potencia Reactiva 3 (FRP3);VAr3
+22;Factor de Potencia 1 (FPF1);%
+23;Factor de Potencia 2 (FPF2);%
+24;Factor de Potencia 3 (FPF3);%
+25;Total system power demand (W);W
+26;Total Potencia factor 1 (TSPF1);%
+27;Frecuencia de Voltaje Total;Hz
+28;Total Energia Aparente (TAPE);kVAh
+29;Voltaje L1_L2 (VL1L2);V
+30;Voltaje L2_L3(VL2L3);V
+31;Voltaje L1_L3 (VL1L3);V
+32;THD L1 (THDL1);%
+33;THD L2 (THDL2);%
+34;THD L3 (THDL3);%
+35;Corriente THD A1 (THDA1);%
+36;Corriente THD A2 (THDA2);%
+37;Corriente THD A3 (THDA3);%
+38;Voltaje promedio de línea a neutro (THDLN);%
+39;Promedio de voltios de línea a línea (THDLL);%
+40;Energía activa total 3 (TAE3);kWh3
+41;Energía Reactiva total 3 (TRE3);kVArh3
+42;Importación total de energía activa (TIAE);kWh
+43;Energía activa total exportada (TEAE);KWH
+44;Importación total de energía reactiva (TIRE);kVArh
+45;importar energía activa L1 (L1IAE);kWh
+46;importar energía activa L2 (L2IAE);kWh
+47;importar energía activa L3 (L3IAE);kWh
+48;importar energía reactiva L1 (L1IRE);kVArh
+49;importar energía reactiva L2 (L2IRE);kVArh
+50;importar energía reactiva L3 (L3IRE);kVArh
+51;Voltios amperios totales del sistema (TSVA);VA
+52;Voltios amperios reactivos totales del sistema (TSVAR);VAr
+53;Connected_Meter;NA
+54;Average value of L1L2L3 three-phase current AvgA1A2A3;A
+55;Phase N current;A
+56;Average value of L1L2L3 three-phase phase voltage;V
+57;Average value of three-phase line voltage (AVGU12U23U31);V
+58;Phase 1 active power (P1);kW
+59;Phase 2 active power (P2);kW
+60;Phase 3 active power (P3);kW
+61;Total Active power (PTotal);kW
+62;Phase 1 reactive power (Q1);kVAR
+63;Phase 2 reactive power (Q2);kVAR
+64;Phase 3 reactive power (Q3);kVAR
+65;Total Reactive power (Qtotal);kVAR
+66;Phase 1 apparent power (S1);kVA
+67;Phase 2 apparent power (S2);kVA
+68;Phase 3 apparent power (S3);kVA
+69;Total Apparent power (STotal);kVA
+70;Phase 1 power factor  (PF1);NA
+71;Phase 2 power factor (PF2);NA
+72;Phase 3 power factor  (PF3);NA
+73;Total power factor  (PFTotal);NA
+74;Phase L1 frequency (Freq1);Hz
+75;Phase L2 frequency (Freq2);Hz
+76;Phase L3 frequency (Freq3);Hz
+77;Phase L1 Positive active energy (EP1IMP);Wh
+78;Phase L2 Positive active energy (EP2IMP);Wh
+79;Phase L3 Positive active energy (EP3IMP);Wh
+80;Total Positive active energy (EPIMP);Wh
+81;Phase L1 Reverse active energy (EP1Exp);Wh
+82;Phase L2 Reverse active energy (EP2Exp);Wh
+83;Phase L3 Reverse active energy (EP3Exp);Wh
+84;Total Reverse active energy (EPExp);Wh
+85;Phase L1 Positive reactive energy (EQ1Imp);VARh
+86;Phase L2 Positive reactive energy (EQ2Imp);VARh
+87;Phase L3 Positive reactive energy (EQ3Imp);VARh
+88;Total Positive reactive energy (EQImp);VARh
+89;Phase L1 Reverse reactive energy (EQ1Exp);VARh
+90;Phase L2 Reverse reactive energy (EQ2Exp);VARh
+91;Phase L3 Reverse reactive energy (EQ3Exp);VARh
+92;Total Reverse reactive energy (EQExp);VARh
+93;Phase L1 Apparent Energy (ES1);VAh
+94;Phase L2 Apparent Energy (ES2);VAh
+95;Phase L3 Apparent Energy (ES3);VAh
+96;Total Apparent Energy (ES);VAh
+97;Phase L1 Positive active energy UInt32 (EP1Imp);kWh
+98;Phase L2 Positive active energy UInt32 (EP2Imp);kWh
+99;Phase L3 Positive active energy UInt32 (EP3Imp);kWh
+100;Total Positive active energy UInt32 (EPImp);kWh
+101;Phase L1 Reverse active energy UInt32 (EP1Exp);kWh
+102;Phase L2 Reverse active energy UInt32 (EP2Exp);kWh
+103;Phase L3 Reverse active energy UInt32 (EP3Exp);kWh
+104;Total Reverse active energy UInt32 (EPExp);kWh
+105;Phase L1 Positive reactive energy UInt32 (EQ1Imp);kVARh
+106;Phase L2 Positive reactive energy UInt32 (EQ2Imp);kVARh
+107;Phase L3 Positive reactive energy UInt32 (EQ3Imp);kVARh
+108;Total Positive reactive energy UInt32 (EQImp);kVARh
+109;Phase L1 Reverse reactive energy UInt32 (EQ1Exp);kVARh
+110;Phase L2 Reverse reactive energy UInt32 (EQ2Exp);kVARh
+111;Phase L3 Reverse reactive energy UInt32 (EQ3Exp);kVARh
+112;Total Reverse reactive energy UInt32 (EQExp);kVARh
+113;Phase L1 Apparent Energy UInt32 (ES1);kVARh
+114;Phase L2 Apparent Energy UInt32 (ES2);kVARh
+115;Phase L3 Apparent Energy UInt32 (ES3);kVARh
+116;Total Apparent Energy UInt32 (ES);kVARh
+117;Phase L1 current total harmonic percentage (I1THD);%
+118;Phase L2 current total harmonic percentage (I2THD);%
+119;Phase L3 current total harmonic percentage (I3THD);%
+120;Phase L1 volage total harmonic percentage (U1THD);%
+121;Phase L2 volage total harmonic percentage (U2THD);%
+122;Phase L3 volage total harmonic percentage (U3THD);%
+123;Phase L1 Maximum current (I1Max);A
+124;Phase L2 Maximum current (I2Max);A
+125;Phase L3 Maximum current (I3Max);A
+126;Phase L1 Minimum current (I1Min);A
+127;Phase L2 Minimum current (I2Min);A
+128;Phase L3 Minimum current (I3Min);A
+129;U1-UN Maximum phase voltage (U1Max);V
+130;U2-UN Maximum phase voltage (U2Max);V
+131;U3-UN Maximum phase voltage (U3Max);V
+132;U1-UN Minimum phase voltage (U1Min);V
+133;U2-UN Minimum phase voltage (U2Min);V
+134;U3-UN Minimum phase voltage (U3Min);V
+135;Ram;%
+136;cpu;%
+137;IP_USB0;NA
+138;Door;NA
+139;CO2;%
+140;RELE_GAS;NA
+141;RELE_EXTRACTOR;NA
+142;RELÉ RECIRCULACIÓN;NA
+143;RELE_HUMEDAD;NA
+144;IP_Ethernet;NA
+145;Door_open_duration;NA
+146;man_trap_button;NA
+147;Maximum total system power demand;W
+148;Total system VA demand;VA
+149;Maximum total system VA demand;VA
+150;Total system reactive power demand;VAr
+151;Maximum total system reactive power demand;VAr
+152;Total  Import ;kVArh
+153;Total Export;kVArh
+154;Total VAh;kVAh
+155;Phase 1 phase angle;Degrees
+156;Phase 2 phase angle;Degrees
+157;Phase 3 phase angle;Degrees
+158;Pt100;ºC
+159;Res-PT100;Ω
+160;RELE_AIRE_FRESCO;NA
+161;HVAC_status;NA
+162;HVAC_onoff;NA
+163;HVAC_mode;NA
+164;HVAC_reatGetpoint;ºC
+165;HVAC_room_temp;ºC
