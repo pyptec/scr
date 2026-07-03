@@ -2,17 +2,185 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>SAMEE200 Dashboard</title>
+    <title>SAMEE200 Dashboard Industrial</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <h1>SAMEE200 Dashboard Industrial</h1>
-    <p>API Flask funcionando correctamente.</p>
 
-    <ul>
-        <li><a href="/api/dashboard">/api/dashboard</a></li>
-        <li><a href="/api/estado">/api/estado</a></li>
-        <li><a href="/api/variables">/api/variables</a></li>
-        <li><a href="/api/ultimos">/api/ultimos</a></li>
-    </ul>
+<header class="topbar">
+    <div>
+        <h1>SAMEE200</h1>
+        <p>Dashboard Industrial | Energía, Producción, EnPI e ISO 50001</p>
+    </div>
+
+    <div class="estado-box">
+        <span id="estadoDatos" class="estado">--</span>
+        <small id="ultimaMedicion">Última medición: --</small>
+    </div>
+</header>
+
+<main class="contenedor">
+
+    <section class="panel">
+        <div class="panel-header">
+            <h2>Resumen energético</h2>
+
+            <select id="rangoTiempo">
+                <option value="hora">Última hora</option>
+                <option value="hoy" selected>Hoy</option>
+                <option value="semana">Semana</option>
+                <option value="mes">Mes</option>
+                <option value="todo">Todo</option>
+            </select>
+        </div>
+
+        <div class="grid-kpi">
+            <div class="card">
+                <span>Totalizador</span>
+                <strong id="energiaTotalizador">--</strong>
+                <small>kWh periodo</small>
+            </div>
+
+            <div class="card">
+                <span>Proceso Aoki</span>
+                <strong id="energiaProceso">--</strong>
+                <small>kWh periodo</small>
+            </div>
+
+            <div class="card">
+                <span>Potencia totalizador</span>
+                <strong id="potenciaTotalizador">--</strong>
+                <small>kW actual</small>
+            </div>
+
+            <div class="card">
+                <span>Potencia proceso</span>
+                <strong id="potenciaProceso">--</strong>
+                <small>kW actual</small>
+            </div>
+
+            <div class="card">
+                <span>Producción</span>
+                <strong id="produccion">--</strong>
+                <small>envases periodo</small>
+            </div>
+
+            <div class="card">
+                <span>EnPI totalizador</span>
+                <strong id="enpiTotalizador">--</strong>
+                <small>kWh / 1000 envases</small>
+            </div>
+
+            <div class="card">
+                <span>EnPI proceso</span>
+                <strong id="enpiProceso">--</strong>
+                <small>kWh / 1000 envases</small>
+            </div>
+
+            <div class="card">
+                <span>Participación proceso</span>
+                <strong id="participacionProceso">--</strong>
+                <small>% del totalizador</small>
+            </div>
+        </div>
+    </section>
+
+    <section class="panel">
+        <h2>Impacto económico y ambiental</h2>
+
+        <div class="grid-kpi">
+            <div class="card">
+                <span>Costo totalizador</span>
+                <strong id="costoTotalizador">--</strong>
+                <small>COP</small>
+            </div>
+
+            <div class="card">
+                <span>Costo proceso</span>
+                <strong id="costoProceso">--</strong>
+                <small>COP</small>
+            </div>
+
+            <div class="card">
+                <span>CO₂ totalizador</span>
+                <strong id="co2Totalizador">--</strong>
+                <small>kg CO₂</small>
+            </div>
+
+            <div class="card">
+                <span>CO₂ proceso</span>
+                <strong id="co2Proceso">--</strong>
+                <small>kg CO₂</small>
+            </div>
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="panel-header">
+            <h2 id="tituloGrafica">Potencia activa total</h2>
+
+            <div class="botones">
+                <button onclick="mostrarGrafica('potencia')">Potencia</button>
+                <button onclick="mostrarGrafica('energia')">Energía</button>
+                <button onclick="mostrarGrafica('enpi')">EnPI</button>
+                <button onclick="mostrarGrafica('variable')">Variable</button>
+            </div>
+        </div>
+
+        <div class="selector-variable">
+            <select id="selectorVariable"></select>
+            <button onclick="graficarVariableSeleccionada()">Graficar variable</button>
+        </div>
+
+        <canvas id="chartPrincipal"></canvas>
+    </section>
+
+    <section class="panel">
+        <h2>Estado del gateway</h2>
+
+        <div class="estado-grid">
+            <div><b>Gateway:</b> <span id="estadoGateway">--</span></div>
+            <div><b>Cliente:</b> <span id="estadoCliente">--</span></div>
+            <div><b>Última medición:</b> <span id="estadoUltima">--</span></div>
+            <div><b>Edad dato:</b> <span id="estadoEdad">--</span></div>
+            <div><b>RAM:</b> <span id="estadoRam">--</span></div>
+            <div><b>CPU:</b> <span id="estadoCpu">--</span></div>
+            <div><b>IP Ethernet:</b> <span id="estadoIpEth">--</span></div>
+            <div><b>Connected meter:</b> <span id="estadoConnect">--</span></div>
+        </div>
+    </section>
+
+    <section class="panel">
+        <h2>Últimos valores</h2>
+
+        <input id="buscarTabla" type="text" placeholder="Buscar variable..." oninput="filtrarTablaUltimos()">
+
+        <div class="tabla-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Gateway</th>
+                        <th>Equipo</th>
+                        <th>Rol</th>
+                        <th>Unit ID</th>
+                        <th>Variable</th>
+                        <th>Valor</th>
+                        <th>Unidad</th>
+                        <th>Hora</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaUltimos"></tbody>
+            </table>
+        </div>
+    </section>
+
+</main>
+
+<script src="/static/js/dashboard.js"></script>
+
 </body>
 </html>
