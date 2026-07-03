@@ -16,6 +16,11 @@ import subprocess
 import modbusdevices
 import random
 
+from db.samee200_db import init_db
+from db.samee200_db import cargar_catalogos_desde_env
+from db.samee200_db import guardar_medicion
+
+
 '''
 Parametros del pto serie modbus
 '''
@@ -191,6 +196,22 @@ def log_modo_lectura(nombre, config):
             f"Lectura por Modbus/dispositivo real"
         )
 
+def guardar_payload_local(payload, origen):
+    """
+    Guarda una medición en SQLite local.
+    No detiene el programa si hay error.
+    """
+
+    try:
+        ok = guardar_medicion(payload, origen=origen)
+
+        if ok:
+            util.logging.info(f"[SQLITE] Medición guardada localmente: {origen}")
+        else:
+            util.logging.warning(f"[SQLITE] No se pudo guardar medición: {origen}")
+
+    except Exception as e:
+        util.logging.error(f"[SQLITE] Error guardando {origen}: {e}")
 #---------------------------------------------------------------------------------------------------    
 # simulador de datos del medidor eastron
 #---------------------------------------------------------------------------------------------------  
@@ -514,7 +535,9 @@ def obtener_datos_medidores_y_sensor():
 # Lógica principal
 def main_loop():
     #global ssh_process  
-   
+    init_db()
+    cargar_catalogos_desde_env()
+    
     tempRaspberry = TIMERCHEQUEOTEMPERATURA
     tempMedidor   = TIMERMEDICION
     tempQueue     = TIMERCOLAEVENTOS
@@ -532,6 +555,13 @@ def main_loop():
     # mediciones de los medidores ME337 y el  sensor SHT20
     datos = obtener_datos_medidores_y_sensor()
     Temp.iniciar_wdt()
+    
+    guardar_payload_local(conneced_meter, "ARRANQUE/connect")
+
+    for key in ('medidor_1', 'medidor_2', 'sensor_sht20'):
+        guardar_payload_local(datos[key], f"ARRANQUE/{key}")
+    
+    
     if  util.check_internet_connection():
          # Conectar al cliente MQTT
         mqtt_client = awsaccess.connect_to_mqtt()
@@ -570,6 +600,9 @@ def main_loop():
             tempRaspberry = TIMERCHEQUEOTEMPERATURA
             json_estado = util.payload_estado_sistema_y_medidor()
             Sistema =json.dumps(json_estado)
+            
+            guardar_payload_local(Sistema, "SISTEMA")
+            
             #se inicia el wdt 
             Temp.iniciar_wdt()
             # Si la puerta está abierta, forzar transmisión inmediata
@@ -592,6 +625,10 @@ def main_loop():
             tempMedidor = TIMERMEDICION
             # mediciones de los medidores ME337 y el  sensor SHT20
             datos = obtener_datos_medidores_y_sensor()
+            
+            for key in ('medidor_1', 'medidor_2', 'sensor_sht20'):
+                guardar_payload_local(datos[key], f"MEDICION/{key}")
+            
             if  util.check_internet_connection():
                 mqtt_client = awsaccess.connect_to_mqtt()
                 if mqtt_client:
