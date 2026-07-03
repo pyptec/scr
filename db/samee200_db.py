@@ -1,6 +1,7 @@
 import os
 import json
 import sqlite3
+import csv
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -11,7 +12,7 @@ load_dotenv("/home/pi/SAMEE200/scr/.env")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DEFAULT_DB_PATH = BASE_DIR / "data" / "samee200.db"
-
+CATALOGO_UNIDADES_PATH = BASE_DIR / "db" / "catalogos_unidades.csv"
 
 def get_db_path():
     return os.getenv("DB_PATH", str(DEFAULT_DB_PATH))
@@ -192,7 +193,8 @@ def init_db():
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     """)
-
+    
+    cargar_unidades_desde_csv(conn)
     conn.commit()
     conn.close()
 
@@ -312,7 +314,11 @@ def registrar_unidades_desde_config(config):
 
     try:
         for reg in registers:
-            unit_id = reg.get("unit")
+            unit_id = (
+                reg.get("unit")
+                or reg.get("u")
+                or reg.get("unit_id")
+            )
 
             if unit_id in [None, "", "None"]:
                 continue
@@ -539,3 +545,92 @@ def guardar_medicion(payload, origen=""):
 
     finally:
         conn.close()
+        
+def cargar_unidades_desde_csv(conn):
+    """
+    Carga el catálogo maestro de unidades desde db/catalogos_unidades.csv.
+
+    Formato esperado:
+        UnitId;Name;Simbol
+
+    También tolera nombres de columnas en minúscula:
+        unit_id, name, simbol
+    """
+
+    if not CATALOGO_UNIDADES_PATH.exists():
+        print(f"[SQLITE] No existe catálogo de unidades: {CATALOGO_UNIDADES_PATH}")
+        return
+
+    cur = conn.cursor()
+
+    try:
+        with open(CATALOGO_UNIDADES_PATH, "r", encoding="utf-8-sig", newline="") as f:
+            sample = f.read(2048)
+            f.seek(0)
+
+            try:
+                dialect = csv.Sniffer().sniff(sample, delimiters=";,|\t")
+                delimiter = dialect.delimiter
+            except Exception:
+                delimiter = ";"
+
+            reader = csv.DictReader(f, delimiter=delimiter)
+
+            for row in reader:
+                unit_id = (
+                    row.get("UnitId")
+                    or row.get("unit_id")
+                    or row.get("unitId")
+                    or row.get("UNIT_ID")
+                    or row.get("id")
+                )
+
+                name = (
+                    row.get("Name")
+                    or row.get("name")
+                    or row.get("nombre")
+                    or f"Unit {unit_id}"
+                )
+
+                simbol = (
+                    row.get("Simbol")
+                    or row.get("simbol")
+                    or row.get("symbol")
+                    or row.get("unidad")
+                    or ""
+                )
+
+                if unit_id in [None, "", "None"]:
+                    continue
+
+                try:
+                    unit_id_int = int(unit_id)
+                except Exception:
+                    continue
+
+                cur.execute("""
+                    INSERT INTO unidades (
+                        unit_id,
+                        name,
+                        alias,
+                        simbol,
+                        descripcion,
+                        updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(unit_id) DO UPDATE SET
+                        name = excluded.name,
+                        simbol = excluded.simbol,
+                        updated_at = CURRENT_TIMESTAMP
+                """, (
+                    unit_id_int,
+                    str(name).strip(),
+                    "",
+                    str(simbol).strip(),
+                    ""
+                ))
+
+        print(f"[SQLITE] Catálogo maestro de unidades cargado: {CATALOGO_UNIDADES_PATH}")
+
+    except Exception as e:
+        print(f"[SQLITE] Error cargando catálogo maestro de unidades: {e}")
