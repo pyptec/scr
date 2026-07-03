@@ -132,6 +132,73 @@ function reconstruirIpv4DesdeDigitos(valor) {
     return privadas[0] || resultados[0];
 }
 
+async function cargarLineaBase() {
+    const rango = obtenerRangoUnix();
+
+    const res = await fetch(`/api/linea-base?inicio=${rango.inicio}&fin=${rango.fin}`);
+    const data = await res.json();
+
+    if (data.ok === false || data.error) {
+        document.getElementById("lbClasificacion").innerText = "Sin modelo";
+        document.getElementById("lbMensaje").innerText = data.error || "No hay datos suficientes";
+        return;
+    }
+
+    document.getElementById("lbEnergiaReal").innerText =
+        formatearNumero(data.energia?.real_kwh, 3);
+
+    document.getElementById("lbEnergiaEsperada").innerText =
+        formatearNumero(data.energia?.esperada_kwh, 3);
+
+    document.getElementById("lbDesviacionPct").innerText =
+        formatearNumero(data.energia?.desviacion_pct, 2);
+
+    document.getElementById("lbAhorroKwh").innerText =
+        formatearNumero(data.energia?.ahorro_kwh, 3);
+
+    document.getElementById("lbAhorroCop").innerText =
+        formatearEntero(data.impacto?.ahorro_cop);
+
+    document.getElementById("lbClasificacion").innerText =
+        data.clasificacion || "--";
+
+    document.getElementById("lbMensaje").innerText =
+        data.mensaje || "ISO 50001";
+
+    const beta0 = data.modelo?.beta0;
+    const beta1 = data.modelo?.beta1;
+
+    if (beta0 !== undefined && beta1 !== undefined) {
+        document.getElementById("lbModelo").innerText =
+            `${formatearNumero(beta0, 2)} + ${formatearNumero(beta1, 5)}x`;
+    } else {
+        document.getElementById("lbModelo").innerText = "--";
+    }
+
+    document.getElementById("lbR2").innerText =
+        formatearNumero(data.modelo?.r2, 3);
+}
+
+
+async function entrenarLineaBase() {
+    const ok = confirm("¿Desea reentrenar la línea base energética con muestras simuladas?");
+
+    if (!ok) {
+        return;
+    }
+
+    const res = await fetch("/api/linea-base/entrenar?dias=30");
+    const data = await res.json();
+
+    if (data.ok) {
+        alert("Línea base reentrenada correctamente.");
+    } else {
+        alert("No fue posible entrenar la línea base.");
+    }
+
+    await cargarLineaBase();
+}
+
 async function cargarDashboard() {
     const rango = obtenerRangoUnix();
 
@@ -373,7 +440,36 @@ async function mostrarGrafica(tipo) {
             }
         });
     }
+    if (tipo === "linea_base") {
+        document.getElementById("tituloGrafica").innerText =
+            "Línea base ISO 50001: Energía real vs esperada";
 
+        const rango = obtenerRangoUnix();
+
+        const res = await fetch(`/api/linea-base?inicio=${rango.inicio}&fin=${rango.fin}`);
+        const data = await res.json();
+
+        const energiaReal = data.energia?.real_kwh || 0;
+        const energiaEsperada = data.energia?.esperada_kwh || 0;
+        const ahorro = data.energia?.ahorro_kwh || 0;
+        const sobreconsumo = data.energia?.sobreconsumo_kwh || 0;
+
+        chartPrincipal = new Chart(ctx, {
+            type: "bar",
+            data: {
+                labels: ["Real", "Esperada", "Ahorro", "Sobreconsumo"],
+                datasets: [{
+                    label: "kWh",
+                    data: [
+                        energiaReal,
+                        energiaEsperada,
+                        ahorro,
+                        sobreconsumo
+                    ]
+                }]
+            }
+        });
+    }
     if (tipo === "variable") {
         await graficarVariableSeleccionada();
     }
@@ -507,6 +603,7 @@ function filtrarTablaUltimos() {
 
 async function actualizarTodo() {
     await cargarDashboard();
+    await cargarLineaBase();
     await cargarEstado();
     await cargarUltimosValores();
 

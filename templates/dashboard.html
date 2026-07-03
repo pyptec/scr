@@ -92,6 +92,63 @@
     <section class="panel">
         <h2>Impacto económico y ambiental</h2>
 
+        <section class="panel">
+            <div class="panel-header">
+                <h2>Línea base energética ISO 50001</h2>
+                <button onclick="entrenarLineaBase()">Reentrenar línea base</button>
+            </div>
+
+            <div class="grid-kpi">
+                <div class="card">
+                    <span>Energía real</span>
+                    <strong id="lbEnergiaReal">--</strong>
+                    <small>kWh periodo</small>
+                </div>
+
+                <div class="card">
+                    <span>Energía esperada</span>
+                    <strong id="lbEnergiaEsperada">--</strong>
+                    <small>kWh según línea base</small>
+                </div>
+
+                <div class="card">
+                    <span>Desviación</span>
+                    <strong id="lbDesviacionPct">--</strong>
+                    <small>% vs línea base</small>
+                </div>
+
+                <div class="card">
+                    <span>Ahorro</span>
+                    <strong id="lbAhorroKwh">--</strong>
+                    <small>kWh evitados</small>
+                </div>
+
+                <div class="card">
+                    <span>Ahorro económico</span>
+                    <strong id="lbAhorroCop">--</strong>
+                    <small>COP estimados</small>
+                </div>
+
+                <div class="card">
+                    <span>Clasificación</span>
+                    <strong id="lbClasificacion">--</strong>
+                    <small id="lbMensaje">ISO 50001</small>
+                </div>
+
+                <div class="card">
+                    <span>Modelo</span>
+                    <strong id="lbModelo">--</strong>
+                    <small>kWh = β0 + β1 × envases</small>
+                </div>
+
+                <div class="card">
+                    <span>R² modelo</span>
+                    <strong id="lbR2">--</strong>
+                    <small>calidad del ajuste</small>
+                </div>
+            </div>
+        </section>
+
         <div class="grid-kpi">
             <div class="card">
                 <span>Costo totalizador</span>
@@ -127,6 +184,7 @@
                 <button onclick="mostrarGrafica('potencia')">Potencia</button>
                 <button onclick="mostrarGrafica('energia')">Energía</button>
                 <button onclick="mostrarGrafica('enpi')">EnPI</button>
+                <button onclick="mostrarGrafica('linea_base')">Línea base</button>
                 <button onclick="mostrarGrafica('variable')">Variable</button>
             </div>
         </div>
