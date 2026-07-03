@@ -10,6 +10,10 @@ from dotenv import load_dotenv
 from db.samee200_db import init_db, get_conn, cargar_catalogos_desde_env
 from db.kpi_samee200 import resumen_kpi_samee200
 
+from db.linea_base_samee200 import entrenar_linea_base_totalizador
+from db.linea_base_samee200 import evaluar_desempeno_actual
+from db.linea_base_samee200 import obtener_muestras_linea_base
+
 load_dotenv("/home/pi/SAMEE200/scr/.env")
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -425,6 +429,34 @@ def api_series():
     return jsonify({
         "unit_ids": unit_ids,
         "series": resultado
+    })
+
+@app.route("/api/linea-base")
+def api_linea_base():
+    inicio = request.args.get("inicio", type=int)
+    fin = request.args.get("fin", type=int)
+
+    data = evaluar_desempeno_actual(inicio=inicio, fin=fin)
+
+    return jsonify(data)
+
+
+@app.route("/api/linea-base/entrenar")
+def api_linea_base_entrenar():
+    dias = request.args.get("dias", default=30, type=int)
+
+    data = entrenar_linea_base_totalizador(dias=dias)
+
+    return jsonify(data)
+
+
+@app.route("/api/linea-base/muestras")
+def api_linea_base_muestras():
+    data = obtener_muestras_linea_base()
+
+    return jsonify({
+        "total": len(data),
+        "muestras": data
     })
 
 
