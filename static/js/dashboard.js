@@ -1,31 +1,99 @@
 let chartPrincipal = null;
 let graficaActual = "potencia";
-let rangoActual = "hoy";
+let rangoActual = "mayoJunio2026";
 let ultimosValores = [];
 let variablesDisponibles = [];
 
+function datetimeLocalAUnix(valor) {
+    if (!valor) return null;
+
+    const fecha = new Date(valor);
+
+    if (Number.isNaN(fecha.getTime())) {
+        return null;
+    }
+
+    return Math.floor(fecha.getTime() / 1000);
+}
+
+function unixADatetimeLocal(timestamp) {
+    const fecha = new Date(timestamp * 1000);
+    const year = fecha.getFullYear();
+    const month = String(fecha.getMonth() + 1).padStart(2, "0");
+    const day = String(fecha.getDate()).padStart(2, "0");
+    const hour = String(fecha.getHours()).padStart(2, "0");
+    const minute = String(fecha.getMinutes()).padStart(2, "0");
+
+    return `${year}-${month}-${day}T${hour}:${minute}`;
+}
+
+function unixDesdeColombia(year, month, day, hour = 0, minute = 0, second = 0) {
+    // Colombia UTC-5. Date.UTC recibe mes base cero.
+    return Math.floor(Date.UTC(year, month - 1, day, hour + 5, minute, second) / 1000);
+}
+
 function obtenerRangoUnix() {
     const ahora = Math.floor(Date.now() / 1000);
-    const fecha = new Date();
+    const rango = document.getElementById("rangoTiempo")?.value || rangoActual;
 
     let inicio = 0;
     let fin = ahora;
 
-    if (rangoActual === "hora") {
-        inicio = ahora - 3600;
-    } else if (rangoActual === "hoy") {
-        fecha.setHours(0, 0, 0, 0);
-        inicio = Math.floor(fecha.getTime() / 1000);
-    } else if (rangoActual === "semana") {
-        inicio = ahora - 7 * 24 * 3600;
-    } else if (rangoActual === "mes") {
-        inicio = ahora - 30 * 24 * 3600;
-    } else if (rangoActual === "todo") {
-        inicio = 0;
-        fin = 9999999999;
+    if (rango === "manual") {
+        const inicioManual = datetimeLocalAUnix(
+            document.getElementById("fechaInicioManual").value
+        );
+
+        const finManual = datetimeLocalAUnix(
+            document.getElementById("fechaFinManual").value
+        );
+
+        if (inicioManual && finManual && finManual > inicioManual) {
+            return {
+                inicio: inicioManual,
+                fin: finManual
+            };
+        }
     }
 
+    if (rango === "hora") {
+        inicio = ahora - 3600;
+    } else if (rango === "hoy") {
+        const fecha = new Date();
+        fecha.setHours(0, 0, 0, 0);
+        inicio = Math.floor(fecha.getTime() / 1000);
+    } else if (rango === "semana") {
+        inicio = ahora - 7 * 24 * 3600;
+    } else if (rango === "mes") {
+        inicio = ahora - 30 * 24 * 3600;
+    } else if (rango === "todo") {
+        inicio = 0;
+        fin = 9999999999;
+    } else if (rango === "mayo2026") {
+        inicio = unixDesdeColombia(2026, 5, 1, 0, 0, 0);
+        fin = unixDesdeColombia(2026, 5, 31, 23, 59, 59);
+    } else if (rango === "junio2026") {
+        inicio = unixDesdeColombia(2026, 6, 1, 0, 0, 0);
+        fin = unixDesdeColombia(2026, 6, 30, 23, 59, 59);
+    } else if (rango === "mayoJunio2026") {
+        inicio = unixDesdeColombia(2026, 5, 1, 0, 0, 0);
+        fin = unixDesdeColombia(2026, 6, 30, 23, 59, 59);
+    }
+
+    document.getElementById("fechaInicioManual").value = unixADatetimeLocal(inicio);
+    document.getElementById("fechaFinManual").value = unixADatetimeLocal(fin);
+
     return { inicio, fin };
+}
+
+function obtenerGranularidad() {
+    return document.getElementById("granularidad")?.value || "hora";
+}
+
+async function aplicarFiltroManual() {
+    rangoActual = document.getElementById("rangoTiempo").value;
+
+    await actualizarTodo();
 }
 
 function formatearNumero(valor, decimales = 2) {
@@ -386,8 +454,9 @@ function destruirGrafica() {
     }
 }
 
-async function obtenerSerie(unitId, deviceId, gatewayId = 10, limite = 1000) {
+async function obtenerSerie(unitId, deviceId, gatewayId = 10, limite = 5000) {
     const rango = obtenerRangoUnix();
+    const granularidad = obtenerGranularidad();
 
     const params = new URLSearchParams({
         inicio: rango.inicio,
@@ -395,10 +464,11 @@ async function obtenerSerie(unitId, deviceId, gatewayId = 10, limite = 1000) {
         limite: limite,
         gateway_id: gatewayId,
         device_id: deviceId,
-        source_type: "device"
+        source_type: "device",
+        granularidad: granularidad
     });
 
-    const res = await fetch(`/api/serie/${unitId}?${params.toString()}`);
+    const res = await fetch(`/api/serie-agregada/${unitId}?${params.toString()}`);
     const data = await res.json();
 
     return data.serie || [];
@@ -520,10 +590,37 @@ async function mostrarGrafica(tipo) {
             }
         });
     }
+    if (tipo === "produccion") {
+    document.getElementById("tituloGrafica").innerText =
+        "Producción mensual de envases AOKI";
+
+    const res = await fetch("/api/produccion/meses");
+    const data = await res.json();
+
+    const meses = data.meses || [];
+
+    chartPrincipal = new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels: meses.map(x => x.mes),
+            datasets: [
+                {
+                    label: "Envases buenos",
+                    data: meses.map(x => Number(x.envases_buenos || 0))
+                },
+                {
+                    label: "Envases malos",
+                    data: meses.map(x => Number(x.envases_malos || 0))
+                }
+            ]
+        }
+    });
+    }
     if (tipo === "variable") {
         await graficarVariableSeleccionada();
     }
 }
+
 
 async function graficarVariableSeleccionada() {
     const selector = document.getElementById("selectorVariable");
@@ -546,16 +643,17 @@ async function graficarVariableSeleccionada() {
     const params = new URLSearchParams({
         inicio: rango.inicio,
         fin: rango.fin,
-        limite: 1000,
+        limite: 5000,
         gateway_id: v.gateway_id,
-        source_type: v.source_type
+        source_type: v.source_type,
+        granularidad: obtenerGranularidad()
     });
 
     if (v.device_id) {
         params.append("device_id", v.device_id);
     }
 
-    const res = await fetch(`/api/serie/${v.unit_id}?${params.toString()}`);
+    const res = await fetch(`/api/serie-agregada/${v.unit_id}?${params.toString()}`);
     const data = await res.json();
     const serie = data.serie || [];
 
@@ -665,6 +763,11 @@ async function actualizarTodo() {
 
 document.getElementById("rangoTiempo").addEventListener("change", async (e) => {
     rangoActual = e.target.value;
+    obtenerRangoUnix();
+    await actualizarTodo();
+});
+
+document.getElementById("granularidad").addEventListener("change", async () => {
     await actualizarTodo();
 });
 
