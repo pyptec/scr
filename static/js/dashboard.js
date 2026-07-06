@@ -1,8 +1,9 @@
 let chartPrincipal = null;
 let graficaActual = "potencia";
-let rangoActual = "mayoJunio2026";
+let rangoActual = "prod_todo";
 let ultimosValores = [];
 let variablesDisponibles = [];
+let mesesProduccion = [];
 
 function datetimeLocalAUnix(valor) {
     if (!valor) return null;
@@ -106,7 +107,6 @@ function formatearNumero(valor, decimales = 2) {
         maximumFractionDigits: decimales
     });
 }
-
 function formatearEntero(valor) {
     if (valor === null || valor === undefined || Number.isNaN(Number(valor))) {
         return "--";
@@ -761,17 +761,51 @@ async function actualizarTodo() {
     }
 }
 
-document.getElementById("rangoTiempo").addEventListener("change", async (e) => {
-    rangoActual = e.target.value;
+function inicializarFiltros() {
+    const selectorRango = document.getElementById("rangoTiempo");
+    const selectorGranularidad = document.getElementById("granularidad");
+    const inputInicio = document.getElementById("fechaInicioManual");
+    const inputFin = document.getElementById("fechaFinManual");
+
+    if (selectorRango) {
+        selectorRango.value = rangoActual;
+
+        selectorRango.addEventListener("change", async (e) => {
+            rangoActual = e.target.value;
+            obtenerRangoUnix();
+            await actualizarTodo();
+        });
+    }
+
+    if (selectorGranularidad) {
+        selectorGranularidad.addEventListener("change", async () => {
+            await actualizarTodo();
+        });
+    }
+
+    if (inputInicio) {
+        inputInicio.addEventListener("change", () => {
+            if (selectorRango) selectorRango.value = "manual";
+            rangoActual = "manual";
+        });
+    }
+
+    if (inputFin) {
+        inputFin.addEventListener("change", () => {
+            if (selectorRango) selectorRango.value = "manual";
+            rangoActual = "manual";
+        });
+    }
+
     obtenerRangoUnix();
-    await actualizarTodo();
-});
+}
 
-document.getElementById("granularidad").addEventListener("change", async () => {
-    await actualizarTodo();
-});
+async function iniciarDashboard() {
+    inicializarFiltros();
+    await cargarRangosProduccion();
+    obtenerRangoUnix();
 
-cargarSelectorVariables();
-actualizarTodo();
+    setInterval(actualizarTodo, 30000);
+}
 
-setInterval(actualizarTodo, 30000);
+iniciarDashboard();
