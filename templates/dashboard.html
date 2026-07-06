@@ -25,6 +25,41 @@
 
 <main class="contenedor">
 
+    <section class="panel filtros-panel">
+        <div class="panel-header">
+            <h2>Filtro de análisis</h2>
+            <button onclick="aplicarFiltroManual()">Aplicar filtro</button>
+        </div>
+
+        <div class="filtros-grid">
+            <div>
+                <label>Desde</label>
+                <input type="datetime-local" id="fechaInicioManual">
+            </div>
+
+            <div>
+                <label>Hasta</label>
+                <input type="datetime-local" id="fechaFinManual">
+            </div>
+
+            <div>
+                <label>Granularidad</label>
+                <select id="granularidad">
+                    <option value="muestra">Muestra real</option>
+                    <option value="10min">10 minutos</option>
+                    <option value="30min">30 minutos</option>
+                    <option value="hora" selected>Hora</option>
+                    <option value="dia">Día</option>
+                </select>
+            </div>
+
+            <div>
+                <label>Rango rápido</label>
+                
+            </div>
+        </div>
+    </section>
+
     <section class="panel">
         <div class="panel-header">
             <h2>Resumen energético</h2>

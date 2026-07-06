@@ -524,6 +524,164 @@ def api_produccion_meses():
         "meses": rows
     })
 
+@app.route("/api/serie-agregada/<int:unit_id>")
+def api_serie_agregada(unit_id):
+    inicio = request.args.get("inicio", type=int)
+    fin = request.args.get("fin", type=int)
+    granularidad = request.args.get("granularidad", default="muestra")
+    gateway_id = request.args.get("gateway_id", type=int)
+    device_id = request.args.get("device_id")
+    source_type = request.args.get("source_type")
+
+    if not fin:
+        fin = int(time.time())
+
+    if not inicio:
+        inicio = fin - 86400
+
+    intervalo = None
+
+    if granularidad == "10min":
+        intervalo = 600
+    elif granularidad == "30min":
+        intervalo = 1800
+    elif granularidad == "hora":
+        intervalo = 3600
+    elif granularidad == "dia":
+        intervalo = 86400
+
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    where = """
+        md.unit_id = ?
+        AND CAST(md.timestamp_utc AS INTEGER) >= ?
+        AND CAST(md.timestamp_utc AS INTEGER) <= ?
+    """
+
+    params = [int(unit_id), int(inicio), int(fin)]
+
+    if gateway_id:
+        where += " AND md.gateway_id = ?"
+        params.append(int(gateway_id))
+
+    if source_type:
+        where += " AND md.source_type = ?"
+        params.append(source_type)
+
+    if device_id:
+        where += " AND TRIM(md.device_id) = ?"
+        params.append(str(device_id))
+
+    # Energías acumuladas: se calculan por delta, no por promedio.
+    unidades_energia = [97, 98, 99, 100, 101, 102, 103, 104, 108, 112, 116]
+
+    if intervalo is None or granularidad == "muestra":
+        cur.execute(f"""
+            SELECT
+                CAST(md.timestamp_utc AS INTEGER) AS timestamp_utc,
+                md.gateway_id,
+                md.source_type,
+                NULLIF(TRIM(md.device_id), '') AS device_id,
+                md.unit_id,
+                u.name AS variable,
+                u.simbol AS simbolo,
+                md.valor
+            FROM mediciones_detalle md
+            LEFT JOIN unidades u
+                ON md.unit_id = u.unit_id
+            WHERE {where}
+            ORDER BY CAST(md.timestamp_utc AS INTEGER) ASC, md.id ASC
+            LIMIT 5000
+        """, params)
+
+        rows = [dict(r) for r in cur.fetchall()]
+        conn.close()
+
+        return jsonify({
+            "unit_id": unit_id,
+            "granularidad": granularidad,
+            "tipo_calculo": "muestra",
+            "total": len(rows),
+            "serie": rows
+        })
+
+    bucket_expr = f"CAST((CAST(md.timestamp_utc AS INTEGER) / {intervalo}) AS INTEGER) * {intervalo}"
+
+    if unit_id in unidades_energia:
+        # Para energía acumulada:
+        # consumo del bucket = max(valor) - min(valor)
+        cur.execute(f"""
+            SELECT
+                {bucket_expr} AS timestamp_utc,
+                md.gateway_id,
+                md.source_type,
+                NULLIF(TRIM(md.device_id), '') AS device_id,
+                md.unit_id,
+                u.name AS variable,
+                u.simbol AS simbolo,
+                MIN(CAST(md.valor AS REAL)) AS valor_min,
+                MAX(CAST(md.valor AS REAL)) AS valor_max,
+                ROUND(MAX(CAST(md.valor AS REAL)) - MIN(CAST(md.valor AS REAL)), 6) AS valor
+            FROM mediciones_detalle md
+            LEFT JOIN unidades u
+                ON md.unit_id = u.unit_id
+            WHERE {where}
+            GROUP BY
+                {bucket_expr},
+                md.gateway_id,
+                md.source_type,
+                NULLIF(TRIM(md.device_id), ''),
+                md.unit_id
+            ORDER BY timestamp_utc ASC
+            LIMIT 5000
+        """, params)
+
+        tipo_calculo = "delta_acumulado"
+
+    else:
+        # Para potencia, corriente, voltaje, FP, THD, temperatura:
+        # promedio por bucket.
+        cur.execute(f"""
+            SELECT
+                {bucket_expr} AS timestamp_utc,
+                md.gateway_id,
+                md.source_type,
+                NULLIF(TRIM(md.device_id), '') AS device_id,
+                md.unit_id,
+                u.name AS variable,
+                u.simbol AS simbolo,
+                ROUND(AVG(CAST(md.valor AS REAL)), 6) AS valor,
+                ROUND(MIN(CAST(md.valor AS REAL)), 6) AS valor_min,
+                ROUND(MAX(CAST(md.valor AS REAL)), 6) AS valor_max
+            FROM mediciones_detalle md
+            LEFT JOIN unidades u
+                ON md.unit_id = u.unit_id
+            WHERE {where}
+            GROUP BY
+                {bucket_expr},
+                md.gateway_id,
+                md.source_type,
+                NULLIF(TRIM(md.device_id), ''),
+                md.unit_id
+            ORDER BY timestamp_utc ASC
+            LIMIT 5000
+        """, params)
+
+        tipo_calculo = "promedio"
+
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+
+    return jsonify({
+        "unit_id": unit_id,
+        "granularidad": granularidad,
+        "tipo_calculo": tipo_calculo,
+        "total": len(rows),
+        "serie": rows
+    })
+
 if __name__ == "__main__":
     app.run(
         host="0.0.0.0",

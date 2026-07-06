@@ -216,3 +216,37 @@ tr:hover {
         align-items: flex-start;
     }
 }
+
+.filtros-panel {
+    border-left: 5px solid #0f3b63;
+}
+
+.filtros-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(180px, 1fr));
+    gap: 16px;
+}
+
+.filtros-grid label {
+    display: block;
+    font-size: 13px;
+    color: #64748b;
+    margin-bottom: 6px;
+}
+
+.filtros-grid input,
+.filtros-grid select {
+    width: 100%;
+}
+
+@media (max-width: 900px) {
+    .filtros-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 640px) {
+    .filtros-grid {
+        grid-template-columns: 1fr;
+    }
+}
