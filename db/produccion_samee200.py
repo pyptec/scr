@@ -310,7 +310,7 @@ def importar_excel_produccion(ruta_archivo, linea="AOKI", producto="Botella_1L")
 
         try:
             cur.execute("""
-                INSERT OR IGNORE INTO produccion_periodo (
+                INSERT INTO produccion_periodo (
                     fecha,
                     fecha_hora_inicio_local,
                     fecha_hora_fin_local,
@@ -327,6 +327,23 @@ def importar_excel_produccion(ruta_archivo, linea="AOKI", producto="Botella_1L")
                     archivo_origen
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(
+                    fecha_hora_inicio_utc,
+                    fecha_hora_fin_utc,
+                    linea,
+                    producto
+                )
+                DO UPDATE SET
+                    fecha = excluded.fecha,
+                    fecha_hora_inicio_local = excluded.fecha_hora_inicio_local,
+                    fecha_hora_fin_local = excluded.fecha_hora_fin_local,
+                    envases_buenos = excluded.envases_buenos,
+                    envases_malos = excluded.envases_malos,
+                    eficiencia = excluded.eficiencia,
+                    turnos = excluded.turnos,
+                    observaciones = excluded.observaciones,
+                    fuente = excluded.fuente,
+                    archivo_origen = excluded.archivo_origen
             """, (
                 periodo["fecha"],
                 periodo["inicio_local"],
