@@ -1,6 +1,6 @@
 let chartPrincipal = null;
 let graficaActual = "potencia";
-let rangoActual = "prod_todo";
+let rangoActual = "ultimos_datos";
 let ultimosValores = [];
 let variablesDisponibles = [];
 let mesesProduccion = [];
@@ -32,12 +32,12 @@ function unixDesdeColombia(year, month, day, hour = 0, minute = 0, second = 0) {
     // Colombia UTC-5. Date.UTC recibe mes base cero.
     return Math.floor(Date.UTC(year, month - 1, day, hour + 5, minute, second) / 1000);
 }
-
 function obtenerRangoUnix() {
     const ahora = Math.floor(Date.now() / 1000);
-    const rango = document.getElementById("rangoTiempo")?.value || rangoActual;
+    const selectorRango = document.getElementById("rangoTiempo");
+    const rango = selectorRango ? selectorRango.value : rangoActual;
 
-    let inicio = 0;
+    let inicio = ahora - 86400;
     let fin = ahora;
 
     if (rango === "manual") {
@@ -57,32 +57,52 @@ function obtenerRangoUnix() {
         }
     }
 
-    if (rango === "hora") {
+    if (rango === "ultimos_datos") {
+        if (mesesProduccion.length) {
+            const r = rangoTodoProduccion();
+            inicio = r.inicio;
+            fin = r.fin;
+        } else {
+            inicio = ahora - 7 * 24 * 3600;
+            fin = ahora;
+        }
+
+    } else if (rango === "hora") {
         inicio = ahora - 3600;
+
     } else if (rango === "hoy") {
         const fecha = new Date();
         fecha.setHours(0, 0, 0, 0);
         inicio = Math.floor(fecha.getTime() / 1000);
+
     } else if (rango === "semana") {
         inicio = ahora - 7 * 24 * 3600;
+
     } else if (rango === "mes") {
         inicio = ahora - 30 * 24 * 3600;
-    } else if (rango === "todo") {
-        inicio = 0;
-        fin = 9999999999;
-    } else if (rango === "mayo2026") {
-        inicio = unixDesdeColombia(2026, 5, 1, 0, 0, 0);
-        fin = unixDesdeColombia(2026, 5, 31, 23, 59, 59);
-    } else if (rango === "junio2026") {
-        inicio = unixDesdeColombia(2026, 6, 1, 0, 0, 0);
-        fin = unixDesdeColombia(2026, 6, 30, 23, 59, 59);
-    } else if (rango === "mayoJunio2026") {
-        inicio = unixDesdeColombia(2026, 5, 1, 0, 0, 0);
-        fin = unixDesdeColombia(2026, 6, 30, 23, 59, 59);
+
+    } else if (rango === "prod_todo") {
+        const r = rangoTodoProduccion();
+        inicio = r.inicio;
+        fin = r.fin;
+
+    } else if (rango && rango.startsWith("prod_mes:")) {
+        const mes = rango.replace("prod_mes:", "");
+        const r = rangoMesProduccion(mes);
+        inicio = r.inicio;
+        fin = r.fin;
     }
 
-    document.getElementById("fechaInicioManual").value = unixADatetimeLocal(inicio);
-    document.getElementById("fechaFinManual").value = unixADatetimeLocal(fin);
+    const inputInicio = document.getElementById("fechaInicioManual");
+    const inputFin = document.getElementById("fechaFinManual");
+
+    if (inputInicio) {
+        inputInicio.value = unixADatetimeLocal(inicio);
+    }
+
+    if (inputFin) {
+        inputFin.value = unixADatetimeLocal(fin);
+    }
 
     return { inicio, fin };
 }
@@ -591,30 +611,32 @@ async function mostrarGrafica(tipo) {
         });
     }
     if (tipo === "produccion") {
-    document.getElementById("tituloGrafica").innerText =
-        "Producción mensual de envases AOKI";
+        document.getElementById("tituloGrafica").innerText =
+            "Producción de envases por periodo";
 
-    const res = await fetch("/api/produccion/meses");
-    const data = await res.json();
+        const rango = obtenerRangoUnix();
 
-    const meses = data.meses || [];
+        const res = await fetch(`/api/produccion?inicio=${rango.inicio}&fin=${rango.fin}`);
+        const data = await res.json();
 
-    chartPrincipal = new Chart(ctx, {
-        type: "bar",
-        data: {
-            labels: meses.map(x => x.mes),
-            datasets: [
-                {
-                    label: "Envases buenos",
-                    data: meses.map(x => Number(x.envases_buenos || 0))
-                },
-                {
-                    label: "Envases malos",
-                    data: meses.map(x => Number(x.envases_malos || 0))
-                }
-            ]
-        }
-    });
+        const periodos = data.periodos || [];
+
+        chartPrincipal = new Chart(ctx, {
+            type: "bar",
+            data: {
+                labels: periodos.map(x => x.fecha_hora_inicio_local),
+                datasets: [
+                    {
+                        label: "Envases buenos",
+                        data: periodos.map(x => Number(x.envases_buenos || 0))
+                    },
+                    {
+                        label: "Envases malos",
+                        data: periodos.map(x => Number(x.envases_malos || 0))
+                    }
+                ]
+            }
+        });
     }
     if (tipo === "variable") {
         await graficarVariableSeleccionada();
@@ -801,11 +823,61 @@ function inicializarFiltros() {
 }
 
 async function iniciarDashboard() {
-    inicializarFiltros();
+    
     await cargarRangosProduccion();
+    inicializarFiltros();
     obtenerRangoUnix();
+
+    await cargarSelectorVariables();
+    await actualizarTodo();
 
     setInterval(actualizarTodo, 30000);
 }
 
+async function cargarRangosProduccion() {
+    const selector = document.getElementById("rangoTiempo");
+
+    if (!selector) return;
+
+    let meses = [];
+
+    try {
+        const res = await fetch("/api/produccion/meses");
+        const data = await res.json();
+        meses = data.meses || [];
+    } catch (error) {
+        console.error("No se pudieron cargar meses de producción:", error);
+        meses = [];
+    }
+
+    mesesProduccion = meses;
+
+    selector.innerHTML = "";
+
+    const opcionesBase = [
+        ["ultimos_datos", "Últimos datos disponibles"],
+        ["manual", "Manual"],
+        ["hora", "Última hora"],
+        ["hoy", "Hoy"],
+        ["semana", "Últimos 7 días"],
+        ["mes", "Últimos 30 días"],
+        ["prod_todo", "Todo producción"]
+    ];
+
+    opcionesBase.forEach(([value, label]) => {
+        const opt = document.createElement("option");
+        opt.value = value;
+        opt.textContent = label;
+        selector.appendChild(opt);
+    });
+
+    mesesProduccion.forEach(m => {
+        const opt = document.createElement("option");
+        opt.value = `prod_mes:${m.mes}`;
+        opt.textContent = `${m.mes} | ${formatearEntero(m.envases_total)} envases`;
+        selector.appendChild(opt);
+    });
+
+    selector.value = rangoActual;
+}
 iniciarDashboard();
