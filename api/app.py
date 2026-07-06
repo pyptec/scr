@@ -13,6 +13,8 @@ from db.kpi_samee200 import resumen_kpi_samee200
 from db.linea_base_samee200 import entrenar_linea_base_totalizador
 from db.linea_base_samee200 import evaluar_desempeno_actual
 from db.linea_base_samee200 import obtener_muestras_linea_base
+from db.produccion_samee200 import obtener_produccion_periodos
+from db.produccion_samee200 import sumar_produccion_rango
 
 load_dotenv("/home/pi/SAMEE200/scr/.env")
 
@@ -459,6 +461,68 @@ def api_linea_base_muestras():
         "muestras": data
     })
 
+@app.route("/api/produccion")
+def api_produccion():
+    inicio = request.args.get("inicio", type=int)
+    fin = request.args.get("fin", type=int)
+
+    data = obtener_produccion_periodos(inicio_utc=inicio, fin_utc=fin)
+
+    return jsonify({
+        "total": len(data),
+        "periodos": data
+    })
+
+
+@app.route("/api/produccion/resumen")
+def api_produccion_resumen():
+    inicio = request.args.get("inicio", type=int)
+    fin = request.args.get("fin", type=int)
+
+    if not fin:
+        fin = int(time.time())
+
+    if not inicio:
+        inicio = fin - 86400
+
+    data = sumar_produccion_rango(inicio, fin)
+
+    return jsonify(data)
+
+
+@app.route("/api/produccion/meses")
+def api_produccion_meses():
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT
+            substr(fecha, 1, 7) AS mes,
+            COUNT(*) AS periodos,
+            ROUND(SUM(envases_buenos), 0) AS envases_buenos,
+            ROUND(SUM(envases_malos), 0) AS envases_malos,
+            ROUND(SUM(envases_buenos + envases_malos), 0) AS envases_total,
+            ROUND(
+                CASE
+                    WHEN SUM(envases_buenos + envases_malos) > 0
+                    THEN SUM(envases_buenos) / SUM(envases_buenos + envases_malos)
+                    ELSE 0
+                END,
+                5
+            ) AS eficiencia_calc
+        FROM produccion_periodo
+        GROUP BY substr(fecha, 1, 7)
+        ORDER BY mes
+    """)
+
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+
+    return jsonify({
+        "total": len(rows),
+        "meses": rows
+    })
 
 if __name__ == "__main__":
     app.run(
