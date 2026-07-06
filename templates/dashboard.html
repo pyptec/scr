@@ -94,6 +94,62 @@
 
         <section class="panel">
             <div class="panel-header">
+                <h2>Producción de envases AOKI</h2>
+                <button onclick="cargarProduccion()">Actualizar producción</button>
+            </div>
+
+            <div class="grid-kpi">
+                <div class="card">
+                    <span>Envases buenos</span>
+                    <strong id="prodBuenos">--</strong>
+                    <small>rango seleccionado</small>
+                </div>
+
+                <div class="card">
+                    <span>Envases malos</span>
+                    <strong id="prodMalos">--</strong>
+                    <small>rango seleccionado</small>
+                </div>
+
+                <div class="card">
+                    <span>Total envases</span>
+                    <strong id="prodTotal">--</strong>
+                    <small>buenos + malos</small>
+                </div>
+
+                <div class="card">
+                    <span>Eficiencia producción</span>
+                    <strong id="prodEficiencia">--</strong>
+                    <small>buenos / total</small>
+                </div>
+
+                <div class="card">
+                    <span>Periodos usados</span>
+                    <strong id="prodPeriodos">--</strong>
+                    <small>filas de producción</small>
+                </div>
+            </div>
+
+            <h3>Resumen mensual</h3>
+            <div class="tabla-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Mes</th>
+                            <th>Periodos</th>
+                            <th>Buenos</th>
+                            <th>Malos</th>
+                            <th>Total</th>
+                            <th>Eficiencia</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaProduccionMeses"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="panel-header">
                 <h2>Línea base energética ISO 50001</h2>
                 <button onclick="entrenarLineaBase()">Reentrenar línea base</button>
             </div>

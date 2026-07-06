@@ -132,6 +132,56 @@ function reconstruirIpv4DesdeDigitos(valor) {
     return privadas[0] || resultados[0];
 }
 
+async function cargarProduccion() {
+    const rango = obtenerRangoUnix();
+
+    const resResumen = await fetch(`/api/produccion/resumen?inicio=${rango.inicio}&fin=${rango.fin}`);
+    const resumen = await resResumen.json();
+
+    document.getElementById("prodBuenos").innerText =
+        formatearEntero(resumen.envases_buenos);
+
+    document.getElementById("prodMalos").innerText =
+        formatearEntero(resumen.envases_malos);
+
+    document.getElementById("prodTotal").innerText =
+        formatearEntero(resumen.envases_total);
+
+    document.getElementById("prodEficiencia").innerText =
+        formatearNumero((resumen.eficiencia_calc || 0) * 100, 2);
+
+    document.getElementById("prodPeriodos").innerText =
+        formatearEntero(resumen.periodos_usados);
+
+    const resMeses = await fetch("/api/produccion/meses");
+    const dataMeses = await resMeses.json();
+
+    const tbody = document.getElementById("tablaProduccionMeses");
+    tbody.innerHTML = "";
+
+    const meses = dataMeses.meses || [];
+
+    if (!meses.length) {
+        tbody.innerHTML = `<tr><td colspan="6">No hay producción cargada</td></tr>`;
+        return;
+    }
+
+    meses.forEach(m => {
+        const tr = document.createElement("tr");
+
+        tr.innerHTML = `
+            <td>${m.mes}</td>
+            <td>${formatearEntero(m.periodos)}</td>
+            <td>${formatearEntero(m.envases_buenos)}</td>
+            <td>${formatearEntero(m.envases_malos)}</td>
+            <td>${formatearEntero(m.envases_total)}</td>
+            <td>${formatearNumero((m.eficiencia_calc || 0) * 100, 2)} %</td>
+        `;
+
+        tbody.appendChild(tr);
+    });
+}
+
 async function cargarLineaBase() {
     const rango = obtenerRangoUnix();
 
@@ -603,6 +653,7 @@ function filtrarTablaUltimos() {
 
 async function actualizarTodo() {
     await cargarDashboard();
+    await cargarProduccion();
     await cargarLineaBase();
     await cargarEstado();
     await cargarUltimosValores();
