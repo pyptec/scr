@@ -6,6 +6,8 @@ from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 
 from db.samee200_db import get_conn
+from db.samee200_db import get_conn
+from db.produccion_samee200 import sumar_produccion_rango
 
 load_dotenv("/home/pi/SAMEE200/scr/.env")
 
@@ -170,10 +172,10 @@ def calcular_delta_acumulado(unit_id, device_id, gateway_id=None, inicio=0, fin=
 
 def generar_produccion_simulada(inicio, fin):
     """
-    Genera producción simulada para pruebas de línea base y EnPI.
+    Fallback de prueba cuando no existe producción real cargada
+    para el rango seleccionado.
 
-    Por ahora no escribe en base de datos. Solo calcula una producción
-    proporcional al número de días del periodo.
+    Esta función solo debe usarse si produccion_periodo no tiene datos.
     """
 
     prod_min = int(os.getenv("PRODUCCION_MIN_DIA", "29000"))
@@ -188,9 +190,60 @@ def generar_produccion_simulada(inicio, fin):
     return {
         "envases_dia_estimado": produccion_dia,
         "envases_periodo": produccion_periodo,
+        "envases_buenos": produccion_periodo,
+        "envases_malos": 0,
+        "envases_total": produccion_periodo,
+        "eficiencia_calc": 1,
+        "periodos_usados": 0,
         "fuente": "simulado"
     }
 
+
+def obtener_produccion_periodo(inicio, fin):
+    """
+    Obtiene producción real desde la tabla produccion_periodo.
+
+    Regla:
+    - Si hay producción real en el rango, usa envases_buenos.
+    - Si no hay producción real, usa simulación como respaldo.
+
+    Para EnPI se recomienda usar envases buenos, porque representan
+    producción útil conforme.
+    """
+
+    try:
+        produccion_real = sumar_produccion_rango(inicio, fin)
+
+        periodos_usados = int(produccion_real.get("periodos_usados", 0) or 0)
+
+        if periodos_usados > 0:
+            envases_buenos = float(produccion_real.get("envases_buenos", 0) or 0)
+            envases_malos = float(produccion_real.get("envases_malos", 0) or 0)
+            envases_total = float(produccion_real.get("envases_total", 0) or 0)
+
+            segundos = max(int(fin) - int(inicio), 1)
+            dias = segundos / 86400
+
+            if dias > 0:
+                envases_dia_estimado = int(round(envases_buenos / dias))
+            else:
+                envases_dia_estimado = int(round(envases_buenos))
+
+            return {
+                "envases_dia_estimado": envases_dia_estimado,
+                "envases_periodo": int(round(envases_buenos)),
+                "envases_buenos": round(envases_buenos, 2),
+                "envases_malos": round(envases_malos, 2),
+                "envases_total": round(envases_total, 2),
+                "eficiencia_calc": produccion_real.get("eficiencia_calc", 0),
+                "periodos_usados": periodos_usados,
+                "fuente": "archivo"
+            }
+
+    except Exception as e:
+        print(f"[KPI] Error leyendo producción real: {e}")
+
+    return generar_produccion_simulada(inicio, fin)
 
 def resumen_kpi_samee200(inicio=None, fin=None):
     """
@@ -276,7 +329,7 @@ def resumen_kpi_samee200(inicio=None, fin=None):
     potencia_totalizador_kw = round((potencia_totalizador_w or 0) / 1000, 3)
     potencia_proceso_kw = round((potencia_proceso_w or 0) / 1000, 3)
 
-    produccion = generar_produccion_simulada(inicio, fin)
+    produccion = obtener_produccion_periodo(inicio, fin)
     envases = produccion["envases_periodo"]
 
     if envases > 0:
