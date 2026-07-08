@@ -333,10 +333,13 @@ def importar_csv_mediciones_historicas(ruta_csv, confirmar=True):
     init_db()
     cargar_catalogos_desde_env()
 
-    filas = leer_csv_mediciones(ruta)
+    # Importación optimizada por streaming.
+    # No carga todo el CSV en memoria y filtra solo variables clave.
+    dispositivos_permitidos = {24, 25, 26}
+    unidades_permitidas = {1, 2, 61, 73, 100}
 
     conn = get_conn()
-    #conn.row_factory = None
+    cur = conn.cursor()
 
     insertados = 0
     duplicados = 0
@@ -345,85 +348,196 @@ def importar_csv_mediciones_historicas(ruta_csv, confirmar=True):
 
     origen = f"HISTORICO_IOTCOLLECTOR/{ruta.name}"
 
-    for idx, fila in enumerate(filas, start=2):
-        try:
-            utc_date = fila.get("utc_date")
-            gateway_id = parse_entero(fila.get("gateway_id_prueba"), default=10)
-            device_id = parse_entero(fila.get("device_id_prueba"), default=None)
-            unit_id = parse_entero(fila.get("unit_id"), default=None)
-            valor = parse_numero(fila.get("value"), default=None)
+    delimitador = detectar_delimitador(ruta)
 
-            if device_id is None or unit_id is None or valor is None:
-                omitidos += 1
-                continue
+    columnas_esperadas = [
+        "utc_date",
+        "utc_received_date",
+        "gateway_id_prueba",
+        "device_id_prueba",
+        "concentrator_id_original",
+        "concentrator_name",
+        "gauge_id_original",
+        "gauge_name",
+        "unit_id",
+        "unit_name",
+        "value",
+    ]
 
-            timestamp_utc = parse_fecha_utc(utc_date)
+    with open(ruta, "r", encoding="utf-8-sig", newline="") as f:
+        reader = csv.reader(f, delimiter=delimitador)
 
-            if timestamp_utc is None:
-                omitidos += 1
-                continue
+        primera_fila = next(reader, None)
 
-            # Evitar importar dos veces la misma medición.
-            if existe_detalle(
-                conn,
-                timestamp_utc=timestamp_utc,
-                gateway_id=gateway_id,
-                device_id=device_id,
-                unit_id=unit_id
-            ):
-                duplicados += 1
-                continue
-
-            payload = {
-                "origen": origen,
-                "utc_date": utc_date,
-                "utc_received_date": fila.get("utc_received_date"),
-                "gateway_id_prueba": gateway_id,
-                "device_id_prueba": device_id,
-                "concentrator_id_original": fila.get("concentrator_id_original"),
-                "concentrator_name": fila.get("concentrator_name"),
-                "gauge_id_original": fila.get("gauge_id_original"),
-                "gauge_name": fila.get("gauge_name"),
-                "unit_id": unit_id,
-                "unit_name": fila.get("unit_name"),
-                "value": valor
+        if not primera_fila:
+            conn.close()
+            return {
+                "ok": False,
+                "error": "El CSV está vacío."
             }
 
-            medicion_id = insertar_medicion(
-                conn=conn,
-                timestamp_utc=timestamp_utc,
-                gateway_id=gateway_id,
-                device_id=device_id,
-                source_type="device",
-                origen=origen,
-                payload_json=json.dumps(payload, ensure_ascii=False)
-            )
+        primera_normalizada = [
+            normalizar_header(x)
+            for x in primera_fila
+        ]
 
-            insertar_detalle(
-                conn=conn,
-                medicion_id=medicion_id,
-                timestamp_utc=timestamp_utc,
-                gateway_id=gateway_id,
-                device_id=device_id,
-                source_type="device",
-                unit_id=unit_id,
-                valor=valor,
-                origen=origen
-            )
+        tiene_encabezado = any(
+            col in primera_normalizada
+            for col in ["utc_date", "gateway_id_prueba", "device_id_prueba", "unit_id", "value"]
+        )
 
-            insertados += 1
+        if tiene_encabezado:
+            headers = primera_normalizada
+            datos_iter = reader
+            fila_inicio = 2
+        else:
+            headers = columnas_esperadas
+            datos_iter = [primera_fila]
+            fila_inicio = 1
 
-            if insertados % 1000 == 0:
-                conn.commit()
-                print(f"[IMPORT] Insertados: {insertados}")
+        print(f"[IMPORT] Delimitador detectado: {repr(delimitador)}")
+        print(f"[IMPORT] CSV con encabezado: {tiene_encabezado}")
+        print(f"[IMPORT] Dispositivos permitidos: {sorted(dispositivos_permitidos)}")
+        print(f"[IMPORT] Unidades permitidas: {sorted(unidades_permitidas)}")
 
-        except Exception as e:
-            errores.append(f"Fila {idx}: {e}")
-            omitidos += 1
+        def procesar_row(row, idx):
+            nonlocal insertados, duplicados, omitidos, errores
 
-            if len(errores) <= 10:
-                print(f"[IMPORT][ERROR] Fila {idx}: {e}")
+            try:
+                fila = {}
 
+                for i, header in enumerate(headers):
+                    fila[header] = row[i] if i < len(row) else None
+
+                utc_date = fila.get("utc_date")
+                gateway_id = parse_entero(fila.get("gateway_id_prueba"), default=10)
+                device_id = parse_entero(fila.get("device_id_prueba"), default=None)
+                unit_id = parse_entero(fila.get("unit_id"), default=None)
+                valor = parse_numero(fila.get("value"), default=None)
+
+                if device_id is None or unit_id is None or valor is None:
+                    omitidos += 1
+                    return
+
+                if device_id not in dispositivos_permitidos:
+                    omitidos += 1
+                    return
+
+                if unit_id not in unidades_permitidas:
+                    omitidos += 1
+                    return
+
+                timestamp_utc = parse_fecha_utc(utc_date)
+
+                if timestamp_utc is None:
+                    omitidos += 1
+                    return
+
+                # Evita duplicados solo para las variables clave.
+                cur.execute("""
+                    SELECT COUNT(*) AS total
+                    FROM mediciones_detalle
+                    WHERE CAST(timestamp_utc AS INTEGER) = ?
+                      AND CAST(gateway_id AS INTEGER) = ?
+                      AND TRIM(device_id) = ?
+                      AND CAST(unit_id AS INTEGER) = ?
+                """, (
+                    int(timestamp_utc),
+                    int(gateway_id),
+                    str(device_id),
+                    int(unit_id)
+                ))
+
+                row_dup = cur.fetchone()
+
+                if row_dup and int(row_dup["total"]) > 0:
+                    duplicados += 1
+                    return
+
+                payload = {
+                    "origen": origen,
+                    "utc_date": utc_date,
+                    "utc_received_date": fila.get("utc_received_date"),
+                    "gateway_id_prueba": gateway_id,
+                    "device_id_prueba": device_id,
+                    "concentrator_id_original": fila.get("concentrator_id_original"),
+                    "concentrator_name": fila.get("concentrator_name"),
+                    "gauge_id_original": fila.get("gauge_id_original"),
+                    "gauge_name": fila.get("gauge_name"),
+                    "unit_id": unit_id,
+                    "unit_name": fila.get("unit_name"),
+                    "value": valor
+                }
+
+                cur.execute("""
+                    INSERT INTO mediciones (
+                        timestamp_utc,
+                        gateway_id,
+                        device_id,
+                        source_type,
+                        origen,
+                        payload_json
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    int(timestamp_utc),
+                    int(gateway_id),
+                    str(device_id),
+                    "device",
+                    origen,
+                    json.dumps(payload, ensure_ascii=False)
+                ))
+
+                medicion_id = cur.lastrowid
+
+                cur.execute("""
+                    INSERT INTO mediciones_detalle (
+                        medicion_id,
+                        timestamp_utc,
+                        gateway_id,
+                        device_id,
+                        source_type,
+                        unit_id,
+                        valor
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    medicion_id,
+                    int(timestamp_utc),
+                    int(gateway_id),
+                    str(device_id),
+                    "device",
+                    int(unit_id),
+                    str(valor)
+                ))
+
+                insertados += 1
+
+                if insertados % 5000 == 0:
+                    if confirmar:
+                        conn.commit()
+
+                    print(
+                        f"[IMPORT] Insertados={insertados} "
+                        f"omitidos={omitidos} "
+                        f"duplicados={duplicados}"
+                    )
+
+            except Exception as e:
+                errores.append(f"Fila {idx}: {e}")
+                omitidos += 1
+
+                if len(errores) <= 10:
+                    print(f"[IMPORT][ERROR] Fila {idx}: {e}")
+
+        if tiene_encabezado:
+            for idx, row in enumerate(datos_iter, start=fila_inicio):
+                procesar_row(row, idx)
+        else:
+            procesar_row(primera_fila, 1)
+
+            for idx, row in enumerate(reader, start=2):
+                procesar_row(row, idx)
     if confirmar:
         conn.commit()
     else:
