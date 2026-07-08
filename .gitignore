@@ -77,3 +77,11 @@ Thumbs.db
 tmp/
 temp/
 *.tmp
+
+# Archivos históricos grandes / datos importados
+data/import_mediciones/
+data/import/
+*.csv
+*.xlsx
+*.bak
+*.zip

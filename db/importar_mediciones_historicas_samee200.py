@@ -280,7 +280,7 @@ def importar_csv_mediciones_historicas(ruta_csv, confirmar=True):
     filas = leer_csv_mediciones(ruta)
 
     conn = get_conn()
-    conn.row_factory = None
+    #conn.row_factory = None
 
     insertados = 0
     duplicados = 0
