@@ -221,34 +221,90 @@ def leer_csv_mediciones(ruta_csv):
     """
     Lee CSV exportado desde SQL Server.
 
-    Espera encabezados:
-    utc_date, utc_received_date, gateway_id_prueba, device_id_prueba,
-    concentrator_id_original, concentrator_name, gauge_id_original,
-    gauge_name, unit_id, unit_name, value
+    Soporta dos formatos:
+
+    1) Con encabezados:
+        utc_date, utc_received_date, gateway_id_prueba, device_id_prueba,
+        concentrator_id_original, concentrator_name, gauge_id_original,
+        gauge_name, unit_id, unit_name, value
+
+    2) Sin encabezados, en este orden:
+        utc_date,
+        utc_received_date,
+        gateway_id_prueba,
+        device_id_prueba,
+        concentrator_id_original,
+        concentrator_name,
+        gauge_id_original,
+        gauge_name,
+        unit_id,
+        unit_name,
+        value
     """
 
     delimitador = detectar_delimitador(ruta_csv)
 
+    columnas_esperadas = [
+        "utc_date",
+        "utc_received_date",
+        "gateway_id_prueba",
+        "device_id_prueba",
+        "concentrator_id_original",
+        "concentrator_name",
+        "gauge_id_original",
+        "gauge_name",
+        "unit_id",
+        "unit_name",
+        "value",
+    ]
+
     with open(ruta_csv, "r", encoding="utf-8-sig", newline="") as f:
-        reader = csv.DictReader(f, delimiter=delimitador)
+        reader = csv.reader(f, delimiter=delimitador)
+        filas_raw = list(reader)
 
-        if not reader.fieldnames:
-            raise RuntimeError("El CSV no tiene encabezados. Exporta de nuevo con encabezados.")
+    if not filas_raw:
+        raise RuntimeError("El CSV está vacío.")
 
-        fieldnames_normalizados = [
-            normalizar_header(h)
-            for h in reader.fieldnames
-        ]
+    primera_fila = [
+        normalizar_header(x)
+        for x in filas_raw[0]
+    ]
 
-        filas = []
+    tiene_encabezado = any(
+        col in primera_fila
+        for col in ["utc_date", "gateway_id_prueba", "device_id_prueba", "unit_id", "value"]
+    )
 
-        for row in reader:
-            fila = {}
+    filas = []
 
-            for original, normalizado in zip(reader.fieldnames, fieldnames_normalizados):
-                fila[normalizado] = row.get(original)
+    if tiene_encabezado:
+        headers = primera_fila
+        datos = filas_raw[1:]
+    else:
+        headers = columnas_esperadas
+        datos = filas_raw
 
-            filas.append(fila)
+    for row in datos:
+        if not row or len(row) < 5:
+            continue
+
+        fila = {}
+
+        for idx, header in enumerate(headers):
+            if idx < len(row):
+                fila[header] = row[idx]
+            else:
+                fila[header] = None
+
+        filas.append(fila)
+
+    print(f"[IMPORT] Delimitador detectado: {repr(delimitador)}")
+    print(f"[IMPORT] CSV con encabezado: {tiene_encabezado}")
+    print(f"[IMPORT] Filas leídas: {len(filas)}")
+
+    if filas:
+        print("[IMPORT] Primera fila normalizada:")
+        print(json.dumps(filas[0], indent=2, ensure_ascii=False))
 
     return filas
 
