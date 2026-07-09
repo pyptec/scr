@@ -333,11 +333,42 @@ def importar_csv_mediciones_historicas(ruta_csv, confirmar=True):
     init_db()
     cargar_catalogos_desde_env()
 
-    # Importación optimizada por streaming.
-    # No carga todo el CSV en memoria y filtra solo variables clave.
+    # Fase 2: variables eléctricas ampliadas para análisis de operación,
+    # validación de medición, huecos de datos, paros y calidad de energía.
     dispositivos_permitidos = {24, 25, 26}
-    unidades_permitidas = {1, 2, 61, 73, 100}
 
+    unidades_permitidas = {
+        # Sensor ambiente
+        1, 2,
+
+        # Voltajes fase-neutro y línea-línea
+        7, 8, 9,
+        29, 30, 31,
+        56, 57,
+
+        # Corrientes
+        10, 11, 12,
+        54, 55,
+
+        # Potencias activas, reactivas y aparentes
+        58, 59, 60, 61,
+        62, 63, 64, 65,
+        66, 67, 68, 69,
+
+        # Factor de potencia y frecuencia
+        27,
+        70, 71, 72, 73,
+        74, 75, 76,
+
+        # Energías acumuladas
+        97, 98, 99, 100,
+        101, 102, 103, 104,
+        108, 112, 116,
+
+        # Armónicos THD corriente y voltaje
+        117, 118, 119,
+        120, 121, 122,
+    }
     conn = get_conn()
     cur = conn.cursor()
 
