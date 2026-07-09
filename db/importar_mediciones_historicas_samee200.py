@@ -335,11 +335,10 @@ def importar_csv_mediciones_historicas(ruta_csv, confirmar=True):
 
     # Fase 2: variables eléctricas ampliadas para análisis de operación,
     # validación de medición, huecos de datos, paros y calidad de energía.
-    dispositivos_permitidos = {24, 25, 26}
+    dispositivos_permitidos = {24, 25}
 
     unidades_permitidas = {
-        # Sensor ambiente
-        1, 2,
+        
 
         # Voltajes fase-neutro y línea-línea
         7, 8, 9,
@@ -481,7 +480,7 @@ def importar_csv_mediciones_historicas(ruta_csv, confirmar=True):
 
                 row_dup = cur.fetchone()
 
-                if row_dup and int(row_dup["total"]) > 0:
+                if row_dup:
                     duplicados += 1
                     return
 
@@ -544,14 +543,15 @@ def importar_csv_mediciones_historicas(ruta_csv, confirmar=True):
 
                 insertados += 1
 
-                if insertados % 5000 == 0:
+                if insertados % 2000 == 0:
                     if confirmar:
                         conn.commit()
 
                     print(
                         f"[IMPORT] Insertados={insertados} "
                         f"omitidos={omitidos} "
-                        f"duplicados={duplicados}"
+                        f"duplicados={duplicados}",
+                        flush=True
                     )
 
             except Exception as e:
