@@ -186,26 +186,56 @@ def api_variables():
 
     cur.execute("""
         SELECT
-            md.device_id,
+            md.gateway_id,
+            COALESCE(g.nombre, 'Gateway ' || md.gateway_id) AS gateway,
+            COALESCE(g.cliente, '') AS cliente,
+
+            md.source_type,
+            NULLIF(TRIM(md.device_id), '') AS device_id,
+
+            COALESCE(d.nombre, 'Device ' || NULLIF(TRIM(md.device_id), '')) AS dispositivo,
+            COALESCE(d.rol, '') AS rol,
+            COALESCE(d.tipo, '') AS tipo_dispositivo,
+            COALESCE(d.ubicacion, '') AS ubicacion_dispositivo,
+
             md.unit_id,
-            COALESCE(u.name, 'Variable ' || md.unit_id) AS nombre,
-            COALESCE(u.simbol, '') AS unidad,
+
+            COALESCE(u.name, 'Variable ' || md.unit_id) AS variable,
+            COALESCE(u.alias, '') AS alias,
+            COALESCE(u.simbol, '') AS simbolo,
+            COALESCE(u.descripcion, '') AS descripcion,
+
             COUNT(*) AS registros,
             datetime(MIN(CAST(md.timestamp_utc AS INTEGER)), 'unixepoch') AS desde_utc,
             datetime(MAX(CAST(md.timestamp_utc AS INTEGER)), 'unixepoch') AS hasta_utc
         FROM mediciones_detalle md
+        LEFT JOIN gateways g
+            ON md.gateway_id = g.gateway_id
+        LEFT JOIN dispositivos d
+            ON CAST(NULLIF(TRIM(md.device_id), '') AS INTEGER) = d.device_id
         LEFT JOIN unidades u
             ON md.unit_id = u.unit_id
         WHERE md.device_id IN ('24','25','26')
         GROUP BY
-            md.device_id,
+            md.gateway_id,
+            g.nombre,
+            g.cliente,
+            md.source_type,
+            NULLIF(TRIM(md.device_id), ''),
+            d.nombre,
+            d.rol,
+            d.tipo,
+            d.ubicacion,
             md.unit_id,
             u.name,
-            u.simbol
+            u.alias,
+            u.simbol,
+            u.descripcion
         HAVING registros > 0
         ORDER BY
-            CAST(md.device_id AS INTEGER),
-            CAST(md.unit_id AS INTEGER)
+            md.gateway_id ASC,
+            CAST(NULLIF(TRIM(md.device_id), '') AS INTEGER) ASC,
+            md.unit_id ASC
     """)
 
     rows = [dict(r) for r in cur.fetchall()]
