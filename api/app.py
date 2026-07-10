@@ -185,31 +185,27 @@ def api_variables():
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT DISTINCT
-            md.gateway_id,
-            g.nombre AS gateway,
-            g.cliente AS cliente,
-            md.source_type,
-            NULLIF(TRIM(md.device_id), '') AS device_id,
-            d.nombre AS dispositivo,
-            d.rol AS rol,
-            d.tipo AS tipo_dispositivo,
-            d.ubicacion AS ubicacion_dispositivo,
+        SELECT
+            md.device_id,
             md.unit_id,
-            u.name AS variable,
-            u.simbol AS simbolo
+            COALESCE(u.name, 'Variable ' || md.unit_id) AS nombre,
+            COALESCE(u.simbol, '') AS unidad,
+            COUNT(*) AS registros,
+            datetime(MIN(CAST(md.timestamp_utc AS INTEGER)), 'unixepoch') AS desde_utc,
+            datetime(MAX(CAST(md.timestamp_utc AS INTEGER)), 'unixepoch') AS hasta_utc
         FROM mediciones_detalle md
-        LEFT JOIN dispositivos d
-            ON CAST(NULLIF(TRIM(md.device_id), '') AS INTEGER) = d.device_id
-        LEFT JOIN gateways g
-            ON md.gateway_id = g.gateway_id
         LEFT JOIN unidades u
             ON md.unit_id = u.unit_id
+        WHERE md.device_id IN ('24','25','26')
+        GROUP BY
+            md.device_id,
+            md.unit_id,
+            u.name,
+            u.simbol
+        HAVING registros > 0
         ORDER BY
-            md.gateway_id ASC,
-            md.source_type ASC,
-            CAST(NULLIF(TRIM(md.device_id), '') AS INTEGER) ASC,
-            md.unit_id ASC
+            CAST(md.device_id AS INTEGER),
+            CAST(md.unit_id AS INTEGER)
     """)
 
     rows = [dict(r) for r in cur.fetchall()]
@@ -219,7 +215,6 @@ def api_variables():
         "total": len(rows),
         "variables": rows
     })
-
 
 @app.route("/api/ultimos")
 def api_ultimos():
@@ -680,6 +675,65 @@ def api_serie_agregada(unit_id):
         "tipo_calculo": tipo_calculo,
         "total": len(rows),
         "serie": rows
+    })
+    
+    
+@app.route("/api/variable-historica")
+def api_variable_historica():
+    device_id = request.args.get("device_id", default="24")
+    unit_id = request.args.get("unit_id", type=int)
+    inicio = request.args.get("inicio", type=int)
+    fin = request.args.get("fin", type=int)
+    limite = request.args.get("limite", default=5000, type=int)
+
+    if unit_id is None:
+        return jsonify({
+            "ok": False,
+            "error": "Falta unit_id"
+        }), 400
+
+    if not fin:
+        fin = int(time.time())
+
+    if not inicio:
+        inicio = fin - 86400
+
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT
+            CAST(md.timestamp_utc AS INTEGER) AS timestamp_utc,
+            CAST(md.valor AS REAL) AS valor,
+            COALESCE(u.name, 'Variable ' || md.unit_id) AS nombre,
+            COALESCE(u.simbol, '') AS unidad
+        FROM mediciones_detalle md
+        LEFT JOIN unidades u
+            ON md.unit_id = u.unit_id
+        WHERE md.device_id = ?
+          AND md.unit_id = ?
+          AND CAST(md.timestamp_utc AS INTEGER) >= ?
+          AND CAST(md.timestamp_utc AS INTEGER) <= ?
+        ORDER BY CAST(md.timestamp_utc AS INTEGER) ASC
+        LIMIT ?
+    """, (
+        str(device_id),
+        int(unit_id),
+        int(inicio),
+        int(fin),
+        int(limite)
+    ))
+
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+
+    return jsonify({
+        "ok": True,
+        "device_id": device_id,
+        "unit_id": unit_id,
+        "total": len(rows),
+        "data": rows
     })
 
 if __name__ == "__main__":
