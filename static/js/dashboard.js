@@ -32,6 +32,58 @@ function unixDesdeColombia(year, month, day, hour = 0, minute = 0, second = 0) {
     // Colombia UTC-5. Date.UTC recibe mes base cero.
     return Math.floor(Date.UTC(year, month - 1, day, hour + 5, minute, second) / 1000);
 }
+
+function ultimoDiaMes(year, month) {
+    return new Date(year, month, 0).getDate();
+}
+
+function rangoMesProduccion(mesTexto) {
+    // mesTexto viene como "2026-05"
+    const partes = String(mesTexto).split("-");
+
+    if (partes.length !== 2) {
+        const ahora = Math.floor(Date.now() / 1000);
+        return {
+            inicio: ahora - 7 * 24 * 3600,
+            fin: ahora
+        };
+    }
+
+    const year = Number(partes[0]);
+    const month = Number(partes[1]);
+    const ultimo = ultimoDiaMes(year, month);
+
+    return {
+        inicio: unixDesdeColombia(year, month, 1, 0, 0, 0),
+        fin: unixDesdeColombia(year, month, ultimo, 23, 59, 59)
+    };
+}
+
+function rangoTodoProduccion() {
+    if (!mesesProduccion || !mesesProduccion.length) {
+        const ahora = Math.floor(Date.now() / 1000);
+        return {
+            inicio: ahora - 7 * 24 * 3600,
+            fin: ahora
+        };
+    }
+
+    const mesesOrdenados = [...mesesProduccion].sort((a, b) =>
+        String(a.mes).localeCompare(String(b.mes))
+    );
+
+    const primerMes = mesesOrdenados[0].mes;
+    const ultimoMes = mesesOrdenados[mesesOrdenados.length - 1].mes;
+
+    const rInicio = rangoMesProduccion(primerMes);
+    const rFin = rangoMesProduccion(ultimoMes);
+
+    return {
+        inicio: rInicio.inicio,
+        fin: rFin.fin
+    };
+}
+
 function obtenerRangoUnix() {
     const ahora = Math.floor(Date.now() / 1000);
     const selectorRango = document.getElementById("rangoTiempo");
@@ -423,48 +475,98 @@ async function cargarEstado() {
 }
 
 async function cargarSelectorVariables() {
-    const res = await fetch("/api/variables");
-    const data = await res.json();
-
-    variablesDisponibles = data.variables || [];
-
     const selector = document.getElementById("selectorVariable");
+
+    if (!selector) {
+        console.error("No existe selectorVariable en el HTML");
+        return;
+    }
+
     selector.innerHTML = "";
 
-    const optDefault = document.createElement("option");
-    optDefault.value = "";
-    optDefault.textContent = "Seleccione una variable...";
-    selector.appendChild(optDefault);
+    const optCargando = document.createElement("option");
+    optCargando.value = "";
+    optCargando.textContent = "Cargando variables...";
+    selector.appendChild(optCargando);
 
-    const grupos = {};
+    try {
+        const res = await fetch("/api/variables");
+        const data = await res.json();
 
-    variablesDisponibles.forEach((v, index) => {
-        const equipo = v.source_type === "gateway"
-            ? "Gateway"
-            : `${v.dispositivo || "Dispositivo"} (${v.rol || "sin rol"})`;
+        variablesDisponibles = data.variables || [];
 
-        const grupo = `${v.gateway || "Gateway"} / ${equipo}`;
+        selector.innerHTML = "";
 
-        if (!grupos[grupo]) grupos[grupo] = [];
+        const optDefault = document.createElement("option");
+        optDefault.value = "";
+        optDefault.textContent = `Seleccione una variable (${variablesDisponibles.length})...`;
+        selector.appendChild(optDefault);
 
-        grupos[grupo].push({ ...v, index });
-    });
+        if (!variablesDisponibles.length) {
+            const opt = document.createElement("option");
+            opt.value = "";
+            opt.textContent = "No hay variables disponibles";
+            selector.appendChild(opt);
+            return;
+        }
 
-    Object.keys(grupos).sort().forEach(nombreGrupo => {
-        const optgroup = document.createElement("optgroup");
-        optgroup.label = nombreGrupo;
+        const grupos = {};
 
-        grupos[nombreGrupo]
-            .sort((a, b) => Number(a.unit_id) - Number(b.unit_id))
-            .forEach(v => {
-                const option = document.createElement("option");
-                option.value = String(v.index);
-                option.textContent = `Unit ${v.unit_id} | ${v.variable || "Variable"} ${v.simbolo || ""}`;
-                optgroup.appendChild(option);
+        variablesDisponibles.forEach((v, index) => {
+            const gateway = v.gateway || `Gateway ${v.gateway_id || ""}`;
+            const dispositivo = v.dispositivo || `Device ${v.device_id || ""}`;
+            const rol = v.rol || "sin rol";
+
+            const grupo = `${gateway} / ${dispositivo} (${rol})`;
+
+            if (!grupos[grupo]) {
+                grupos[grupo] = [];
+            }
+
+            grupos[grupo].push({
+                ...v,
+                index
             });
+        });
 
-        selector.appendChild(optgroup);
-    });
+        Object.keys(grupos).sort().forEach(nombreGrupo => {
+            const optgroup = document.createElement("optgroup");
+            optgroup.label = nombreGrupo;
+
+            grupos[nombreGrupo]
+                .sort((a, b) => Number(a.unit_id) - Number(b.unit_id))
+                .forEach(v => {
+                    const option = document.createElement("option");
+                    option.value = String(v.index);
+
+                    const variable = v.variable || `Variable ${v.unit_id}`;
+                    const simbolo = v.simbolo || "";
+                    const descripcion = v.descripcion || "";
+
+                    option.textContent =
+                        `Unit ${v.unit_id} | ${variable}` +
+                        `${simbolo ? " [" + simbolo + "]" : ""}` +
+                        `${descripcion ? " | " + descripcion : ""}` +
+                        ` | ${formatearEntero(v.registros || 0)} reg.`;
+
+                    optgroup.appendChild(option);
+                });
+
+            selector.appendChild(optgroup);
+        });
+
+        console.log("Variables cargadas:", variablesDisponibles.length);
+
+    } catch (error) {
+        console.error("Error cargando variables:", error);
+
+        selector.innerHTML = "";
+
+        const optError = document.createElement("option");
+        optError.value = "";
+        optError.textContent = "Error cargando variables";
+        selector.appendChild(optError);
+    }
 }
 
 function destruirGrafica() {
