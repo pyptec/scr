@@ -3,7 +3,19 @@ let graficaActual = "potencia";
 let rangoActual = "ultimos_datos";
 let ultimosValores = [];
 let variablesDisponibles = [];
+let variableSeleccionadaKey = null;
 let mesesProduccion = [];
+
+function obtenerKeyVariable(v) {
+    if (!v) return null;
+
+    return [
+        v.gateway_id ?? "",
+        v.source_type ?? "",
+        v.device_id ?? "",
+        v.unit_id ?? ""
+    ].join("|");
+}
 
 function datetimeLocalAUnix(valor) {
     if (!valor) return null;
@@ -482,6 +494,11 @@ async function cargarSelectorVariables() {
         return;
     }
 
+    const variableAnterior = selector.value !== ""
+        ? variablesDisponibles[Number(selector.value)]
+        : null;
+    const keyAnterior = variableSeleccionadaKey || obtenerKeyVariable(variableAnterior);
+
     selector.innerHTML = "";
 
     const optCargando = document.createElement("option");
@@ -559,6 +576,16 @@ async function cargarSelectorVariables() {
 
             selector.appendChild(optgroup);
         });
+
+        if (keyAnterior) {
+            const indiceSeleccionado = variablesDisponibles.findIndex(v =>
+                obtenerKeyVariable(v) === keyAnterior
+            );
+
+            if (indiceSeleccionado >= 0) {
+                selector.value = String(indiceSeleccionado);
+            }
+        }
 
         console.log("Variables cargadas:", variablesDisponibles.length);
 
@@ -761,6 +788,9 @@ async function graficarVariableSeleccionada() {
     const v = variablesDisponibles[Number(selector.value)];
 
     if (!v) return;
+
+    graficaActual = "variable";
+    variableSeleccionadaKey = obtenerKeyVariable(v);
 
     destruirGrafica();
 
