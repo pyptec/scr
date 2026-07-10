@@ -491,9 +491,14 @@ async function cargarSelectorVariables() {
 
     try {
         const res = await fetch("/api/variables");
+
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status} al consultar /api/variables`);
+        }
+
         const data = await res.json();
 
-        variablesDisponibles = data.variables || [];
+        variablesDisponibles = Array.isArray(data.variables) ? data.variables : [];
 
         selector.innerHTML = "";
 
@@ -925,12 +930,13 @@ function inicializarFiltros() {
 }
 
 async function iniciarDashboard() {
-    
+    // El selector no debe depender de los datos de producción para mostrarse.
+    await cargarSelectorVariables();
+
     await cargarRangosProduccion();
     inicializarFiltros();
     obtenerRangoUnix();
 
-    await cargarSelectorVariables();
     await actualizarTodo();
 
     setInterval(actualizarTodo, 30000);
