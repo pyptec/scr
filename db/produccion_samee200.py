@@ -584,6 +584,8 @@ def sumar_produccion_rango(inicio_utc, fin_utc):
 
     total_buenos = 0.0
     total_malos = 0.0
+    total_horas_programadas = 0.0
+    total_horas_productivas = 0.0
     total_periodos = 0
 
     detalle = []
@@ -604,9 +606,19 @@ def sumar_produccion_rango(inicio_utc, fin_utc):
 
         buenos = float(p["envases_buenos"] or 0) * factor
         malos = float(p["envases_malos"] or 0) * factor
+        horas_programadas = duracion_overlap / 3600
+
+        eficiencia = float(p["eficiencia"] or 0)
+        if eficiencia > 1:
+            eficiencia /= 100
+        eficiencia = min(max(eficiencia, 0), 1)
+
+        horas_productivas = horas_programadas * eficiencia
 
         total_buenos += buenos
         total_malos += malos
+        total_horas_programadas += horas_programadas
+        total_horas_productivas += horas_productivas
         total_periodos += 1
 
         detalle.append({
@@ -615,7 +627,9 @@ def sumar_produccion_rango(inicio_utc, fin_utc):
             "fin_local": p["fecha_hora_fin_local"],
             "factor_overlap": round(factor, 4),
             "envases_buenos_aplicados": round(buenos, 2),
-            "envases_malos_aplicados": round(malos, 2)
+            "envases_malos_aplicados": round(malos, 2),
+            "horas_programadas": round(horas_programadas, 3),
+            "horas_productivas": round(horas_productivas, 3)
         })
 
     total = total_buenos + total_malos
@@ -629,6 +643,8 @@ def sumar_produccion_rango(inicio_utc, fin_utc):
         "envases_malos": round(total_malos, 2),
         "envases_total": round(total, 2),
         "eficiencia_calc": round(eficiencia_calc, 5),
+        "horas_programadas": round(total_horas_programadas, 3),
+        "horas_productivas": round(total_horas_productivas, 3),
         "periodos_usados": total_periodos,
         "detalle": detalle
     }

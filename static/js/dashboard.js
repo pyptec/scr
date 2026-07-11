@@ -367,12 +367,14 @@ async function cargarLineaBase() {
     document.getElementById("lbMensaje").innerText =
         data.mensaje || "ISO 50001";
 
-    const beta0 = data.modelo?.beta0;
-    const beta1 = data.modelo?.beta1;
+    const beta0 = data.modelo?.intercepto;
+    const betaEnvases = data.modelo?.coef_envases_buenos;
+    const betaHoras = data.modelo?.coef_horas_productivas;
 
-    if (beta0 !== undefined && beta1 !== undefined) {
+    if (beta0 !== undefined && betaEnvases !== undefined && betaHoras !== undefined) {
         document.getElementById("lbModelo").innerText =
-            `${formatearNumero(beta0, 2)} + ${formatearNumero(beta1, 5)}x`;
+            `${formatearNumero(beta0, 2)} + ${formatearNumero(betaEnvases, 6)} × envases + ` +
+            `${formatearNumero(betaHoras, 4)} × horas`;
     } else {
         document.getElementById("lbModelo").innerText = "--";
     }

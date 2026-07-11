@@ -10,6 +10,19 @@ from db.kpi_samee200 import resumen_kpi_samee200
 
 load_dotenv("/home/pi/SAMEE200/scr/.env")
 
+MODELO_OFICIAL_AOKI = {
+    "nombre_modelo": "LB_AOKI_ENVASES_HORAS_PRODUCTIVAS",
+    "variable_dependiente": "kwh_proceso_aoki",
+    "variables_independientes": ["envases_buenos", "horas_productivas"],
+    "intercepto": 514.50,
+    "coef_envases_buenos": 0.005018,
+    "coef_horas_productivas": 16.5198,
+    "r2": 0.9278,
+    "r2_ajustado": 0.9248,
+    "cv_rmse_pct": 3.64,
+    "oficial": True
+}
+
 
 def init_linea_base_db():
     """
@@ -301,38 +314,8 @@ def entrenar_linea_base_totalizador(dias=30):
 
 
 def obtener_modelo_activo():
-    conn = get_conn()
-    cur = conn.cursor()
-
-    cur.execute("""
-        SELECT
-            id,
-            nombre_modelo,
-            fecha_inicio_base,
-            fecha_fin_base,
-            variable_dependiente,
-            variable_independiente,
-            beta0,
-            beta1,
-            r2,
-            mae,
-            rmse,
-            activo,
-            created_at
-        FROM linea_base_energia
-        WHERE nombre_modelo = 'LB_TOTALIZADOR_ENVASES'
-          AND activo = 1
-        ORDER BY id DESC
-        LIMIT 1
-    """)
-
-    row = cur.fetchone()
-    conn.close()
-
-    if not row:
-        return None
-
-    return dict(row)
+    """Retorna la línea base oficial validada para el proceso Aoki."""
+    return dict(MODELO_OFICIAL_AOKI)
 
 
 def evaluar_desempeno_actual(inicio=None, fin=None):
@@ -347,22 +330,19 @@ def evaluar_desempeno_actual(inicio=None, fin=None):
 
     modelo = obtener_modelo_activo()
 
-    if modelo is None:
-        entrenamiento = entrenar_linea_base_totalizador()
-        if not entrenamiento.get("ok"):
-            return entrenamiento
-
-        modelo = obtener_modelo_activo()
-
     kpi = resumen_kpi_samee200(inicio=inicio, fin=fin)
 
-    energia_real = float(kpi["totalizador"]["energia_kwh"])
-    envases = int(kpi["produccion"]["envases_periodo"])
+    energia_real = float(kpi["proceso"]["energia_kwh"])
+    envases_buenos = float(kpi["produccion"].get("envases_buenos", 0) or 0)
+    horas_productivas = float(kpi["produccion"].get("horas_productivas", 0) or 0)
+    horas_programadas = float(kpi["produccion"].get("horas_programadas", 0) or 0)
+    jornadas_equivalentes = horas_programadas / 24
 
-    beta0 = float(modelo["beta0"])
-    beta1 = float(modelo["beta1"])
-
-    energia_esperada = beta0 + beta1 * envases
+    energia_esperada = (
+        modelo["intercepto"] * jornadas_equivalentes
+        + modelo["coef_envases_buenos"] * envases_buenos
+        + modelo["coef_horas_productivas"] * horas_productivas
+    )
 
     desviacion_kwh = energia_real - energia_esperada
 
@@ -385,6 +365,12 @@ def evaluar_desempeno_actual(inicio=None, fin=None):
             "fin": kpi["fin"]
         },
         "produccion": kpi["produccion"],
+        "variables_modelo": {
+            "envases_buenos": round(envases_buenos, 2),
+            "horas_productivas": round(horas_productivas, 3),
+            "horas_programadas": round(horas_programadas, 3),
+            "jornadas_equivalentes_24h": round(jornadas_equivalentes, 5)
+        },
         "energia": {
             "real_kwh": round(energia_real, 3),
             "esperada_kwh": round(energia_esperada, 3),

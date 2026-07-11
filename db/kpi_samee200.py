@@ -183,6 +183,7 @@ def generar_produccion_simulada(inicio, fin):
 
     segundos = max(int(fin) - int(inicio), 1)
     dias = segundos / 86400
+    horas_programadas = segundos / 3600
 
     produccion_dia = random.randint(prod_min, prod_max)
     produccion_periodo = int(produccion_dia * dias)
@@ -194,6 +195,8 @@ def generar_produccion_simulada(inicio, fin):
         "envases_malos": 0,
         "envases_total": produccion_periodo,
         "eficiencia_calc": 1,
+        "horas_programadas": round(horas_programadas, 3),
+        "horas_productivas": round(horas_programadas, 3),
         "periodos_usados": 0,
         "fuente": "simulado"
     }
@@ -236,6 +239,8 @@ def obtener_produccion_periodo(inicio, fin):
                 "envases_malos": round(envases_malos, 2),
                 "envases_total": round(envases_total, 2),
                 "eficiencia_calc": produccion_real.get("eficiencia_calc", 0),
+                "horas_programadas": produccion_real.get("horas_programadas", 0),
+                "horas_productivas": produccion_real.get("horas_productivas", 0),
                 "periodos_usados": periodos_usados,
                 "fuente": "archivo"
             }
