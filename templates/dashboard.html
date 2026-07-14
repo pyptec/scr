@@ -411,8 +411,30 @@
     <section class="panel modulo modulo-pendiente" data-module="calidad" hidden>
         <h2>Calidad</h2><p>Estructura preparada. Contenido pendiente de la subfase correspondiente.</p>
     </section>
-    <section class="panel modulo modulo-pendiente" data-module="eficiencia-operacional" hidden>
-        <h2>Eficiencia operacional</h2><p>Estructura preparada. Contenido pendiente de la subfase correspondiente.</p>
+    <section class="panel modulo" data-module="eficiencia-operacional" hidden>
+        <div class="panel-header">
+            <div>
+                <h2>Estados eléctricos de Aoki</h2>
+                <small>DATOS_HISTORICOS_DE_PRUEBA · ME337_1 · Clasificación preliminar</small>
+            </div>
+        </div>
+        <div class="grid-kpi">
+            <div class="card"><span>Horas productivas</span><strong id="estadoHorasProductivas">--</strong><small>PRODUCTIVE</small></div>
+            <div class="card"><span>Horas de espera</span><strong id="estadoHorasEspera">--</strong><small>IDLE</small></div>
+            <div class="card"><span>Horas apagado</span><strong id="estadoHorasApagado">--</strong><small>OFF</small></div>
+            <div class="card"><span>Horas sin datos</span><strong id="estadoHorasSinDatos">--</strong><small>NO_DATA</small></div>
+            <div class="card"><span>Cobertura</span><strong id="estadoCobertura">--</strong><small>periodo seleccionado</small></div>
+            <div class="card"><span>Señal inconsistente</span><strong id="estadoInconsistencias">--</strong><small>segmentos para revisión</small></div>
+        </div>
+        <p id="estadoCriterio" class="periodo-efectivo">Criterio: --</p>
+        <canvas id="chartEstadosAoki"></canvas>
+        <h3>Resumen por jornada 06:00–06:00</h3>
+        <div class="tabla-wrapper">
+            <table>
+                <thead><tr><th>Jornada</th><th>Productivas</th><th>Espera</th><th>Apagado</th><th>Sin datos</th><th>Cobertura</th><th>Transiciones</th><th>Inconsistencias</th></tr></thead>
+                <tbody id="tablaEstadosAoki"></tbody>
+            </table>
+        </div>
     </section>
     <section class="panel modulo modulo-pendiente" data-module="eficiencia-energetica" hidden>
         <h2>Eficiencia energética</h2><p>Estructura preparada. Contenido pendiente de la subfase correspondiente.</p>

@@ -216,6 +216,11 @@ button:hover {
     max-height: 420px;
 }
 
+#chartEstadosAoki {
+    max-height: 380px;
+    margin: 22px 0;
+}
+
 .estado-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(180px, 1fr));

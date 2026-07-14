@@ -1,0 +1,16 @@
+{
+  "version": "aoki-current-v1-2026-07",
+  "offIdleCurrentA": 27.38,
+  "idleProductiveCurrentA": 54.58,
+  "minimumPersistenceMinutes": 20,
+  "minimumConsecutiveSamples": 2,
+  "expectedIntervalMinutes": 10,
+  "maximumGapMinutes": 20,
+  "powerZeroToleranceKW": 0.0,
+  "dataset": {
+    "type": "DATOS_HISTORICOS_DE_PRUEBA",
+    "origin": "copia histórica local del SAMEE200",
+    "declaredPeriod": "2026-05-01/2026-06-25",
+    "usage": "desarrollo y validación local en Windows"
+  }
+}

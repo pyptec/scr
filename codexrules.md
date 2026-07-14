@@ -117,3 +117,61 @@ La respuesta final de cada subfase debe incluir:
 7. siguiente subfase recomendada.
 
 Luego debe detenerse.
+
+## Reglas específicas de la fase 2 — Estados eléctricos y paradas
+
+1. Usar únicamente `ME337_1` para detectar el estado operativo de Aoki.
+2. `ME337_2` es el totalizador de planta y no debe usarse para inferir paradas de Aoki.
+3. Clasificar cada intervalo como `PRODUCTIVE`, `IDLE`, `OFF` o `NO_DATA`.
+4. Los umbrales preliminares de corriente son:
+   - `I < 27.38 A` → `OFF`;
+   - `27.38 A ≤ I < 54.58 A` → `IDLE`;
+   - `I ≥ 54.58 A` → `PRODUCTIVE`.
+5. Los umbrales deben ser configurables, versionados y visibles en la trazabilidad del cálculo.
+6. Usar potencia activa como señal secundaria de validación, no como sustituto automático de la corriente.
+7. Exigir al menos dos muestras consecutivas o 20 minutos para confirmar un cambio de estado.
+8. Una muestra aislada no crea una parada.
+9. Un hueco de datos nunca se clasifica como apagado.
+10. Los intervalos mayores al límite de cobertura se clasifican `NO_DATA`.
+11. No interpolar huecos largos para calcular horas productivas.
+12. Ordenar timestamps y eliminar duplicados antes de clasificar estados.
+13. Conservar el valor original, timestamp, variable, unidad y criterio de clasificación.
+14. Agrupar únicamente intervalos consecutivos válidos para construir eventos.
+15. No considerar todo evento no productivo como falla correctiva.
+16. Los eventos sin causa deben quedar `PENDING_REVIEW` o `SIN_CLASIFICAR`.
+17. Conciliar eventos eléctricos con observaciones usando tolerancia configurable.
+18. No duplicar una parada reportada y detectada.
+19. Conservar duración reportada y duración eléctrica por separado.
+20. Calcular y mostrar por separado:
+   - horas productivas;
+   - horas de espera;
+   - horas apagado;
+   - horas sin datos;
+   - cobertura;
+   - eventos reportados;
+   - eventos detectados.
+21. Validar que la suma de estados coincida con el periodo dentro de una tolerancia de un intervalo.
+22. Las horas productivas detectadas serán la variable operacional utilizada por la línea base, una vez validadas.
+23. No sustituir horas productivas faltantes por 24 horas.
+24. No calcular MTBF, MTTR ni disponibilidad técnica definitiva en la fase 2.
+25. No modificar la ecuación oficial de la línea base durante la fase 2.
+26. Añadir pruebas para cambios de estado, rebotes, muestras aisladas, huecos, duplicados, periodos parciales y conciliación de eventos.
+27. El dashboard debe mostrar claramente cuándo un indicador es `Detectado`, `Reportado`, `Conciliado`, `Pendiente de revisión` o `Sin datos`.
+28. La gráfica de estados debe incluir corriente, umbrales, estado clasificado y eventos reportados.
+29. No usar colores sin leyenda ni ocultar los criterios de clasificación.
+30. Al terminar cada subfase de la fase 2, detenerse y esperar autorización.
+
+## Base de datos histórica local y protección de la Raspberry
+
+1. La base local contiene datos históricos reales del 1 de mayo al 25 de junio de 2026 y se usa únicamente para pruebas.
+2. La Raspberry `192.168.2.124` es una fuente de solo lectura durante estas fases.
+3. La única copia autorizada es Raspberry → Windows.
+4. Está prohibido copiar, desplegar o sincronizar la base de Windows hacia la Raspberry.
+5. No ejecutar comandos remotos que escriban, borren, renombren, migren o reemplacen archivos en `/home/pi/SAMEE200/scr/data`.
+6. No usar sincronización bidireccional ni opciones destructivas como `rsync --delete`.
+7. No ejecutar migraciones de esquema sobre la Raspberry.
+8. Todas las pruebas y modificaciones deben realizarse en el proyecto local de Windows.
+9. Antes de modificar una base local, crear una copia desechable o respaldo.
+10. Etiquetar el conjunto de datos como `DATOS_HISTORICOS_DE_PRUEBA` y no presentarlo como telemetría actual.
+11. Si una operación puede afectar la Raspberry, detenerse y solicitar autorización expresa.
+12. Ningún cambio local autoriza automáticamente un despliegue al gateway.

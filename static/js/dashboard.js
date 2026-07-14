@@ -7,6 +7,7 @@ let variableSeleccionadaKey = null;
 let mesesProduccion = [];
 let moduloActual = "resumen";
 let actualizacionEnCurso = false;
+let chartEstadosAoki = null;
 
 function obtenerKeyVariable(v) {
     if (!v) return null;
@@ -364,6 +365,48 @@ async function cargarProduccion() {
             <td>${escaparHtml(fila.observaciones || "--")}</td>
         `;
         tbody.appendChild(tr);
+    });
+}
+
+async function cargarEstadosAoki() {
+    const rango = obtenerRangoUnix();
+    const respuesta = await fetch(`/api/aoki/estados?inicio=${rango.inicio}&fin=${rango.fin}`);
+    const data = await respuesta.json();
+    if (!respuesta.ok) throw new Error(data.error || "No fue posible clasificar los estados de Aoki");
+    const diarios = data.daily || [];
+    const sumar = campo => diarios.reduce((total, dia) => total + Number(dia[campo] || 0), 0);
+    const programadas = sumar("scheduledHours");
+    const productivas = sumar("productiveHours");
+    const espera = sumar("idleHours");
+    const apagado = sumar("offHours");
+    const sinDatos = sumar("noDataHours");
+    const cobertura = programadas > 0 ? (programadas - sinDatos) / programadas * 100 : null;
+    document.getElementById("estadoHorasProductivas").innerText = formatearNumero(productivas, 2);
+    document.getElementById("estadoHorasEspera").innerText = formatearNumero(espera, 2);
+    document.getElementById("estadoHorasApagado").innerText = formatearNumero(apagado, 2);
+    document.getElementById("estadoHorasSinDatos").innerText = formatearNumero(sinDatos, 2);
+    document.getElementById("estadoCobertura").innerText = cobertura === null ? "Datos insuficientes" : `${formatearNumero(cobertura, 2)} %`;
+    document.getElementById("estadoInconsistencias").innerText = formatearEntero(sumar("inconsistentSegments"));
+    const umbrales = data.thresholds || {};
+    document.getElementById("estadoCriterio").innerText = `Criterio ${umbrales.version || "--"}: OFF < ${umbrales.offIdleCurrentA} A; IDLE < ${umbrales.idleProductiveCurrentA} A; persistencia ${umbrales.minimumConsecutiveSamples} muestras o ${umbrales.minimumPersistenceMinutes} min; hueco máximo ${umbrales.maximumGapMinutes} min.`;
+
+    const tbody = document.getElementById("tablaEstadosAoki");
+    tbody.innerHTML = diarios.length ? "" : '<tr><td colspan="8">Sin datos para el periodo</td></tr>';
+    diarios.forEach(dia => {
+        const fila = document.createElement("tr");
+        fila.innerHTML = `<td>${escaparHtml(dia.productionDate)}</td><td>${formatearNumero(dia.productiveHours, 2)}</td><td>${formatearNumero(dia.idleHours, 2)}</td><td>${formatearNumero(dia.offHours, 2)}</td><td>${formatearNumero(dia.noDataHours, 2)}</td><td>${formatearNumero(dia.coveragePct, 2)} %</td><td>${formatearEntero(dia.stateTransitions)}</td><td>${formatearEntero(dia.inconsistentSegments)}</td>`;
+        tbody.appendChild(fila);
+    });
+    if (chartEstadosAoki) chartEstadosAoki.destroy();
+    chartEstadosAoki = new Chart(document.getElementById("chartEstadosAoki"), {
+        type: "bar",
+        data: { labels: diarios.map(d => d.productionDate), datasets: [
+            { label: "PRODUCTIVE", data: diarios.map(d => d.productiveHours), backgroundColor: "#16a34a" },
+            { label: "IDLE", data: diarios.map(d => d.idleHours), backgroundColor: "#f59e0b" },
+            { label: "OFF", data: diarios.map(d => d.offHours), backgroundColor: "#64748b" },
+            { label: "NO_DATA", data: diarios.map(d => d.noDataHours), backgroundColor: "#dc2626" }
+        ]},
+        options: { responsive: true, scales: { x: { stacked: true }, y: { stacked: true, title: { display: true, text: "Horas" } } } }
     });
 }
 
@@ -965,6 +1008,8 @@ async function actualizarTodo() {
             await cargarDashboard();
         } else if (moduloActual === "produccion") {
             await cargarProduccion();
+        } else if (moduloActual === "eficiencia-operacional") {
+            await cargarEstadosAoki();
         } else if (moduloActual === "linea-base") {
             await cargarLineaBase();
         } else if (moduloActual === "variables") {
