@@ -74,6 +74,10 @@ class DashboardStructureTests(unittest.TestCase):
         self.assertEqual(self.html.count("Pendiente de fase 3"), 2)
         self.assertIn("function inicializarVistasLineaBase()", self.javascript)
 
+    def test_variable_selector_supports_gateway_variables_without_device(self):
+        self.assertIn('"Variables del gateway"', self.javascript)
+        self.assertIn("v.source_type", self.javascript)
+
 
 if __name__ == "__main__":
     unittest.main()

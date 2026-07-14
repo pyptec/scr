@@ -194,7 +194,13 @@ def api_variables():
             md.source_type,
             NULLIF(TRIM(md.device_id), '') AS device_id,
 
-            COALESCE(d.nombre, 'Device ' || NULLIF(TRIM(md.device_id), '')) AS dispositivo,
+            COALESCE(
+                d.nombre,
+                CASE
+                    WHEN NULLIF(TRIM(md.device_id), '') IS NULL THEN 'Variables del gateway'
+                    ELSE 'Device ' || NULLIF(TRIM(md.device_id), '')
+                END
+            ) AS dispositivo,
             COALESCE(d.rol, '') AS rol,
             COALESCE(d.tipo, '') AS tipo_dispositivo,
             COALESCE(d.ubicacion, '') AS ubicacion_dispositivo,
@@ -216,7 +222,6 @@ def api_variables():
             ON CAST(NULLIF(TRIM(md.device_id), '') AS INTEGER) = d.device_id
         LEFT JOIN unidades u
             ON md.unit_id = u.unit_id
-        WHERE md.device_id IN ('24','25','26')
         GROUP BY
             md.gateway_id,
             g.nombre,

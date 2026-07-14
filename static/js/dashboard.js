@@ -571,8 +571,10 @@ async function cargarSelectorVariables() {
 
         variablesDisponibles.forEach((v, index) => {
             const gateway = v.gateway || `Gateway ${v.gateway_id || ""}`;
-            const dispositivo = v.dispositivo || `Device ${v.device_id || ""}`;
-            const rol = v.rol || "sin rol";
+            const dispositivo = v.dispositivo || (
+                v.device_id ? `Device ${v.device_id}` : "Variables del gateway"
+            );
+            const rol = v.rol || v.source_type || "sin rol";
 
             const grupo = `${gateway} / ${dispositivo} (${rol})`;
 
