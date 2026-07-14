@@ -105,7 +105,10 @@ def api_estado():
         "cpu": None,
         "ip_usb0": None,
         "ip_ethernet": None,
-        "connected_meter": None
+        "connected_meter": None,
+        "temperatura_sistema_c": None,
+        "temperatura_sistema_timestamp_utc": None,
+        "temperatura_sistema_fecha_colombia": None
     }
 
     try:
@@ -149,24 +152,52 @@ def api_estado():
             else:
                 estado["estado_datos"] = "SIN DATOS RECIENTES"
 
-        def ultimo_valor(unit_id):
-            cur.execute("""
-                SELECT valor
+        def ultima_medicion_variable(unit_id, device_id=None):
+            where_device = ""
+            params = [int(unit_id)]
+            if device_id is not None:
+                where_device = " AND TRIM(device_id) = ?"
+                params.append(str(device_id))
+            cur.execute(f"""
+                SELECT valor, CAST(timestamp_utc AS INTEGER) AS timestamp_utc
                 FROM mediciones_detalle
                 WHERE unit_id = ?
+                {where_device}
                 ORDER BY CAST(timestamp_utc AS INTEGER) DESC, id DESC
                 LIMIT 1
-            """, (int(unit_id),))
+            """, params)
             r = cur.fetchone()
             if not r:
                 return None
-            return r["valor"]
+            return {"valor": r["valor"], "timestamp_utc": r["timestamp_utc"]}
+
+        def ultimo_valor(unit_id, device_id=None):
+            medicion = ultima_medicion_variable(unit_id, device_id)
+            return medicion["valor"] if medicion else None
 
         estado["connected_meter"] = ultimo_valor(53)
         estado["ram"] = ultimo_valor(135)
         estado["cpu"] = ultimo_valor(136)
         estado["ip_usb0"] = ultimo_valor(137)
         estado["ip_ethernet"] = ultimo_valor(144)
+
+        cur.execute("""
+            SELECT device_id
+            FROM dispositivos
+            WHERE LOWER(COALESCE(nombre, '')) LIKE '%sistema raspberry%'
+               OR LOWER(COALESCE(tipo, '')) LIKE '%variables internas gateway%'
+            ORDER BY device_id
+            LIMIT 1
+        """)
+        sistema = cur.fetchone()
+        if sistema:
+            medicion_temperatura = ultima_medicion_variable(1, sistema["device_id"])
+            if medicion_temperatura:
+                estado["temperatura_sistema_c"] = medicion_temperatura["valor"]
+                estado["temperatura_sistema_timestamp_utc"] = medicion_temperatura["timestamp_utc"]
+                estado["temperatura_sistema_fecha_colombia"] = convertir_utc_a_colombia(
+                    medicion_temperatura["timestamp_utc"]
+                )
 
         conn.close()
         return jsonify(estado)

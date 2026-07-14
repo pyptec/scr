@@ -514,6 +514,14 @@ async function cargarEstado() {
     document.getElementById("estadoCpu").innerText =
         data.cpu !== null && data.cpu !== undefined ? `${data.cpu} %` : "--";
 
+    document.getElementById("estadoTemperaturaSistema").innerText =
+        data.temperatura_sistema_c !== null && data.temperatura_sistema_c !== undefined
+            ? `${formatearNumero(data.temperatura_sistema_c, 1)} °C`
+            : "No disponible";
+
+    document.getElementById("estadoTemperaturaFecha").innerText =
+        data.temperatura_sistema_fecha_colombia || "No disponible";
+
     document.getElementById("estadoIpEth").innerText =
         reconstruirIpv4DesdeDigitos(data.ip_ethernet);
 
