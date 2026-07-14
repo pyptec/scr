@@ -436,8 +436,19 @@
             </table>
         </div>
     </section>
-    <section class="panel modulo modulo-pendiente" data-module="eficiencia-energetica" hidden>
-        <h2>Eficiencia energética</h2><p>Estructura preparada. Contenido pendiente de la subfase correspondiente.</p>
+    <section class="panel modulo" data-module="eficiencia-energetica" hidden>
+        <div class="panel-header"><div><h2>Reconstrucción trazable de energía Aoki</h2><small>DATOS_HISTORICOS_DE_PRUEBA · ME337_1</small></div></div>
+        <div class="grid-kpi">
+            <div class="card"><span>Energía total calculada</span><strong id="energiaReconTotal">--</strong><small>kWh conocidos</small></div>
+            <div class="card"><span>Energía medida directamente</span><strong id="energiaReconMedida">--</strong><small>kWh · acumulador</small></div>
+            <div class="card"><span>Energía reconstruida</span><strong id="energiaReconEstimada">--</strong><small>kWh · potencia</small></div>
+            <div class="card"><span>Cobertura energética</span><strong id="energiaReconCobertura">--</strong><small>% duración con energía</small></div>
+            <div class="card"><span>Porcentaje reconstruido</span><strong id="energiaReconPct">--</strong><small>% de energía conocida</small></div>
+            <div class="card"><span>Intervalos NO_DATA</span><strong id="energiaReconNoData">--</strong><small>energía no recuperable</small></div>
+        </div>
+        <p id="energiaReconCriterio" class="periodo-efectivo">Criterio: --</p>
+        <h3>Detalle diario de calidad energética</h3>
+        <div class="tabla-wrapper"><table><thead><tr><th>Jornada</th><th>Total kWh</th><th>Medida kWh</th><th>Reconstruida kWh</th><th>Reconstruido</th><th>Cobertura</th><th>NO_DATA</th><th>Resultado</th></tr></thead><tbody id="tablaEnergiaReconstruida"></tbody></table></div>
     </section>
     <section class="panel modulo modulo-pendiente" data-module="confiabilidad" hidden>
         <h2>Confiabilidad y mantenimiento</h2><p>Estructura preparada. Contenido pendiente de la subfase correspondiente.</p>

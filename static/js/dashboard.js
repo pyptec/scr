@@ -410,6 +410,38 @@ async function cargarEstadosAoki() {
     });
 }
 
+async function cargarEnergiaReconstruidaAoki() {
+    const rango = obtenerRangoUnix();
+    const respuesta = await fetch(`/api/aoki/energia-reconstruida?inicio=${rango.inicio}&fin=${rango.fin}`);
+    const data = await respuesta.json();
+    if (!respuesta.ok) throw new Error(data.error || "No fue posible reconstruir la energía de Aoki");
+    const diarios = data.daily || [];
+    const sumar = campo => diarios.reduce((total, dia) => total + Number(dia[campo] || 0), 0);
+    const total = sumar("calculatedEnergyKWh");
+    const medida = sumar("measuredEnergyKWh");
+    const reconstruida = sumar("reconstructedEnergyKWh");
+    const intervalosNoData = sumar("noDataIntervals");
+    const duracionTotal = (data.intervals || []).reduce((suma, intervalo) => suma + Number(intervalo.durationSeconds || 0), 0);
+    const duracionNoData = (data.intervals || []).filter(i => i.source === "NO_DATA").reduce((suma, intervalo) => suma + Number(intervalo.durationSeconds || 0), 0);
+    const cobertura = duracionTotal > 0 ? (duracionTotal - duracionNoData) / duracionTotal * 100 : null;
+    const porcentajeReconstruido = total > 0 ? reconstruida / total * 100 : null;
+    document.getElementById("energiaReconTotal").innerText = formatearNumero(total, 3);
+    document.getElementById("energiaReconMedida").innerText = formatearNumero(medida, 3);
+    document.getElementById("energiaReconEstimada").innerText = formatearNumero(reconstruida, 3);
+    document.getElementById("energiaReconCobertura").innerText = cobertura === null ? "Datos insuficientes" : `${formatearNumero(cobertura, 2)} %`;
+    document.getElementById("energiaReconPct").innerText = porcentajeReconstruido === null ? "Datos insuficientes" : `${formatearNumero(porcentajeReconstruido, 2)} %`;
+    document.getElementById("energiaReconNoData").innerText = formatearEntero(intervalosNoData);
+    const config = data.config || {};
+    document.getElementById("energiaReconCriterio").innerText = `Criterio ${config.version || "--"}: acumulador → potencia trapezoidal → potencia rectangular → NO_DATA. Corriente no usada como energía.`;
+    const tbody = document.getElementById("tablaEnergiaReconstruida");
+    tbody.innerHTML = diarios.length ? "" : '<tr><td colspan="8">Sin datos para el periodo</td></tr>';
+    diarios.forEach(dia => {
+        const fila = document.createElement("tr");
+        fila.innerHTML = `<td>${escaparHtml(dia.productionDate)}</td><td>${formatearNumero(dia.calculatedEnergyKWh, 3)}</td><td>${formatearNumero(dia.measuredEnergyKWh, 3)}</td><td>${formatearNumero(dia.reconstructedEnergyKWh, 3)}</td><td>${dia.reconstructedPct === null ? "No disponible" : formatearNumero(dia.reconstructedPct, 2) + " %"}</td><td>${dia.energyCoveragePct === null ? "No disponible" : formatearNumero(dia.energyCoveragePct, 2) + " %"}</td><td>${formatearEntero(dia.noDataIntervals)}</td><td>${escaparHtml(dia.resultType)}</td>`;
+        tbody.appendChild(fila);
+    });
+}
+
 async function cargarLineaBase() {
     const rango = obtenerRangoUnix();
 
@@ -1010,6 +1042,8 @@ async function actualizarTodo() {
             await cargarProduccion();
         } else if (moduloActual === "eficiencia-operacional") {
             await cargarEstadosAoki();
+        } else if (moduloActual === "eficiencia-energetica") {
+            await cargarEnergiaReconstruidaAoki();
         } else if (moduloActual === "linea-base") {
             await cargarLineaBase();
         } else if (moduloActual === "variables") {

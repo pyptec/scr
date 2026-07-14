@@ -17,6 +17,7 @@ from db.produccion_samee200 import obtener_produccion_periodos
 from db.produccion_samee200 import sumar_produccion_rango
 from db.produccion_samee200 import obtener_modulo_produccion
 from db.aoki_states import classify_aoki_states, query_aoki_rows
+from db.aoki_energy import reconstruct_aoki_energy, query_aoki_energy_rows
 
 load_dotenv("/home/pi/SAMEE200/scr/.env")
 
@@ -223,6 +224,22 @@ def api_aoki_estados():
     try:
         rows = query_aoki_rows(conn, inicio, fin)
         return jsonify(classify_aoki_states(rows, inicio, fin))
+    finally:
+        conn.close()
+
+
+@app.route("/api/aoki/energia-reconstruida")
+def api_aoki_energia_reconstruida():
+    inicio = request.args.get("inicio", type=int)
+    fin = request.args.get("fin", type=int)
+    if inicio is None or fin is None or fin <= inicio:
+        return jsonify({"error": "Rango de fechas inválido"}), 400
+    if fin - inicio > 90 * 86400:
+        return jsonify({"error": "El rango máximo local es de 90 días"}), 400
+    conn = get_conn()
+    try:
+        rows = query_aoki_energy_rows(conn, inicio, fin)
+        return jsonify(reconstruct_aoki_energy(rows, start_utc=inicio, end_utc=fin))
     finally:
         conn.close()
 

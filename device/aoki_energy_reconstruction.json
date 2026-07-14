@@ -1,0 +1,16 @@
+{
+  "version": "aoki-energy-reconstruction-v1-2026-07",
+  "stateMaximumGapMinutes": 20,
+  "maximumRecoverableAccumulatorGapMinutes": 720,
+  "maximumDerivedPowerKW": 62.5,
+  "crossValidationTolerancePct": 25.0,
+  "estimatedResultThresholdPct": 20.0,
+  "calibration": {
+    "dataset": "DATOS_HISTORICOS_DE_PRUEBA",
+    "period": "2026-05-01/2026-06-25",
+    "observedMaximumPowerKW": 50.0,
+    "crossValidationErrorP95Pct": 18.8689,
+    "notes": "Límites empíricos provisionales; no representan capacidad nominal."
+  },
+  "currentModel": null
+}

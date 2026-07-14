@@ -409,6 +409,256 @@ persistencia mínima de estado = 2 muestras consecutivas o 20 minutos
 
 El límite máximo de hueco debe ser configurable. Como valor inicial puede usarse 20 minutos, pero debe quedar documentado.
 
+## Subfase 2.2B — Reconstrucción trazable de la línea de consumo energético
+
+Esta subfase se ejecuta después del preprocesamiento de datos y antes de clasificar estados. Su objetivo es reconstruir, cuando sea técnicamente posible, la serie de energía consumida por intervalo aunque una de las variables eléctricas falle.
+
+La reconstrucción nunca debe inventar consumo. Un intervalo solo puede recuperarse si existe otra señal válida y físicamente coherente. Si no existe información suficiente, debe conservarse como `NO_DATA`.
+
+### Variables disponibles
+
+Usar para `ME337_1`, proceso Aoki:
+
+```text
+unit_id 54 = corriente trifásica promedio, A
+unit_id 61 = potencia activa total, kW
+unit_id 100 = energía activa positiva acumulada, kWh
+```
+
+La prioridad para reconstruir energía por intervalo es:
+
+1. delta válido del acumulador `unit_id 100`;
+2. integración de potencia `unit_id 61`;
+3. estimación excepcional mediante corriente `unit_id 54`, únicamente si existe un modelo eléctrico validado;
+4. `NO_DATA` cuando ninguna fuente sea suficiente.
+
+### Método principal: delta del acumulador
+
+Para cada par consecutivo de lecturas válidas:
+
+```text
+energia_intervalo_kWh = energia_final_kWh - energia_inicial_kWh
+```
+
+Calcular también:
+
+```text
+potencia_media_intervalo_kW = energia_intervalo_kWh / delta_horas
+```
+
+Aceptar el delta solo cuando:
+
+- ambos valores sean numéricos;
+- `delta_horas > 0`;
+- el intervalo no supere el máximo configurable;
+- el delta no sea negativo;
+- el consumo sea físicamente posible;
+- no se detecte reinicio, salto o cambio de escala del acumulador.
+
+Si el acumulador disminuye, marcar:
+
+```text
+ACCUMULATOR_RESET
+```
+
+No aplicar valor absoluto a un delta negativo.
+
+### Método alternativo: integración de potencia
+
+Cuando el acumulador sea inválido, esté ausente o presente reinicio, usar potencia activa válida:
+
+```text
+energia_intervalo_kWh =
+((potencia_inicio_kW + potencia_fin_kW) / 2) × delta_horas
+```
+
+Usar integración trapezoidal cuando existan ambas lecturas. Si solo existe una potencia válida y el intervalo está dentro del máximo atribuible, se puede usar integración rectangular, pero debe quedar marcada como estimación de menor calidad.
+
+No asumir intervalos fijos de diez minutos. Usar siempre `delta_horas` calculado desde timestamps reales.
+
+### Uso de corriente como último recurso
+
+No convertir corriente directamente a energía con una constante arbitraria.
+
+Solo permitir estimación por corriente si se construye y valida previamente una relación con potencia usando intervalos donde ambas señales sean válidas, por ejemplo:
+
+```text
+potencia_estimada_kW = f(corriente_promedio_A)
+```
+
+El modelo debe documentar:
+
+- periodo de calibración;
+- cantidad de muestras;
+- ecuación;
+- R², RMSE y error relativo;
+- rango válido de corriente;
+- versión del modelo.
+
+Si el modelo no alcanza la calidad mínima aprobada, la corriente se usa únicamente para clasificar estados y el intervalo energético permanece `NO_DATA`.
+
+### Jerarquía y calidad del dato
+
+Cada intervalo debe guardar el origen de la energía:
+
+```typescript
+interface AokiEnergyInterval {
+  startUtc: string;
+  endUtc: string;
+  durationSeconds: number;
+  energyKWh: number | null;
+  averagePowerKW: number | null;
+  source:
+    | "ACCUMULATOR_DELTA"
+    | "POWER_TRAPEZOIDAL"
+    | "POWER_RECTANGULAR"
+    | "CURRENT_MODEL"
+    | "NO_DATA";
+  quality:
+    | "MEASURED"
+    | "RECONSTRUCTED_HIGH"
+    | "RECONSTRUCTED_MEDIUM"
+    | "RECONSTRUCTED_LOW"
+    | "INVALID"
+    | "NO_DATA";
+  reason: string | null;
+}
+```
+
+Reglas de calidad:
+
+```text
+ACCUMULATOR_DELTA válido
+→ MEASURED
+
+POWER_TRAPEZOIDAL
+→ RECONSTRUCTED_HIGH
+
+POWER_RECTANGULAR
+→ RECONSTRUCTED_MEDIUM
+
+CURRENT_MODEL validado
+→ RECONSTRUCTED_LOW
+
+sin fuente suficiente
+→ NO_DATA
+```
+
+### Validación cruzada
+
+Cuando acumulador y potencia estén disponibles, comparar:
+
+```text
+potencia_media_desde_energia = delta_kWh / delta_horas
+```
+
+contra la potencia media medida.
+
+Calcular:
+
+```text
+error_pct =
+abs(potencia_media_desde_energia - potencia_media_medida)
+/ potencia_media_medida × 100
+```
+
+Si el error supera una tolerancia configurable, marcar `INCONSISTENT_ENERGY_SOURCE` y no aceptar silenciosamente el dato.
+
+### Tratamiento de huecos
+
+Un hueco de comunicación no debe reconstruirse por interpolación lineal entre dos acumulados si no puede demostrarse cómo se distribuyó el consumo dentro del hueco.
+
+Se permite recuperar el consumo total del hueco mediante delta acumulado válido, pero:
+
+- el total se asigna al periodo completo del hueco;
+- no se inventa la forma minuto a minuto;
+- no se usa ese hueco para detectar con precisión paradas o estados internos;
+- debe marcarse como `AGGREGATED_GAP_ENERGY`.
+
+Si el hueco supera el máximo permitido para análisis de estados, sigue siendo `NO_DATA` para estados aunque tenga energía total recuperable.
+
+### Serie energética reconstruida
+
+Generar una serie continua por intervalo con:
+
+```text
+energía medida
+energía reconstruida
+energía no recuperable
+potencia media del intervalo
+fuente utilizada
+calidad
+motivo de sustitución
+```
+
+Calcular por jornada:
+
+```text
+energia_medida_kWh
+energia_reconstruida_kWh
+energia_no_recuperable_kWh
+porcentaje_reconstruido
+porcentaje_NO_DATA
+intervalos_por_fuente
+```
+
+No mezclar energía reconstruida con medida sin mostrar su proporción.
+
+### Uso en dashboard y línea base
+
+La energía real del periodo puede usar intervalos medidos y reconstruidos de calidad alta o media.
+
+Los intervalos reconstruidos mediante corriente solo podrán entrar en la línea base con autorización expresa y después de validar el modelo.
+
+Mostrar en el dashboard:
+
+```text
+Energía total calculada
+Energía medida directamente
+Energía reconstruida
+Cobertura energética
+Porcentaje reconstruido
+Intervalos NO_DATA
+```
+
+Si el porcentaje reconstruido supera un umbral configurable, clasificar el resultado como `ESTIMACIÓN` y no como medición completa.
+
+### Pruebas mínimas
+
+Agregar pruebas para:
+
+1. delta normal del acumulador;
+2. reinicio del acumulador;
+3. salto físicamente imposible;
+4. reconstrucción trapezoidal con potencia;
+5. reconstrucción rectangular con una sola potencia;
+6. ausencia de acumulador con potencia válida;
+7. ausencia de potencia con acumulador válido;
+8. ambas señales inválidas;
+9. hueco con delta acumulado recuperable;
+10. hueco sin información suficiente;
+11. comparación entre potencia medida y derivada del acumulador;
+12. trazabilidad de fuente y calidad;
+13. no conversión automática de corriente a energía;
+14. conservación de `NO_DATA` cuando no es posible reconstruir.
+
+### Entrega de la subfase 2.2B
+
+Presentar:
+
+1. archivos modificados;
+2. algoritmo de jerarquía de fuentes;
+3. reglas para reinicios y saltos;
+4. fórmula de integración de potencia;
+5. porcentaje de energía medida y reconstruida;
+6. intervalos que permanecen `NO_DATA`;
+7. resultados para mayo y junio de 2026;
+8. validación cruzada acumulador-potencia;
+9. pruebas ejecutadas;
+10. limitaciones pendientes.
+
+Detenerse al finalizar. No avanzar a la subfase 2.3 sin autorización.
+
 ## Subfase 2.3 — Clasificación de estados eléctricos de Aoki
 
 La subfase 2.2 debe estar aprobada antes de iniciar esta subfase.
