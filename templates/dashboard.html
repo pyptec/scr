@@ -137,6 +137,18 @@
                 <strong id="participacionProceso">--</strong>
                 <small>% del totalizador</small>
             </div>
+
+            <div class="card">
+                <span>Horas productivas</span>
+                <strong id="horasProductivasResumen">No disponible</strong>
+                <small>pendiente de cálculo validado</small>
+            </div>
+
+            <div class="card">
+                <span>Horas de parada</span>
+                <strong id="horasParadaResumen">No disponible</strong>
+                <small>pendiente de extracción validada</small>
+            </div>
         </div>
     </section>
 
@@ -204,6 +216,13 @@
                 <button onclick="entrenarLineaBase()">Reentrenar línea base</button>
             </div>
 
+            <nav class="subnav-linea-base" aria-label="Vistas de línea base ISO 50001">
+                <button class="subnav-item activo" data-linea-base-target="desempeno">Desempeño</button>
+                <button class="subnav-item" data-linea-base-target="indice-base-100">Índice Base 100</button>
+                <button class="subnav-item" data-linea-base-target="cusum">CUSUM</button>
+            </nav>
+
+            <section class="vista-linea-base" data-linea-base-view="desempeno">
             <div class="grid-kpi">
                 <div class="card">
                     <span>Energía real Aoki</span>
@@ -253,6 +272,19 @@
                     <small>calidad del ajuste</small>
                 </div>
             </div>
+            </section>
+
+            <section class="vista-linea-base estado-pendiente" data-linea-base-view="indice-base-100" hidden>
+                <h3>Índice Base 100</h3>
+                <strong>Pendiente de fase 3</strong>
+                <p>La estructura está preparada; no se realizan cálculos provisionales.</p>
+            </section>
+
+            <section class="vista-linea-base estado-pendiente" data-linea-base-view="cusum" hidden>
+                <h3>CUSUM</h3>
+                <strong>Pendiente de fase 3</strong>
+                <p>La estructura está preparada; no se realizan cálculos provisionales.</p>
+            </section>
         </section>
 
         <div class="panel modulo" data-module="impacto" hidden>

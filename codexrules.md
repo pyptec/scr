@@ -34,6 +34,11 @@ Estas reglas aplican a todos los cambios del proyecto SAMEE200.
 13. No inventar duración de paradas.
 14. Conservar el texto original de observaciones.
 15. No contar ausencia de datos como parada.
+16. Mostrar por separado horas productivas y horas de parada.
+17. La temperatura del gateway debe provenir de la variable real del sistema y mostrarse en °C.
+18. No usar temperatura del gateway en la línea base oficial sin reentrenamiento aprobado.
+19. Base 100 y CUSUM deben usar energía real y esperada de los mismos días válidos.
+20. No calcular Base 100 ni CUSUM con datos o cobertura insuficientes.
 
 ## Línea base
 
@@ -68,6 +73,10 @@ No modificar, reemplazar ni reentrenar este modelo sin autorización expresa.
 8. Mostrar el periodo efectivo evaluado.
 9. No recargar todo el dashboard si solo cambia un módulo.
 10. Evitar efectos que sobrescriban selecciones del usuario.
+11. El módulo `Estado del gateway` debe mostrar temperatura actual, mínima, máxima, promedio y última lectura.
+12. Incluir gráfica temporal de temperatura cuando existan datos históricos.
+13. Mantener componentes separados para Índice Base 100 y CUSUM.
+14. En fase 1 estos componentes deben quedar en estado `Pendiente de fase 3`, sin cálculos provisionales.
 
 ## Backend
 
@@ -80,9 +89,20 @@ No modificar, reemplazar ni reentrenar este modelo sin autorización expresa.
 7. No alterar la base de datos sin justificarlo.
 8. Si se requiere migración, documentarla.
 
+
+## Reglas de Índice Base 100 y CUSUM
+
+1. `indice_base_100 = energia_real / energia_esperada × 100`.
+2. `residuo_dia = energia_real_dia - energia_esperada_dia`.
+3. `CUSUM_dia = CUSUM_anterior + residuo_dia`.
+4. Usar exactamente los mismos días válidos para energía real y esperada.
+5. Mostrar de forma visible la convención de signos.
+6. No reiniciar CUSUM dentro del rango salvo cambio del periodo o de versión de línea base.
+7. No mezclar datos de versiones distintas del modelo.
+
 ## Pruebas
 
-Cada subfase debe incluir pruebas unitarias, pruebas de integración cuando correspondan, datos nulos, divisiones por cero, periodos parciales, observaciones ambiguas, diferencias de zona horaria y validación de totales.
+Cada subfase debe incluir pruebas unitarias, pruebas de integración cuando correspondan, datos nulos, divisiones por cero, periodos parciales, observaciones ambiguas, diferencias de zona horaria y validación de totales, temperatura del gateway, horas productivas, horas de parada y estados pendientes de Base 100/CUSUM.
 
 ## Entrega de cada subfase
 

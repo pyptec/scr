@@ -63,6 +63,17 @@ class DashboardStructureTests(unittest.TestCase):
         self.assertIn('moduloActual === "variables"', actualizar)
         self.assertNotIn("await cargarProduccion();\n        await cargarLineaBase();", actualizar)
 
+    def test_summary_prepares_productive_and_downtime_cards(self):
+        self.assertIn('id="horasProductivasResumen"', self.html)
+        self.assertIn('id="horasParadaResumen"', self.html)
+        self.assertIn("No disponible", self.html)
+
+    def test_base_100_and_cusum_are_separate_pending_phase_3_views(self):
+        self.assertIn('data-linea-base-view="indice-base-100"', self.html)
+        self.assertIn('data-linea-base-view="cusum"', self.html)
+        self.assertEqual(self.html.count("Pendiente de fase 3"), 2)
+        self.assertIn("function inicializarVistasLineaBase()", self.javascript)
+
 
 if __name__ == "__main__":
     unittest.main()

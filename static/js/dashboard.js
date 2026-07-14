@@ -117,10 +117,12 @@ function obtenerRangoUnix() {
         );
 
         if (inicioManual && finManual && finManual > inicioManual) {
-            return {
+            const rangoManual = {
                 inicio: inicioManual,
                 fin: finManual
             };
+            formatearPeriodoEfectivo(rangoManual);
+            return rangoManual;
         }
     }
 
@@ -984,6 +986,23 @@ function inicializarNavegacion() {
     return navegarAModulo(moduloInicial, false);
 }
 
+function inicializarVistasLineaBase() {
+    document.querySelectorAll("[data-linea-base-target]").forEach(boton => {
+        boton.addEventListener("click", () => {
+            const vistaSeleccionada = boton.dataset.lineaBaseTarget;
+
+            document.querySelectorAll("[data-linea-base-view]").forEach(vista => {
+                vista.hidden = vista.dataset.lineaBaseView !== vistaSeleccionada;
+            });
+            document.querySelectorAll("[data-linea-base-target]").forEach(item => {
+                const activo = item.dataset.lineaBaseTarget === vistaSeleccionada;
+                item.classList.toggle("activo", activo);
+                item.setAttribute("aria-current", activo ? "page" : "false");
+            });
+        });
+    });
+}
+
 function inicializarFiltros() {
     const selectorRango = document.getElementById("rangoTiempo");
     const selectorGranularidad = document.getElementById("granularidad");
@@ -1026,6 +1045,7 @@ function inicializarFiltros() {
 async function iniciarDashboard() {
     await cargarRangosProduccion();
     inicializarFiltros();
+    inicializarVistasLineaBase();
     obtenerRangoUnix();
 
     await inicializarNavegacion();

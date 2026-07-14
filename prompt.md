@@ -50,6 +50,8 @@ Dividir el dashboard en módulos de navegación independientes:
 9. Variables eléctricas
 10. Estado del gateway
 
+Dentro de `Línea base ISO 50001` también deben existir vistas para `Índice Base 100` y `CUSUM`. En la fase 1 se prepara únicamente su estructura visual y navegación; los cálculos definitivos se implementan en la fase 3.
+
 Cada módulo debe tener sus propios componentes, consultas y funciones de cálculo, pero compartir un filtro global de fechas.
 
 ## Fases del proyecto
@@ -61,7 +63,7 @@ Objetivo: crear navegación modular y corregir indicadores básicos de producci�
 Objetivo: clasificar cada intervalo de `ME337_1` como productivo, espera, apagado o sin datos.
 
 ### Fase 3 — Eficiencia energética y línea base
-Objetivo: calcular energía real, EnPI, energía esperada, desviación, ahorro o sobreconsumo.
+Objetivo: calcular energía real, EnPI, energía esperada, desviación, ahorro o sobreconsumo, además de las gráficas de Índice Base 100 y CUSUM.
 
 ### Fase 4 — Confiabilidad y mantenimiento
 Objetivo: conciliar paradas reportadas y eléctricas, calcular MTBF, MTTR y disponibilidad técnica.
@@ -114,7 +116,9 @@ Requisitos:
 - mostrar el periodo efectivo evaluado;
 - permitir navegación sin perder el filtro;
 - no cargar todos los módulos a la vez si no es necesario;
-- usar `Resumen` como pantalla inicial.
+- usar `Resumen` como pantalla inicial;
+- dejar preparadas las rutas o componentes de `Índice Base 100` y `CUSUM`, mostrando `Pendiente de fase 3`;
+- asegurar que el resumen tenga tarjetas para `Horas productivas` y `Horas de parada`.
 
 No avances a la subfase 1.2 hasta terminar y probar la navegación.
 
@@ -262,7 +266,7 @@ Energía Aoki
 Energía total planta
 Producción buena
 Producción total
-Horas reales de trabajo
+Horas productivas o reales de trabajo
 Horas de parada reportadas
 Disponibilidad operacional reportada
 Eficiencia de calidad
@@ -273,6 +277,50 @@ Cobertura de datos
 ```
 
 No duplicar cálculos. Cada tarjeta debe consumir servicios o funciones centrales. No mostrar `0` cuando el dato no existe; usar `No disponible`, `Pendiente de parametrización` o `Datos insuficientes`.
+
+
+## Subfase 1.7 — Estado del gateway y temperatura
+
+Actualizar el módulo `Estado del gateway` para mostrar:
+
+```text
+Temperatura actual del gateway
+Temperatura mínima del periodo
+Temperatura máxima del periodo
+Temperatura promedio del periodo
+Fecha y hora de la última lectura
+Estado térmico
+```
+
+La temperatura debe provenir de la variable real del sistema Raspberry Pi o gateway, mantenerse en °C y no confundirse con la temperatura ambiental del proceso Aoki. Agregar una gráfica temporal para el rango seleccionado.
+
+No inventar umbrales térmicos. Buscar primero si ya existen en configuración. Si no existen, crear parámetros configurables y mostrar `Pendiente de parametrización`. Usar estados `NORMAL`, `ADVERTENCIA`, `CRÍTICO` o `SIN_DATOS`.
+
+La temperatura del gateway no entra en la ecuación oficial actual de la línea base; queda disponible para verificar estabilidad del nodo, calidad de datos y futuros análisis.
+
+## Preparación de Índice Base 100 y CUSUM
+
+Durante la fase 1 crear solamente componentes, rutas y contratos de datos para estas dos vistas dentro de `Línea base ISO 50001`. Mostrar `Pendiente de fase 3` mientras no exista cálculo validado.
+
+En la fase 3 se deben usar estas fórmulas:
+
+```text
+indice_base_100 = energia_real / energia_esperada × 100
+residuo_dia = energia_real_dia - energia_esperada_dia
+CUSUM_dia = CUSUM_dia_anterior + residuo_dia
+```
+
+Interpretación:
+
+```text
+Base 100 = 100: desempeño igual a la línea base
+Base 100 < 100: consumo menor al esperado
+Base 100 > 100: consumo mayor al esperado
+CUSUM creciente: sobreconsumo acumulado
+CUSUM decreciente: ahorro acumulado
+```
+
+No calcular Base 100 ni CUSUM con días sin energía real, energía esperada o cobertura suficiente.
 
 ## Criterios de aceptación de la fase 1
 
@@ -291,6 +339,10 @@ No duplicar cálculos. Cada tarjeta debe consumir servicios o funciones centrale
 13. No se modifica la línea base oficial.
 14. Los datos faltantes no se muestran como cero.
 15. Existen pruebas unitarias para fórmulas y extracción de paradas.
+16. El resumen muestra horas productivas y horas de parada.
+17. El estado del gateway muestra temperatura real, estadísticas del periodo y última lectura.
+18. Existe una gráfica temporal de temperatura del gateway.
+19. Las vistas Índice Base 100 y CUSUM quedan preparadas sin cálculos improvisados.
 
 # Instrucción inicial para Codex
 
