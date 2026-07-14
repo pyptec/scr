@@ -1,6 +1,7 @@
 import os
 import csv
 import math
+import re
 import unicodedata
 from pathlib import Path
 from datetime import datetime, date, time, timedelta, timezone
@@ -12,6 +13,86 @@ from db.samee200_db import get_conn
 load_dotenv("/home/pi/SAMEE200/scr/.env")
 
 TZ_COLOMBIA = timezone(timedelta(hours=-5))
+
+
+PATRON_INTERVALO_PARADA = re.compile(
+    r"(?:se\s+)?(?:para|detiene)\b.*?(?:a\s+)?las\s+"
+    r"(?P<inicio>[01]?\d|2[0-3]):(?P<min_inicio>[0-5]\d).*?"
+    r"(?:se\s+)?(?:inicia|reinicia|arranca|reanuda)\b.*?(?:a\s+)?las\s+"
+    r"(?P<fin>[01]?\d|2[0-3]):(?P<min_fin>[0-5]\d)",
+    re.IGNORECASE,
+)
+PATRON_DURACION_PARADA = re.compile(
+    r"(?:se\s+)?(?:para|detiene)\b[^.;\n]*?"
+    r"(?P<duracion>\d+(?:[.,]\d+)?)\s*(?:minutos?|min\b)",
+    re.IGNORECASE,
+)
+PATRON_MENCION_PARADA = re.compile(r"\b(?:para|parada|detiene|detenida)\b", re.IGNORECASE)
+
+
+def _evento_parada(fecha, texto, inicio=None, fin=None, duracion=None, estado="VALID"):
+    return {
+        "date": fecha,
+        "startTime": inicio,
+        "endTime": fin,
+        "durationMinutes": duracion,
+        "rawText": texto,
+        "cause": None,
+        "status": estado,
+    }
+
+
+def extraer_paradas_reportadas(observacion, fecha=None):
+    """Extrae únicamente duraciones explícitas; nunca infiere datos ausentes."""
+    texto = str(observacion or "").strip()
+    if not texto:
+        return []
+
+    candidatos = []
+    rangos_ocupados = []
+
+    for match in PATRON_INTERVALO_PARADA.finditer(texto):
+        inicio = f"{int(match.group('inicio')):02d}:{match.group('min_inicio')}"
+        fin = f"{int(match.group('fin')):02d}:{match.group('min_fin')}"
+        inicio_minutos = int(match.group("inicio")) * 60 + int(match.group("min_inicio"))
+        fin_minutos = int(match.group("fin")) * 60 + int(match.group("min_fin"))
+        if fin_minutos < inicio_minutos:
+            fin_minutos += 24 * 60
+        duracion = fin_minutos - inicio_minutos
+        candidatos.append(_evento_parada(fecha, match.group(0), inicio, fin, duracion))
+        rangos_ocupados.append(match.span())
+
+    for match in PATRON_DURACION_PARADA.finditer(texto):
+        if any(inicio <= match.start() < fin for inicio, fin in rangos_ocupados):
+            continue
+        duracion = float(match.group("duracion").replace(",", "."))
+        if duracion.is_integer():
+            duracion = int(duracion)
+        candidatos.append(_evento_parada(fecha, match.group(0), duracion=duracion))
+        rangos_ocupados.append(match.span())
+
+    menciones = list(PATRON_MENCION_PARADA.finditer(texto))
+    menciones_cubiertas = sum(
+        1 for mencion in menciones
+        if any(inicio <= mencion.start() < fin for inicio, fin in rangos_ocupados)
+    )
+    if menciones and menciones_cubiertas < len(menciones):
+        candidatos.append(_evento_parada(
+            fecha, texto, duracion=None, estado="PENDING_REVIEW"
+        ))
+
+    eventos = []
+    vistos = set()
+    for evento in candidatos:
+        clave = (
+            evento["date"], evento["startTime"], evento["endTime"],
+            evento["durationMinutes"], evento["rawText"].strip().casefold(),
+            evento["status"],
+        )
+        if clave not in vistos:
+            vistos.add(clave)
+            eventos.append(evento)
+    return eventos
 
 
 def normalizar_columna(texto):
@@ -605,9 +686,20 @@ def calcular_modulo_produccion(periodos, inicio_utc, fin_utc):
         total = buenos + malos
         horas_programadas = (overlap_fin - overlap_inicio) / 3600
         observaciones = str(periodo.get("observaciones") or "").strip()
-        parada_pendiente = bool(observaciones)
-        minutos_parada = None if parada_pendiente else 0.0
+        eventos_parada = extraer_paradas_reportadas(observaciones, periodo.get("fecha"))
+        parada_pendiente = any(e["status"] == "PENDING_REVIEW" for e in eventos_parada)
+        # Una duración sin ubicación temporal no se distribuye en un corte parcial.
+        if factor < 1 and eventos_parada:
+            parada_pendiente = True
+        minutos_parada = None if parada_pendiente else sum(
+            float(e["durationMinutes"] or 0) for e in eventos_parada
+        )
+        if minutos_parada is not None and minutos_parada > horas_programadas * 60:
+            parada_pendiente = True
+            minutos_parada = None
         horas_reales = None if parada_pendiente else horas_programadas
+        if horas_reales is not None:
+            horas_reales = max(horas_programadas - minutos_parada / 60, 0)
         buenos_hora = buenos / horas_reales if horas_reales and horas_reales > 0 else None
 
         total_buenos += buenos
@@ -624,6 +716,7 @@ def calcular_modulo_produccion(periodos, inicio_utc, fin_utc):
             "turnos": 0.0, "horas_programadas": 0.0,
             "minutos_parada": 0.0, "parada_pendiente": False,
             "observaciones": [],
+            "eventos_parada": [],
         })
         diario["envases_buenos"] += buenos
         diario["envases_malos"] += malos
@@ -634,6 +727,7 @@ def calcular_modulo_produccion(periodos, inicio_utc, fin_utc):
             diario["minutos_parada"] += minutos_parada
         if observaciones and observaciones not in diario["observaciones"]:
             diario["observaciones"].append(observaciones)
+        diario["eventos_parada"].extend(eventos_parada)
 
     detalle = []
     for fecha in sorted(diarios):
@@ -656,6 +750,7 @@ def calcular_modulo_produccion(periodos, inicio_utc, fin_utc):
             "horas_reales_trabajo": round(horas_reales, 3) if horas_reales is not None else None,
             "produccion_buena_hora_real": round(buenos_hora, 3) if buenos_hora is not None else None,
             "observaciones": " | ".join(diario["observaciones"]),
+            "paradas_reportadas": diario["eventos_parada"],
         })
 
     produccion_total = total_buenos + total_malos
