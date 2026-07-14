@@ -228,6 +228,12 @@ function formatearEntero(valor) {
     });
 }
 
+function escaparHtml(valor) {
+    return String(valor ?? "").replace(/[&<>'"]/g, caracter => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;"
+    })[caracter]);
+}
+
 function formatearHoraColombia(timestampUtc) {
     if (!timestampUtc) return "--";
 
@@ -314,7 +320,7 @@ function reconstruirIpv4DesdeDigitos(valor) {
 async function cargarProduccion() {
     const rango = obtenerRangoUnix();
 
-    const resResumen = await fetch(`/api/produccion/resumen?inicio=${rango.inicio}&fin=${rango.fin}`);
+    const resResumen = await fetch(`/api/produccion/modulo?inicio=${rango.inicio}&fin=${rango.fin}`);
     const resumen = await resResumen.json();
 
     document.getElementById("prodBuenos").innerText =
@@ -324,39 +330,39 @@ async function cargarProduccion() {
         formatearEntero(resumen.envases_malos);
 
     document.getElementById("prodTotal").innerText =
-        formatearEntero(resumen.envases_total);
+        formatearEntero(resumen.produccion_total);
 
-    document.getElementById("prodEficiencia").innerText =
-        formatearNumero((resumen.eficiencia_calc || 0) * 100, 2);
+    const pendiente = "Dato pendiente";
+    document.getElementById("prodHorasProgramadas").innerText = formatearNumero(resumen.horas_programadas, 2);
+    document.getElementById("prodHorasReales").innerText = resumen.horas_reales_trabajo === null ? pendiente : formatearNumero(resumen.horas_reales_trabajo, 2);
+    document.getElementById("prodHorasParada").innerText = resumen.horas_parada_reportadas === null ? pendiente : formatearNumero(resumen.horas_parada_reportadas, 2);
+    document.getElementById("prodBuenosHora").innerText = resumen.produccion_buena_hora_real === null ? pendiente : formatearNumero(resumen.produccion_buena_hora_real, 2);
+    document.getElementById("prodTotalHora").innerText = resumen.produccion_total_hora_real === null ? pendiente : formatearNumero(resumen.produccion_total_hora_real, 2);
+    document.getElementById("prodDias").innerText = formatearEntero(resumen.dias_produccion_incluidos);
 
-    document.getElementById("prodPeriodos").innerText =
-        formatearEntero(resumen.periodos_usados);
-
-    const resMeses = await fetch("/api/produccion/meses");
-    const dataMeses = await resMeses.json();
-
-    const tbody = document.getElementById("tablaProduccionMeses");
+    const tbody = document.getElementById("tablaProduccionDiaria");
     tbody.innerHTML = "";
 
-    const meses = dataMeses.meses || [];
-
-    if (!meses.length) {
-        tbody.innerHTML = `<tr><td colspan="6">No hay producción cargada</td></tr>`;
+    const detalle = resumen.detalle_diario || [];
+    if (!detalle.length) {
+        tbody.innerHTML = `<tr><td colspan="10">No hay producción cargada para el periodo</td></tr>`;
         return;
     }
 
-    meses.forEach(m => {
+    detalle.forEach(fila => {
         const tr = document.createElement("tr");
-
         tr.innerHTML = `
-            <td>${m.mes}</td>
-            <td>${formatearEntero(m.periodos)}</td>
-            <td>${formatearEntero(m.envases_buenos)}</td>
-            <td>${formatearEntero(m.envases_malos)}</td>
-            <td>${formatearEntero(m.envases_total)}</td>
-            <td>${formatearNumero((m.eficiencia_calc || 0) * 100, 2)} %</td>
+            <td>${escaparHtml(fila.fecha || "--")}</td>
+            <td>${formatearEntero(fila.envases_buenos)}</td>
+            <td>${formatearEntero(fila.envases_malos)}</td>
+            <td>${formatearEntero(fila.produccion_total)}</td>
+            <td>${formatearNumero(fila.turnos, 0)}</td>
+            <td>${formatearNumero(fila.horas_programadas, 2)}</td>
+            <td>${fila.minutos_parada_reportados === null ? pendiente : formatearNumero(fila.minutos_parada_reportados, 0)}</td>
+            <td>${fila.horas_reales_trabajo === null ? pendiente : formatearNumero(fila.horas_reales_trabajo, 2)}</td>
+            <td>${fila.produccion_buena_hora_real === null ? pendiente : formatearNumero(fila.produccion_buena_hora_real, 2)}</td>
+            <td>${escaparHtml(fila.observaciones || "--")}</td>
         `;
-
         tbody.appendChild(tr);
     });
 }

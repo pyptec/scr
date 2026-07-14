@@ -572,6 +572,119 @@ def obtener_produccion_periodos(inicio_utc=None, fin_utc=None):
     return rows
 
 
+def calcular_modulo_produccion(periodos, inicio_utc, fin_utc):
+    """Calcula indicadores de producción sin usar la eficiencia importada.
+
+    La extracción de duraciones desde observaciones pertenece a la subfase 1.3.
+    Por ello, una observación no vacía deja la parada y sus indicadores derivados
+    pendientes de revisión en vez de asumir cero minutos.
+    """
+    inicio_utc = int(inicio_utc)
+    fin_utc = int(fin_utc)
+    if fin_utc <= inicio_utc:
+        raise ValueError("El fin del periodo debe ser posterior al inicio")
+
+    diarios = {}
+    total_buenos = 0.0
+    total_malos = 0.0
+    total_horas_programadas = 0.0
+    total_parada_minutos = 0.0
+    hay_paradas_pendientes = False
+
+    for periodo in periodos:
+        periodo_inicio = int(periodo["fecha_hora_inicio_utc"])
+        periodo_fin = int(periodo["fecha_hora_fin_utc"])
+        overlap_inicio = max(inicio_utc, periodo_inicio)
+        overlap_fin = min(fin_utc, periodo_fin)
+        if overlap_fin <= overlap_inicio or periodo_fin <= periodo_inicio:
+            continue
+
+        factor = (overlap_fin - overlap_inicio) / (periodo_fin - periodo_inicio)
+        buenos = max(float(periodo.get("envases_buenos") or 0), 0) * factor
+        malos = max(float(periodo.get("envases_malos") or 0), 0) * factor
+        total = buenos + malos
+        horas_programadas = (overlap_fin - overlap_inicio) / 3600
+        observaciones = str(periodo.get("observaciones") or "").strip()
+        parada_pendiente = bool(observaciones)
+        minutos_parada = None if parada_pendiente else 0.0
+        horas_reales = None if parada_pendiente else horas_programadas
+        buenos_hora = buenos / horas_reales if horas_reales and horas_reales > 0 else None
+
+        total_buenos += buenos
+        total_malos += malos
+        total_horas_programadas += horas_programadas
+        if parada_pendiente:
+            hay_paradas_pendientes = True
+        else:
+            total_parada_minutos += minutos_parada
+
+        fecha = periodo.get("fecha") or "Sin fecha"
+        diario = diarios.setdefault(fecha, {
+            "fecha": fecha, "envases_buenos": 0.0, "envases_malos": 0.0,
+            "turnos": 0.0, "horas_programadas": 0.0,
+            "minutos_parada": 0.0, "parada_pendiente": False,
+            "observaciones": [],
+        })
+        diario["envases_buenos"] += buenos
+        diario["envases_malos"] += malos
+        diario["turnos"] += max(float(periodo.get("turnos") or 0), 0) * factor
+        diario["horas_programadas"] += horas_programadas
+        diario["parada_pendiente"] = diario["parada_pendiente"] or parada_pendiente
+        if minutos_parada is not None:
+            diario["minutos_parada"] += minutos_parada
+        if observaciones and observaciones not in diario["observaciones"]:
+            diario["observaciones"].append(observaciones)
+
+    detalle = []
+    for fecha in sorted(diarios):
+        diario = diarios[fecha]
+        total = diario["envases_buenos"] + diario["envases_malos"]
+        minutos_parada = None if diario["parada_pendiente"] else diario["minutos_parada"]
+        horas_reales = None if minutos_parada is None else max(
+            diario["horas_programadas"] - minutos_parada / 60, 0
+        )
+        buenos_hora = diario["envases_buenos"] / horas_reales if horas_reales and horas_reales > 0 else None
+        detalle.append({
+            "fecha": fecha,
+            "envases_buenos": round(diario["envases_buenos"], 2),
+            "envases_malos": round(diario["envases_malos"], 2),
+            "produccion_total": round(total, 2),
+            "turnos": round(diario["turnos"], 2),
+            "horas_programadas": round(diario["horas_programadas"], 3),
+            "minutos_parada_reportados": minutos_parada,
+            "estado_parada": "DATO_PENDIENTE" if diario["parada_pendiente"] else "VALIDO",
+            "horas_reales_trabajo": round(horas_reales, 3) if horas_reales is not None else None,
+            "produccion_buena_hora_real": round(buenos_hora, 3) if buenos_hora is not None else None,
+            "observaciones": " | ".join(diario["observaciones"]),
+        })
+
+    produccion_total = total_buenos + total_malos
+    horas_parada = None if hay_paradas_pendientes else total_parada_minutos / 60
+    horas_reales = None if horas_parada is None else max(total_horas_programadas - horas_parada, 0)
+    productividad_buena = total_buenos / horas_reales if horas_reales and horas_reales > 0 else None
+    productividad_total = produccion_total / horas_reales if horas_reales and horas_reales > 0 else None
+
+    return {
+        "periodo": {"inicio_utc": inicio_utc, "fin_utc": fin_utc},
+        "envases_buenos": round(total_buenos, 2),
+        "envases_malos": round(total_malos, 2),
+        "produccion_total": round(produccion_total, 2),
+        "horas_programadas": round(total_horas_programadas, 3),
+        "horas_parada_reportadas": round(horas_parada, 3) if horas_parada is not None else None,
+        "horas_reales_trabajo": round(horas_reales, 3) if horas_reales is not None else None,
+        "produccion_buena_hora_real": round(productividad_buena, 3) if productividad_buena is not None else None,
+        "produccion_total_hora_real": round(productividad_total, 3) if productividad_total is not None else None,
+        "dias_produccion_incluidos": len(detalle),
+        "estado_paradas": "DATO_PENDIENTE" if hay_paradas_pendientes else "VALIDO",
+        "detalle_diario": detalle,
+    }
+
+
+def obtener_modulo_produccion(inicio_utc, fin_utc):
+    periodos = obtener_produccion_periodos(inicio_utc, fin_utc)
+    return calcular_modulo_produccion(periodos, inicio_utc, fin_utc)
+
+
 def sumar_produccion_rango(inicio_utc, fin_utc):
     """
     Suma producción dentro de un rango.

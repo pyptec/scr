@@ -180,32 +180,60 @@
                 </div>
 
                 <div class="card">
-                    <span>Eficiencia producción</span>
-                    <strong id="prodEficiencia">--</strong>
-                    <small>buenos / total</small>
+                    <span>Horas programadas</span>
+                    <strong id="prodHorasProgramadas">--</strong>
+                    <small>horas del rango efectivo</small>
                 </div>
 
                 <div class="card">
-                    <span>Periodos usados</span>
-                    <strong id="prodPeriodos">--</strong>
-                    <small>filas de producción</small>
+                    <span>Horas reales de trabajo</span>
+                    <strong id="prodHorasReales">--</strong>
+                    <small>programadas menos parada</small>
+                </div>
+
+                <div class="card">
+                    <span>Horas de parada</span>
+                    <strong id="prodHorasParada">--</strong>
+                    <small>paradas reportadas</small>
+                </div>
+
+                <div class="card">
+                    <span>Producción buena por hora real</span>
+                    <strong id="prodBuenosHora">--</strong>
+                    <small>envases / hora real</small>
+                </div>
+
+                <div class="card">
+                    <span>Producción total por hora real</span>
+                    <strong id="prodTotalHora">--</strong>
+                    <small>envases / hora real</small>
+                </div>
+
+                <div class="card">
+                    <span>Días de producción incluidos</span>
+                    <strong id="prodDias">--</strong>
+                    <small>jornadas con registros</small>
                 </div>
             </div>
 
-            <h3>Resumen mensual</h3>
+            <h3>Detalle diario</h3>
             <div class="tabla-wrapper">
                 <table>
                     <thead>
                         <tr>
-                            <th>Mes</th>
-                            <th>Periodos</th>
+                            <th>Fecha</th>
                             <th>Buenos</th>
                             <th>Malos</th>
                             <th>Total</th>
-                            <th>Eficiencia</th>
+                            <th>Turnos</th>
+                            <th>Horas programadas</th>
+                            <th>Minutos parada</th>
+                            <th>Horas reales</th>
+                            <th>Buenos/hora</th>
+                            <th>Observaciones</th>
                         </tr>
                     </thead>
-                    <tbody id="tablaProduccionMeses"></tbody>
+                    <tbody id="tablaProduccionDiaria"></tbody>
                 </table>
             </div>
         </section>

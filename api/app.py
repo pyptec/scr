@@ -15,6 +15,7 @@ from db.linea_base_samee200 import evaluar_desempeno_actual
 from db.linea_base_samee200 import obtener_muestras_linea_base
 from db.produccion_samee200 import obtener_produccion_periodos
 from db.produccion_samee200 import sumar_produccion_rango
+from db.produccion_samee200 import obtener_modulo_produccion
 
 load_dotenv("/home/pi/SAMEE200/scr/.env")
 
@@ -513,6 +514,15 @@ def api_produccion_resumen():
     data = sumar_produccion_rango(inicio, fin)
 
     return jsonify(data)
+
+
+@app.route("/api/produccion/modulo")
+def api_produccion_modulo():
+    inicio = request.args.get("inicio", type=int)
+    fin = request.args.get("fin", type=int)
+    if inicio is None or fin is None or fin <= inicio:
+        return jsonify({"error": "Rango de fechas inválido"}), 400
+    return jsonify(obtener_modulo_produccion(inicio, fin))
 
 
 @app.route("/api/produccion/meses")
