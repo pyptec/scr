@@ -23,6 +23,19 @@
     </div>
 </header>
 
+<nav class="menu-principal" aria-label="Módulos del dashboard">
+    <button class="menu-item activo" data-module-target="resumen">Resumen</button>
+    <button class="menu-item" data-module-target="produccion">Producción</button>
+    <button class="menu-item" data-module-target="calidad">Calidad</button>
+    <button class="menu-item" data-module-target="eficiencia-operacional">Eficiencia operacional</button>
+    <button class="menu-item" data-module-target="eficiencia-energetica">Eficiencia energética</button>
+    <button class="menu-item" data-module-target="linea-base">Línea base ISO 50001</button>
+    <button class="menu-item" data-module-target="impacto">Impacto económico y ambiental</button>
+    <button class="menu-item" data-module-target="confiabilidad">Confiabilidad y mantenimiento</button>
+    <button class="menu-item" data-module-target="variables">Variables eléctricas</button>
+    <button class="menu-item" data-module-target="gateway">Estado del gateway</button>
+</nav>
+
 <main class="contenedor">
 
     <section class="panel filtros-panel">
@@ -66,9 +79,10 @@
                 </select>
             </div>
         </div>
+        <p id="periodoEfectivo" class="periodo-efectivo">Periodo efectivo evaluado: --</p>
     </section>
 
-    <section class="panel">
+    <section class="panel modulo" data-module="resumen">
         <div class="panel-header">
             <h2>Resumen energético</h2>
 
@@ -126,10 +140,9 @@
         </div>
     </section>
 
-    <section class="panel">
-        <h2>Impacto económico y ambiental</h2>
+    <section class="modulo-host">
 
-        <section class="panel">
+        <section class="panel modulo" data-module="produccion" hidden>
             <div class="panel-header">
                 <h2>Producción de envases AOKI</h2>
                 <button onclick="cargarProduccion()">Actualizar producción</button>
@@ -185,7 +198,7 @@
             </div>
         </section>
 
-        <section class="panel">
+        <section class="panel modulo" data-module="linea-base" hidden>
             <div class="panel-header">
                 <h2>Línea base energética ISO 50001</h2>
                 <button onclick="entrenarLineaBase()">Reentrenar línea base</button>
@@ -242,7 +255,9 @@
             </div>
         </section>
 
-        <div class="grid-kpi">
+        <div class="panel modulo" data-module="impacto" hidden>
+            <h2>Impacto económico y ambiental</h2>
+            <div class="grid-kpi">
             <div class="card">
                 <span>Costo totalizador</span>
                 <strong id="costoTotalizador">--</strong>
@@ -266,10 +281,11 @@
                 <strong id="co2Proceso">--</strong>
                 <small>kg CO₂</small>
             </div>
+            </div>
         </div>
     </section>
 
-    <section class="panel">
+    <section class="panel modulo" data-module="variables" hidden>
         <div class="panel-header">
             <h2 id="tituloGrafica">Potencia activa total</h2>
 
@@ -291,7 +307,7 @@
         <canvas id="chartPrincipal"></canvas>
     </section>
 
-    <section class="panel">
+    <section class="panel modulo" data-module="gateway" hidden>
         <h2>Estado del gateway</h2>
 
         <div class="estado-grid">
@@ -306,7 +322,7 @@
         </div>
     </section>
 
-    <section class="panel">
+    <section class="panel modulo" data-module="variables" hidden>
         <h2>Últimos valores</h2>
 
         <input id="buscarTabla" type="text" placeholder="Buscar variable..." oninput="filtrarTablaUltimos()">
@@ -328,6 +344,19 @@
                 <tbody id="tablaUltimos"></tbody>
             </table>
         </div>
+    </section>
+
+    <section class="panel modulo modulo-pendiente" data-module="calidad" hidden>
+        <h2>Calidad</h2><p>Estructura preparada. Contenido pendiente de la subfase correspondiente.</p>
+    </section>
+    <section class="panel modulo modulo-pendiente" data-module="eficiencia-operacional" hidden>
+        <h2>Eficiencia operacional</h2><p>Estructura preparada. Contenido pendiente de la subfase correspondiente.</p>
+    </section>
+    <section class="panel modulo modulo-pendiente" data-module="eficiencia-energetica" hidden>
+        <h2>Eficiencia energética</h2><p>Estructura preparada. Contenido pendiente de la subfase correspondiente.</p>
+    </section>
+    <section class="panel modulo modulo-pendiente" data-module="confiabilidad" hidden>
+        <h2>Confiabilidad y mantenimiento</h2><p>Estructura preparada. Contenido pendiente de la subfase correspondiente.</p>
     </section>
 
 </main>

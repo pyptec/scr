@@ -56,6 +56,46 @@ body {
     padding: 24px;
 }
 
+.menu-principal {
+    display: flex;
+    gap: 8px;
+    padding: 12px 24px;
+    overflow-x: auto;
+    background: #e8eef4;
+    border-bottom: 1px solid #cbd5e1;
+}
+
+.menu-principal .menu-item {
+    flex: 0 0 auto;
+    background: transparent;
+    color: #0f3b63;
+    border: 1px solid #b8c7d6;
+}
+
+.menu-principal .menu-item:hover,
+.menu-principal .menu-item.activo {
+    color: white;
+    background: #0f3b63;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+.modulo-host {
+    margin: 0;
+}
+
+.periodo-efectivo {
+    margin: 16px 0 0;
+    color: #475569;
+    font-size: 14px;
+}
+
+.modulo-pendiente {
+    border-left: 5px solid #94a3b8;
+}
+
 .panel {
     background: white;
     border-radius: 14px;

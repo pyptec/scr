@@ -5,6 +5,8 @@ let ultimosValores = [];
 let variablesDisponibles = [];
 let variableSeleccionadaKey = null;
 let mesesProduccion = [];
+let moduloActual = "resumen";
+let actualizacionEnCurso = false;
 
 function obtenerKeyVariable(v) {
     if (!v) return null;
@@ -63,11 +65,12 @@ function rangoMesProduccion(mesTexto) {
 
     const year = Number(partes[0]);
     const month = Number(partes[1]);
-    const ultimo = ultimoDiaMes(year, month);
+    const siguienteYear = month === 12 ? year + 1 : year;
+    const siguienteMonth = month === 12 ? 1 : month + 1;
 
     return {
-        inicio: unixDesdeColombia(year, month, 1, 0, 0, 0),
-        fin: unixDesdeColombia(year, month, ultimo, 23, 59, 59)
+        inicio: unixDesdeColombia(year, month, 1, 6, 0, 0),
+        fin: unixDesdeColombia(siguienteYear, siguienteMonth, 1, 6, 0, 0)
     };
 }
 
@@ -135,15 +138,13 @@ function obtenerRangoUnix() {
         inicio = ahora - 3600;
 
     } else if (rango === "hoy") {
-        const fecha = new Date();
-        fecha.setHours(0, 0, 0, 0);
-        inicio = Math.floor(fecha.getTime() / 1000);
+        ({ inicio, fin } = rangoJornadaActual(1));
 
     } else if (rango === "semana") {
-        inicio = ahora - 7 * 24 * 3600;
+        ({ inicio, fin } = rangoJornadaActual(7));
 
     } else if (rango === "mes") {
-        inicio = ahora - 30 * 24 * 3600;
+        ({ inicio, fin } = rangoJornadaActual(30));
 
     } else if (rango === "prod_todo") {
         const r = rangoTodoProduccion();
@@ -168,7 +169,31 @@ function obtenerRangoUnix() {
         inputFin.value = unixADatetimeLocal(fin);
     }
 
-    return { inicio, fin };
+    const rangoEfectivo = { inicio, fin };
+    formatearPeriodoEfectivo(rangoEfectivo);
+    return rangoEfectivo;
+}
+
+function formatearPeriodoEfectivo(rango) {
+    const opciones = {
+        timeZone: "America/Bogota",
+        year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", hour12: false
+    };
+    const inicio = new Date(rango.inicio * 1000).toLocaleString("es-CO", opciones);
+    const fin = new Date(rango.fin * 1000).toLocaleString("es-CO", opciones);
+    const texto = document.getElementById("periodoEfectivo");
+    if (texto) texto.textContent = `Periodo efectivo evaluado: ${inicio} – ${fin} (jornada 06:00–06:00)`;
+}
+
+function rangoJornadaActual(dias = 1) {
+    const ahora = new Date();
+    const partes = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/Bogota", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hour12: false
+    }).formatToParts(ahora).reduce((acc, parte) => ({ ...acc, [parte.type]: parte.value }), {});
+    let fin = unixDesdeColombia(Number(partes.year), Number(partes.month), Number(partes.day), 6);
+    if (Number(partes.hour) >= 6) fin += 86400;
+    return { inicio: fin - dias * 86400, fin };
 }
 
 function obtenerGranularidad() {
@@ -911,15 +936,52 @@ function filtrarTablaUltimos() {
 }
 
 async function actualizarTodo() {
-    await cargarDashboard();
-    await cargarProduccion();
-    await cargarLineaBase();
-    await cargarEstado();
-    await cargarUltimosValores();
+    if (actualizacionEnCurso) return;
+    actualizacionEnCurso = true;
 
-    if (graficaActual) {
-        await mostrarGrafica(graficaActual);
+    try {
+        obtenerRangoUnix();
+        await cargarEstado();
+
+        if (moduloActual === "resumen" || moduloActual === "impacto") {
+            await cargarDashboard();
+        } else if (moduloActual === "produccion") {
+            await cargarProduccion();
+        } else if (moduloActual === "linea-base") {
+            await cargarLineaBase();
+        } else if (moduloActual === "variables") {
+            if (!variablesDisponibles.length) await cargarSelectorVariables();
+            await cargarUltimosValores();
+            if (graficaActual) await mostrarGrafica(graficaActual);
+        }
+    } finally {
+        actualizacionEnCurso = false;
     }
+}
+
+async function navegarAModulo(nombre, actualizarHash = true) {
+    const existe = document.querySelector(`[data-module="${nombre}"]`);
+    moduloActual = existe ? nombre : "resumen";
+
+    document.querySelectorAll("[data-module]").forEach(elemento => {
+        elemento.hidden = elemento.dataset.module !== moduloActual;
+    });
+    document.querySelectorAll("[data-module-target]").forEach(boton => {
+        const activo = boton.dataset.moduleTarget === moduloActual;
+        boton.classList.toggle("activo", activo);
+        boton.setAttribute("aria-current", activo ? "page" : "false");
+    });
+
+    if (actualizarHash) history.replaceState(null, "", `#${moduloActual}`);
+    await actualizarTodo();
+}
+
+function inicializarNavegacion() {
+    document.querySelectorAll("[data-module-target]").forEach(boton => {
+        boton.addEventListener("click", () => navegarAModulo(boton.dataset.moduleTarget));
+    });
+    const moduloInicial = window.location.hash.slice(1) || "resumen";
+    return navegarAModulo(moduloInicial, false);
 }
 
 function inicializarFiltros() {
@@ -962,14 +1024,11 @@ function inicializarFiltros() {
 }
 
 async function iniciarDashboard() {
-    // El selector no debe depender de los datos de producción para mostrarse.
-    await cargarSelectorVariables();
-
     await cargarRangosProduccion();
     inicializarFiltros();
     obtenerRangoUnix();
 
-    await actualizarTodo();
+    await inicializarNavegacion();
 
     setInterval(actualizarTodo, 30000);
 }
