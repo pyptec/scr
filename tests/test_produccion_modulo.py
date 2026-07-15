@@ -33,6 +33,7 @@ class ProduccionModuloTests(unittest.TestCase):
         self.assertEqual(len(eventos), 1)
         self.assertEqual(eventos[0]["durationMinutes"], 75)
         self.assertEqual(eventos[0]["status"], "VALID")
+        self.assertEqual(eventos[0]["temporalSource"], "EXPLICIT_DURATION")
         self.assertEqual(eventos[0]["rawText"], "Se para la máquina 75 minutos")
 
     def test_extrae_intervalos_de_los_ejemplos(self):
@@ -49,6 +50,7 @@ class ProduccionModuloTests(unittest.TestCase):
             "Se detiene a las 23:30 y se reinicia a las 01:00"
         )[0]
         self.assertEqual(evento["durationMinutes"], 90)
+        self.assertTrue(evento["crossesMidnight"])
 
     def test_suma_varias_paradas_en_una_observacion(self):
         texto = "Se para la máquina 40 minutos. Se para la máquina 75 minutos"
@@ -65,6 +67,92 @@ class ProduccionModuloTests(unittest.TestCase):
             "Se para la máquina 40 minutos. Se para la máquina 40 minutos"
         )
         self.assertEqual(len(eventos), 1)
+
+    def test_para_limpieza_es_causa_y_no_otra_parada(self):
+        texto = "T03 Se para máquina 75 minutos para limpieza de filtros."
+        eventos = extraer_paradas_reportadas(texto, "2026-05-10")
+        self.assertEqual(len(eventos), 1)
+        self.assertEqual(eventos[0]["cause"], "limpieza")
+        self.assertEqual(eventos[0]["status"], "VALID")
+
+    def test_raw_text_conserva_observacion_completa_y_matched_text_el_fragmento(self):
+        texto = "T01 Se para la máquina 40 minutos por fallas. Nota de turno."
+        evento = extraer_paradas_reportadas(texto, "2026-05-01")[0]
+        self.assertEqual(evento["rawText"], texto)
+        self.assertEqual(evento["matchedText"], "Se para la máquina 40 minutos por fallas. Nota de turno")
+        self.assertEqual(evento["cause"], "falla")
+
+    def test_event_id_es_estable(self):
+        texto = "Se para la máquina 40 minutos por mantenimiento"
+        primero = extraer_paradas_reportadas(texto, "2026-05-01")[0]
+        segundo = extraer_paradas_reportadas(texto, "2026-05-01")[0]
+        self.assertEqual(primero["eventId"], segundo["eventId"])
+        self.assertTrue(primero["eventId"].startswith("reported-"))
+
+    def test_causa_desconocida_permanece_null(self):
+        evento = extraer_paradas_reportadas("Parada por causa desconocida")[0]
+        self.assertIsNone(evento["cause"])
+
+    def test_caso_real_4_mayo_a_las(self):
+        texto = (
+            "T02 Se para la máquina a las 14:50 por revisión del compresor, "
+            "el tecnico informa cambio de pieza y se arranca a las 18:00."
+        )
+        evento = extraer_paradas_reportadas(texto, "2026-05-04")[0]
+        self.assertEqual((evento["startTime"], evento["endTime"]), ("14:50", "18:00"))
+        self.assertEqual(evento["durationMinutes"], 190)
+        self.assertEqual(evento["temporalSource"], "START_END")
+
+    def test_caso_real_13_mayo_reibicia_y_segunda_parada(self):
+        texto = (
+            "T02 Se para la máquina a las 16:15 para mantenimiento al compresor, "
+            "se reibicia máquina a las 20:40.\n"
+            "T03 Se para la máquina 105 minutos por daño de empaques."
+        )
+        eventos = extraer_paradas_reportadas(texto, "2026-05-13")
+        self.assertEqual(len(eventos), 2)
+        self.assertEqual(eventos[0]["durationMinutes"], 265)
+        self.assertEqual(eventos[0]["status"], "VALID")
+        self.assertEqual(eventos[1]["durationMinutes"], 105)
+
+    def test_caso_real_24_junio_a_la_y_cruce_medianoche(self):
+        texto = (
+            "T01 Se para la máquina a la 09:40 por falta de energia.\n"
+            "T03 Se inicia producción a la 01:00 por falta de energia y presecado."
+        )
+        evento = extraer_paradas_reportadas(texto, "2026-06-24")[0]
+        self.assertEqual((evento["startTime"], evento["endTime"]), ("09:40", "01:00"))
+        self.assertEqual(evento["durationMinutes"], 920)
+        self.assertTrue(evento["crossesMidnight"])
+
+    def test_caso_real_18_mayo_solo_reinicio_es_partial(self):
+        texto = (
+            "T01 Máquina parada por mantenimiento de compresor Booster Kaeser.\n"
+            "T02 Se inicia producción a las 14:00"
+        )
+        evento = extraer_paradas_reportadas(texto, "2026-05-18")[0]
+        self.assertIsNone(evento["startTime"])
+        self.assertEqual(evento["endTime"], "14:00")
+        self.assertIsNone(evento["durationMinutes"])
+        self.assertEqual(evento["temporalSource"], "PARTIAL_TIME")
+        self.assertEqual(evento["status"], "PARTIAL")
+
+    def test_caso_real_5_junio_duracion_y_reinicio_contextual(self):
+        texto = (
+            "T01 Se para la máquina 160 minutos por punto corrido y queda en ajustes.\n"
+            "T02 Se inicia a las 15:30 por ajuste de macho."
+        )
+        evento = extraer_paradas_reportadas(texto, "2026-06-05")[0]
+        self.assertIsNone(evento["startTime"])
+        self.assertEqual(evento["endTime"], "15:30")
+        self.assertEqual(evento["durationMinutes"], 160)
+        self.assertEqual(evento["temporalSource"], "EXPLICIT_DURATION")
+        self.assertEqual(evento["status"], "VALID")
+
+    def test_duracion_mayor_a_24_horas_requiere_revision(self):
+        evento = extraer_paradas_reportadas("Se para la máquina 1500 minutos")[0]
+        self.assertEqual(evento["durationMinutes"], 1500)
+        self.assertEqual(evento["status"], "PENDING_REVIEW")
 
     def test_calcula_totales_y_productividad_sin_usar_eficiencia_importada(self):
         fila = periodo(0, 86400, buenos=2400, malos=24)

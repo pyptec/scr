@@ -1,5 +1,6 @@
 import os
 import csv
+import hashlib
 import math
 import re
 import unicodedata
@@ -15,79 +16,157 @@ load_dotenv("/home/pi/SAMEE200/scr/.env")
 TZ_COLOMBIA = timezone(timedelta(hours=-5))
 
 
-PATRON_INTERVALO_PARADA = re.compile(
-    r"(?:se\s+)?(?:para|detiene)\b.*?(?:a\s+)?las\s+"
-    r"(?P<inicio>[01]?\d|2[0-3]):(?P<min_inicio>[0-5]\d).*?"
-    r"(?:se\s+)?(?:inicia|reinicia|arranca|reanuda)\b.*?(?:a\s+)?las\s+"
-    r"(?P<fin>[01]?\d|2[0-3]):(?P<min_fin>[0-5]\d)",
+PATRON_MENCION_PARADA = re.compile(
+    r"\b(?:"
+    r"se\s+(?:para|detiene)(?:\s+(?:la\s+)?m[aá]quina)?"
+    r"|(?:la\s+)?m[aá]quina\s+(?:parada|detenida)"
+    r"|parada"
+    r")\b",
+    re.IGNORECASE,
+)
+PATRON_HORA = re.compile(
+    r"\ba\s+la(?:s)?\s+(?P<hora>[01]?\d|2[0-3]):(?P<minuto>[0-5]\d)",
+    re.IGNORECASE,
+)
+PATRON_REINICIO = re.compile(
+    r"\b(?:se\s+)?(?:inicia|reinicia|reibicia|arranca|reanuda)"
+    r"(?:\s+(?:la\s+)?m[aá]quina|\s+producci[oó]n)?\b",
     re.IGNORECASE,
 )
 PATRON_DURACION_PARADA = re.compile(
-    r"(?:se\s+)?(?:para|detiene)\b[^.;\n]*?"
     r"(?P<duracion>\d+(?:[.,]\d+)?)\s*(?:minutos?|min\b)",
     re.IGNORECASE,
 )
-PATRON_MENCION_PARADA = re.compile(r"\b(?:para|parada|detiene|detenida)\b", re.IGNORECASE)
+PATRONES_CAUSA = (
+    (re.compile(r"\bfalta\s+de\s+(?:materia\s+prima|material)\b", re.IGNORECASE), "falta de material"),
+    (re.compile(r"\bcambio\s+de\s+molde\b", re.IGNORECASE), "cambio de molde"),
+    (re.compile(r"\blimpieza\b", re.IGNORECASE), "limpieza"),
+    (re.compile(r"\bmantenimiento\b", re.IGNORECASE), "mantenimiento"),
+    (re.compile(r"\bajustes?\b", re.IGNORECASE), "ajuste"),
+    (re.compile(r"\bfallas?\b", re.IGNORECASE), "falla"),
+)
 
 
-def _evento_parada(fecha, texto, inicio=None, fin=None, duracion=None, estado="VALID"):
+def _normalizar_texto_evento(texto):
+    texto = unicodedata.normalize("NFD", str(texto or ""))
+    texto = "".join(c for c in texto if unicodedata.category(c) != "Mn")
+    return " ".join(texto.casefold().split())
+
+
+def _hora_normalizada(match):
+    if match is None:
+        return None
+    return f"{int(match.group('hora')):02d}:{match.group('minuto')}"
+
+
+def _minutos_hora(valor):
+    hora, minuto = valor.split(":")
+    return int(hora) * 60 + int(minuto)
+
+
+def _extraer_causa(texto):
+    for patron, causa in PATRONES_CAUSA:
+        if patron.search(texto):
+            return causa
+    return None
+
+
+def _event_id(fecha, posicion, inicio, fin, duracion, texto):
+    payload = "|".join((
+        str(fecha or ""), str(posicion), str(inicio or ""), str(fin or ""),
+        str(duracion if duracion is not None else ""), _normalizar_texto_evento(texto),
+    ))
+    return f"reported-{hashlib.sha256(payload.encode('utf-8')).hexdigest()[:20]}"
+
+
+def _evento_parada(fecha, observacion, fragmento, posicion):
+    reinicio = PATRON_REINICIO.search(fragmento)
+    limite_inicio = reinicio.start() if reinicio else len(fragmento)
+    inicio_match = PATRON_HORA.search(fragmento, 0, limite_inicio)
+    fin_match = PATRON_HORA.search(fragmento, reinicio.end()) if reinicio else None
+    duracion_match = PATRON_DURACION_PARADA.search(fragmento)
+
+    inicio = _hora_normalizada(inicio_match)
+    fin = _hora_normalizada(fin_match)
+    duracion_explicita = None
+    if duracion_match:
+        duracion_explicita = float(duracion_match.group("duracion").replace(",", "."))
+        if duracion_explicita.is_integer():
+            duracion_explicita = int(duracion_explicita)
+
+    crosses_midnight = False
+    duracion_intervalo = None
+    if inicio is not None and fin is not None:
+        inicio_minutos = _minutos_hora(inicio)
+        fin_minutos = _minutos_hora(fin)
+        if fin_minutos < inicio_minutos:
+            fin_minutos += 24 * 60
+            crosses_midnight = True
+        duracion_intervalo = fin_minutos - inicio_minutos
+
+    if duracion_intervalo is not None:
+        duracion = duracion_intervalo
+        fuente_temporal = "START_END"
+    elif duracion_explicita is not None:
+        duracion = duracion_explicita
+        fuente_temporal = "EXPLICIT_DURATION"
+    elif inicio is not None or fin is not None:
+        duracion = None
+        fuente_temporal = "PARTIAL_TIME"
+    else:
+        duracion = None
+        fuente_temporal = "TEXT_ONLY"
+
+    if duracion is not None and 0 < duracion <= 24 * 60:
+        estado = "VALID"
+    elif duracion is not None:
+        estado = "PENDING_REVIEW"
+    elif inicio is not None or fin is not None:
+        estado = "PARTIAL"
+    else:
+        estado = "PENDING_REVIEW"
+
     return {
+        "eventId": _event_id(fecha, posicion, inicio, fin, duracion, observacion),
+        "productionDate": fecha,
+        # Alias temporal para consumidores históricos; productionDate es el campo canónico.
         "date": fecha,
         "startTime": inicio,
         "endTime": fin,
         "durationMinutes": duracion,
-        "rawText": texto,
-        "cause": None,
+        "crossesMidnight": crosses_midnight,
+        "rawText": observacion,
+        "matchedText": fragmento.strip(" \t\r\n.;"),
+        "cause": _extraer_causa(fragmento),
+        "temporalSource": fuente_temporal,
         "status": estado,
     }
 
 
 def extraer_paradas_reportadas(observacion, fecha=None):
-    """Extrae únicamente duraciones explícitas; nunca infiere datos ausentes."""
-    texto = str(observacion or "").strip()
-    if not texto:
+    """Normaliza menciones de parada sin inventar componentes temporales."""
+    texto_original = "" if observacion is None else str(observacion)
+    if not texto_original.strip():
         return []
 
+    menciones = list(PATRON_MENCION_PARADA.finditer(texto_original))
     candidatos = []
-    rangos_ocupados = []
-
-    for match in PATRON_INTERVALO_PARADA.finditer(texto):
-        inicio = f"{int(match.group('inicio')):02d}:{match.group('min_inicio')}"
-        fin = f"{int(match.group('fin')):02d}:{match.group('min_fin')}"
-        inicio_minutos = int(match.group("inicio")) * 60 + int(match.group("min_inicio"))
-        fin_minutos = int(match.group("fin")) * 60 + int(match.group("min_fin"))
-        if fin_minutos < inicio_minutos:
-            fin_minutos += 24 * 60
-        duracion = fin_minutos - inicio_minutos
-        candidatos.append(_evento_parada(fecha, match.group(0), inicio, fin, duracion))
-        rangos_ocupados.append(match.span())
-
-    for match in PATRON_DURACION_PARADA.finditer(texto):
-        if any(inicio <= match.start() < fin for inicio, fin in rangos_ocupados):
-            continue
-        duracion = float(match.group("duracion").replace(",", "."))
-        if duracion.is_integer():
-            duracion = int(duracion)
-        candidatos.append(_evento_parada(fecha, match.group(0), duracion=duracion))
-        rangos_ocupados.append(match.span())
-
-    menciones = list(PATRON_MENCION_PARADA.finditer(texto))
-    menciones_cubiertas = sum(
-        1 for mencion in menciones
-        if any(inicio <= mencion.start() < fin for inicio, fin in rangos_ocupados)
-    )
-    if menciones and menciones_cubiertas < len(menciones):
-        candidatos.append(_evento_parada(
-            fecha, texto, duracion=None, estado="PENDING_REVIEW"
-        ))
+    for indice, mencion in enumerate(menciones):
+        fin = menciones[indice + 1].start() if indice + 1 < len(menciones) else len(texto_original)
+        if indice + 1 < len(menciones):
+            inicio_linea_siguiente = texto_original.rfind("\n", mencion.end(), fin) + 1
+            prefijo_siguiente = texto_original[inicio_linea_siguiente:fin]
+            if re.fullmatch(r"\s*T\d+\s*", prefijo_siguiente, re.IGNORECASE):
+                fin = inicio_linea_siguiente
+        fragmento = texto_original[mencion.start():fin]
+        candidatos.append(_evento_parada(fecha, texto_original, fragmento, mencion.start()))
 
     eventos = []
     vistos = set()
     for evento in candidatos:
         clave = (
-            evento["date"], evento["startTime"], evento["endTime"],
-            evento["durationMinutes"], evento["rawText"].strip().casefold(),
-            evento["status"],
+            evento["productionDate"], evento["startTime"], evento["endTime"],
+            evento["durationMinutes"], _normalizar_texto_evento(evento["matchedText"]),
         )
         if clave not in vistos:
             vistos.add(clave)
@@ -687,7 +766,7 @@ def calcular_modulo_produccion(periodos, inicio_utc, fin_utc):
         horas_programadas = (overlap_fin - overlap_inicio) / 3600
         observaciones = str(periodo.get("observaciones") or "").strip()
         eventos_parada = extraer_paradas_reportadas(observaciones, periodo.get("fecha"))
-        parada_pendiente = any(e["status"] == "PENDING_REVIEW" for e in eventos_parada)
+        parada_pendiente = any(e["status"] != "VALID" for e in eventos_parada)
         # Una duración sin ubicación temporal no se distribuye en un corte parcial.
         if factor < 1 and eventos_parada:
             parada_pendiente = True
