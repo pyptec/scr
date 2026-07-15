@@ -23,12 +23,18 @@ def segment(state, start, end, samples=2, current=45, power=30, day="2026-05-01"
         "minimumCurrentA": current - 1 if current is not None else None,
         "averageCurrentA": current,
         "averagePowerKW": power,
+        "quality": "VALID_STATE",
     }
 
 
 class AokiEventTests(unittest.TestCase):
     def detect(self, segments):
-        return detect_aoki_downtime_events({"segments": segments, "thresholds": THRESHOLDS})
+        boundary_before = segment("PRODUCTIVE", "09:40", "10:00", current=63)
+        boundary_after = segment("PRODUCTIVE", "11:00", "11:20", current=63)
+        return detect_aoki_downtime_events({
+            "segments": [boundary_before, *segments, boundary_after],
+            "thresholds": THRESHOLDS,
+        })
 
     def test_groups_consecutive_idle_and_off_as_one_event(self):
         result = self.detect([
@@ -59,6 +65,22 @@ class AokiEventTests(unittest.TestCase):
         self.assertEqual(event["detectedBy"], "ME337_1")
         self.assertEqual(event["status"], "DETECTED")
         self.assertEqual(event["classification"], "SIN_CLASIFICAR")
+
+    def test_event_touching_range_end_is_excluded_as_censored(self):
+        before = segment("PRODUCTIVE", "09:40", "10:00", current=63)
+        censored = segment("IDLE", "10:00", "10:20")
+        result = detect_aoki_downtime_events({
+            "segments": [before, censored], "thresholds": THRESHOLDS,
+        })
+        self.assertEqual(result["summary"]["eventCount"], 0)
+        self.assertEqual(result["summary"]["boundaryCensoredEvents"], 1)
+
+    def test_event_preserves_worst_signal_quality(self):
+        first = segment("IDLE", "10:00", "10:20")
+        second = segment("OFF", "10:20", "10:40", current=8)
+        second["quality"] = "INCONSISTENT_SIGNAL"
+        event = self.detect([first, second])["events"][0]
+        self.assertEqual(event["quality"], "INCONSISTENT_SIGNAL")
 
 
 if __name__ == "__main__":

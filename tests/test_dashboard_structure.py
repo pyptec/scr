@@ -78,6 +78,7 @@ class DashboardStructureTests(unittest.TestCase):
         self.assertIn('id="estadoBalance"', self.html)
         self.assertIn('id="tablaEventosAoki"', self.html)
         self.assertIn("No son fallas confirmadas", self.html)
+        self.assertIn("const resumenEventos = data.summary || {}", self.javascript)
 
     def test_dashboard_labels_historical_dataset_and_preliminary_baseline(self):
         self.assertIn("DATOS_HISTORICOS_DE_PRUEBA", self.html)

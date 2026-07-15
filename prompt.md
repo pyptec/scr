@@ -1540,29 +1540,481 @@ Duración total apagado
 Duración total no productiva
 ```
 
-## Subfase 2.6 — Conciliación con paradas reportadas
+## Subfase 2.6 — Conciliación trazable de eventos eléctricos con paradas reportadas
 
-Comparar los eventos eléctricos con las paradas extraídas en la fase 1. Usar una tolerancia temporal configurable, inicialmente ±20 minutos.
+Esta es la siguiente subfase autorizada después de cerrar y validar la subfase 2.5.
 
-Clasificar cada evento como:
+Trabaja únicamente en la subfase 2.6. No avances todavía a actualización global de módulos, MTBF, MTTR, disponibilidad técnica, confiabilidad definitiva, reentrenamiento de línea base, Índice Base 100 definitivo ni CUSUM definitivo.
+
+### Puerta de entrada obligatoria: cierre de la subfase 2.5
+
+Antes de implementar la conciliación, verifica que la detección de eventos no productivos ya cumpla lo siguiente:
+
+```text
+- los eventos agrupan únicamente segmentos eléctricos consecutivos IDLE/OFF;
+- no incluyen PRODUCTIVE;
+- no incluyen NO_DATA;
+- no crean eventos por una sola muestra aislada;
+- respetan persistencia mínima y timestamps reales;
+- no unen eventos separados por NO_DATA;
+- la duración total IDLE + OFF coincide con la suma de eventos dentro de tolerancia;
+- cada evento conserva inicio, fin, duración, estado dominante, corriente, potencia, muestras y calidad;
+- todos los eventos permanecen DETECTED o SIN_CLASIFICAR antes de conciliación;
+- no se presentan como fallas confirmadas.
+```
+
+Para el periodo histórico mostrado, revisar específicamente los valores visibles del dashboard, sin asumir que son correctos solo porque aparecen en pantalla:
+
+```text
+Eventos detectados: 103
+Duración total IDLE: 250,22 h
+Duración total OFF: 6,90 h
+Duración no productiva: 257,12 h
+```
+
+Validar que:
+
+```text
+250,22 + 6,90 ≈ 257,12
+```
+
+y que los totales procedan del backend, no de sumas duplicadas en frontend.
+
+Si la subfase 2.5 no cumple estas verificaciones, corregir únicamente lo necesario para cerrarla y documentar las diferencias antes de continuar.
+
+### Contexto metodológico vigente
+
+Los eventos eléctricos son una clasificación preliminar derivada de corriente y potencia del sistema medido.
+
+No equivalen automáticamente a:
+
+```text
+falla
+paro correctivo
+parada de producción confirmada
+indisponibilidad técnica
+```
+
+La medición puede incluir cargas auxiliares o compartidas. Por tanto, la conciliación con producción y observaciones debe ser trazable y conservar incertidumbre.
+
+### Objetivo
+
+Comparar cada evento eléctrico `IDLE/OFF` de la subfase 2.5 con las paradas reportadas extraídas de observaciones de producción, para clasificarlos como:
 
 ```text
 REPORTADA_Y_DETECTADA
 SOLO_REPORTADA
 SOLO_DETECTADA
 SIN_DATOS
+PENDIENTE_REVISION
 ```
 
-Evitar duplicar una misma parada. Conservar siempre:
+No convertir automáticamente ninguna coincidencia en falla correctiva.
 
-- texto original de la observación;
-- duración reportada;
-- duración eléctrica;
-- diferencia entre ambas;
-- causa reportada;
-- estado de validación.
+### Fuentes de datos
 
-No convertir automáticamente un evento eléctrico en falla correctiva. Los eventos sin causa deben quedar `SIN_CLASIFICAR` o `PENDING_REVIEW`.
+#### Eventos eléctricos
+
+Usar exclusivamente los eventos generados para:
+
+```text
+gateway_id = 10
+device_id = 24
+fuente = ME337_1
+```
+
+Cada evento debe conservar como mínimo:
+
+```text
+startUtc
+endUtc
+startLocal
+endLocal
+durationMinutes
+dominantState
+minimumCurrentA
+averageCurrentA
+averagePowerKW
+sampleCount
+quality
+status
+classification
+```
+
+#### Paradas reportadas
+
+Usar la estructura validada de la fase 1:
+
+```typescript
+interface ReportedDowntime {
+  date: string;
+  startTime: string | null;
+  endTime: string | null;
+  durationMinutes: number | null;
+  rawText: string;
+  cause: string | null;
+  status: "VALID" | "PENDING_REVIEW";
+}
+```
+
+Conservar siempre el texto original de la observación.
+
+### Alineación temporal
+
+Usar hora local:
+
+```text
+America/Bogota
+```
+
+Usar jornada productiva:
+
+```text
+06:00–06:00
+```
+
+No comparar únicamente por fecha calendario.
+
+Construir timestamps completos para las paradas reportadas cuando existan hora de inicio y fin.
+
+Si una parada cruza medianoche, asignar correctamente el fin al día siguiente.
+
+No inventar hora de inicio o fin cuando solo exista duración.
+
+### Tolerancia temporal
+
+Usar inicialmente una tolerancia configurable de:
+
+```text
+±20 minutos
+```
+
+Centralizarla en configuración versionada:
+
+```typescript
+interface DowntimeReconciliationConfig {
+  matchingToleranceMinutes: number;
+  minimumOverlapMinutes: number;
+  minimumOverlapPct: number;
+  version: string;
+}
+```
+
+Valores iniciales propuestos:
+
+```text
+matchingToleranceMinutes = 20
+minimumOverlapMinutes = 10
+minimumOverlapPct = 30
+```
+
+Estos valores son preliminares y deben documentarse; no asumir que están validados industrialmente.
+
+### Criterios de coincidencia
+
+Una parada reportada y un evento eléctrico pueden considerarse candidatos cuando se cumpla al menos una de estas condiciones:
+
+```text
+1. existe solapamiento temporal real;
+2. el inicio está dentro de ±20 minutos;
+3. el fin está dentro de ±20 minutos;
+4. una parada reportada queda contenida dentro del evento eléctrico;
+5. un evento eléctrico queda contenido dentro de la parada reportada.
+```
+
+Calcular:
+
+```text
+overlapMinutes
+startDifferenceMinutes
+endDifferenceMinutes
+durationDifferenceMinutes
+overlapPctReported
+overlapPctElectrical
+```
+
+No conciliar únicamente porque ambos eventos ocurran el mismo día.
+
+### Resolución uno a uno y muchos a muchos
+
+Evitar duplicados.
+
+Casos posibles:
+
+```text
+1 parada reportada ↔ 1 evento eléctrico
+1 parada reportada ↔ varios eventos eléctricos
+varias paradas reportadas ↔ 1 evento eléctrico
+sin correspondencia
+```
+
+Para coincidencias múltiples:
+
+- agrupar candidatos;
+- ordenar por mayor solapamiento y menor diferencia temporal;
+- no asignar un mismo evento eléctrico a dos paradas sin dejar trazabilidad;
+- conservar los vínculos secundarios como candidatos pendientes de revisión;
+- no fusionar eventos automáticamente si existe NO_DATA entre ellos.
+
+### Clasificación
+
+#### REPORTADA_Y_DETECTADA
+
+Asignar cuando exista una coincidencia temporal suficientemente consistente.
+
+Conservar:
+
+```text
+reportedEventId
+electricalEventId
+reportedDurationMinutes
+electricalDurationMinutes
+durationDifferenceMinutes
+overlapMinutes
+cause
+rawText
+confidence
+```
+
+#### SOLO_REPORTADA
+
+Asignar cuando exista parada reportada válida sin evento eléctrico coincidente.
+
+Posibles razones:
+
+```text
+- parada corta menor que la resolución de muestreo;
+- señal eléctrica compartida;
+- evento fuera de tolerancia;
+- cobertura insuficiente;
+- estado eléctrico no distinguible.
+```
+
+No marcar automáticamente como error del operario ni como falla del medidor.
+
+#### SOLO_DETECTADA
+
+Asignar cuando exista evento eléctrico sin parada reportada coincidente.
+
+Mantener:
+
+```text
+classification = SIN_CLASIFICAR
+status = PENDING_REVIEW
+```
+
+No clasificarlo como falla correctiva.
+
+#### SIN_DATOS
+
+Usar cuando la ventana de conciliación esté afectada por `NO_DATA` suficiente para impedir una conclusión.
+
+#### PENDIENTE_REVISION
+
+Usar cuando:
+
+```text
+- la observación sea ambigua;
+- falte hora de inicio o fin;
+- existan múltiples candidatos similares;
+- la diferencia de duración sea elevada;
+- el solapamiento sea insuficiente pero exista proximidad temporal.
+```
+
+### Confianza de conciliación
+
+Asignar una confianza explícita:
+
+```text
+HIGH
+MEDIUM
+LOW
+NOT_APPLICABLE
+```
+
+Ejemplo de criterios:
+
+```text
+HIGH:
+- inicio y fin reportados;
+- solapamiento >= 70 %;
+- diferencias de inicio y fin dentro de tolerancia.
+
+MEDIUM:
+- coincidencia parcial;
+- una sola hora conocida;
+- duración similar.
+
+LOW:
+- observación ambigua;
+- varios candidatos;
+- coincidencia basada principalmente en proximidad.
+```
+
+No mostrar un porcentaje de confianza artificial si no existe un modelo calibrado. Usar categorías explicables.
+
+### Contrato de salida
+
+Crear una estructura similar a:
+
+```typescript
+interface ReconciledDowntimeEvent {
+  reconciliationId: string;
+  productionDate: string;
+  classification:
+    | "REPORTADA_Y_DETECTADA"
+    | "SOLO_REPORTADA"
+    | "SOLO_DETECTADA"
+    | "SIN_DATOS"
+    | "PENDIENTE_REVISION";
+  confidence: "HIGH" | "MEDIUM" | "LOW" | "NOT_APPLICABLE";
+  reportedEvent: ReportedDowntime | null;
+  electricalEvent: ElectricalDowntimeEvent | null;
+  overlapMinutes: number | null;
+  startDifferenceMinutes: number | null;
+  endDifferenceMinutes: number | null;
+  durationDifferenceMinutes: number | null;
+  cause: string | null;
+  rawText: string | null;
+  reviewStatus: "AUTO_MATCHED" | "PENDING_REVIEW" | "VALIDATED" | "DISCARDED";
+  reconciliationVersion: string;
+}
+```
+
+### Resumen por periodo
+
+Calcular:
+
+```text
+totalReportadas
+totalDetectadas
+totalReportadasYDetectadas
+totalSoloReportadas
+totalSoloDetectadas
+totalSinDatos
+totalPendientesRevision
+minutosReportados
+minutosElectricos
+minutosConciliados
+diferenciaTotalMinutos
+```
+
+No sumar dos veces la misma duración en el total conciliado.
+
+Separar claramente:
+
+```text
+duración reportada
+duración eléctrica
+duración coincidente
+```
+
+### Actualización mínima del dashboard
+
+Agregar dentro de `Eficiencia operacional` o en una vista específica de conciliación:
+
+Tarjetas:
+
+```text
+Paradas reportadas
+Eventos eléctricos detectados
+Reportadas y detectadas
+Solo reportadas
+Solo detectadas
+Pendientes de revisión
+```
+
+Tabla de conciliación:
+
+```text
+Jornada
+Inicio reportado
+Fin reportado
+Duración reportada
+Inicio eléctrico
+Fin eléctrico
+Duración eléctrica
+Diferencia
+Clasificación
+Confianza
+Causa
+Observación
+Estado de revisión
+```
+
+Agregar filtros por:
+
+```text
+clasificación
+confianza
+estado dominante
+jornada
+estado de revisión
+```
+
+Mantener visible la advertencia:
+
+```text
+Los eventos eléctricos no son fallas confirmadas. La conciliación es preliminar y requiere revisión cuando la evidencia sea incompleta.
+```
+
+### Reglas de seguridad metodológica
+
+No hacer en esta subfase:
+
+```text
+- calcular MTBF;
+- calcular MTTR;
+- calcular disponibilidad técnica;
+- convertir SOLO_DETECTADA en falla;
+- asumir que IDLE es siempre parada;
+- asumir que OFF es siempre falla;
+- imputar NO_DATA;
+- modificar producción;
+- modificar la línea base oficial;
+- escribir en la Raspberry.
+```
+
+### Pruebas mínimas
+
+Agregar pruebas para:
+
+1. coincidencia exacta uno a uno;
+2. coincidencia dentro de ±20 minutos;
+3. solapamiento parcial suficiente;
+4. parada reportada sin evento eléctrico;
+5. evento eléctrico sin parada reportada;
+6. evento afectado por `NO_DATA`;
+7. observación sin hora de inicio;
+8. observación sin hora de fin;
+9. parada que cruza medianoche;
+10. un evento eléctrico con varias paradas candidatas;
+11. una parada reportada con varios eventos eléctricos;
+12. no duplicación de eventos;
+13. cálculo de diferencias de duración;
+14. conservación del texto original;
+15. clasificación `PENDING_REVIEW`;
+16. separación entre duración reportada, eléctrica y coincidente;
+17. no cálculo de MTBF, MTTR ni disponibilidad;
+18. consistencia del resumen del periodo.
+
+### Entrega de la subfase 2.6
+
+Presentar:
+
+1. archivos modificados;
+2. cierre y validación de la subfase 2.5;
+3. configuración de tolerancias;
+4. algoritmo de conciliación;
+5. contratos de datos;
+6. resultados del periodo mayo-junio de 2026;
+7. cantidad por clasificación;
+8. diferencias de duración;
+9. casos ambiguos;
+10. pruebas ejecutadas;
+11. limitaciones pendientes.
+
+Detenerse al finalizar. No avanzar a la subfase 2.7 ni a la fase 4 sin autorización.
 
 ## Subfase 2.7 — Actualización de módulos del dashboard
 
@@ -1610,15 +2062,17 @@ No cambiar todavía la ecuación oficial de línea base.
 
 # Instrucción vigente para continuar la fase 2
 
-Las subfases 2.1, 2.2, 2.2B, 2.3 y 2.3B se consideran cerradas o documentadas para continuar el ajuste del dashboard.
+Las subfases 2.1, 2.2, 2.2B, 2.3, 2.3B, 2.4 y 2.5 se consideran implementadas o en cierre técnico.
 
 El siguiente trabajo autorizado es únicamente:
 
 ```text
-SUBFASE 2.4 — Consolidación de horas por estado eléctrico y cobertura
+SUBFASE 2.6 — Conciliación trazable de eventos eléctricos con paradas reportadas
 ```
 
-No avanzar a la subfase 2.5, conciliación de paradas, MTBF, MTTR, disponibilidad técnica, reentrenamiento de línea base, Índice Base 100 definitivo ni CUSUM definitivo hasta recibir autorización.
+Antes de implementar, Codex debe verificar y cerrar los criterios de aceptación de la subfase 2.5. Si encuentra inconsistencias, debe corregir únicamente lo necesario y documentarlas.
+
+No avanzar a la subfase 2.7, MTBF, MTTR, disponibilidad técnica, fase 3 definitiva, fase 4 ni reentrenamiento de modelos hasta recibir autorización.
 
 
 ---

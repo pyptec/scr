@@ -1,8 +1,6 @@
 from collections import Counter
-from datetime import datetime
-
-
 NON_PRODUCTIVE_STATES = {"IDLE", "OFF"}
+QUALITY_RANK = {"VALID_STATE": 0, "PARTIAL_SIGNAL": 1, "INCONSISTENT_SIGNAL": 2}
 
 
 def _weighted_average(parts, value_key):
@@ -27,6 +25,10 @@ def _build_event(parts, thresholds):
     dominant = max(("OFF", "IDLE"), key=lambda state: (seconds_by_state[state], state == "OFF"))
     minimum_values = [part["minimumCurrentA"] for part in parts if part.get("minimumCurrentA") is not None]
     production_dates = list(dict.fromkeys(part["productionDate"] for part in parts))
+    quality = max(
+        (part.get("quality", "VALID_STATE") for part in parts),
+        key=lambda item: QUALITY_RANK.get(item, 3),
+    )
     return {
         "startUtc": parts[0]["startUtc"],
         "endUtc": parts[-1]["endUtc"],
@@ -46,6 +48,7 @@ def _build_event(parts, thresholds):
         "detectedBy": "ME337_1",
         "status": "DETECTED",
         "classification": "SIN_CLASIFICAR",
+        "quality": quality,
         "thresholdVersion": thresholds["version"],
     }
 
@@ -53,6 +56,7 @@ def _build_event(parts, thresholds):
 def detect_aoki_downtime_events(classification):
     """Agrupa estados no productivos válidos sin usar producción ni NO_DATA."""
     events = []
+    boundary_censored = []
     pending = []
     thresholds = classification["thresholds"]
 
@@ -73,6 +77,22 @@ def detect_aoki_downtime_events(classification):
         pending.append(segment)
     flush()
 
+    segments = classification.get("segments", [])
+    if segments:
+        range_start, range_end = segments[0]["startUtc"], segments[-1]["endUtc"]
+        complete = []
+        for event in events:
+            reasons = []
+            if event["startUtc"] == range_start:
+                reasons.append("RANGE_START")
+            if event["endUtc"] == range_end:
+                reasons.append("RANGE_END")
+            if reasons:
+                boundary_censored.append({**event, "exclusionReasons": reasons})
+            else:
+                complete.append(event)
+        events = complete
+
     idle_minutes = sum(event["stateMinutes"]["IDLE"] for event in events)
     off_minutes = sum(event["stateMinutes"]["OFF"] for event in events)
     return {
@@ -84,5 +104,7 @@ def detect_aoki_downtime_events(classification):
             "nonProductiveHours": round((idle_minutes + off_minutes) / 60, 4),
             "detectedBy": "ME337_1",
             "status": "DETECTED",
+            "boundaryCensoredEvents": len(boundary_censored),
         },
+        "boundaryCensoredEvents": boundary_censored,
     }
