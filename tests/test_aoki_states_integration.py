@@ -36,4 +36,6 @@ class AokiStatesLocalDatabaseIntegrationTests(unittest.TestCase):
         self.assertEqual(len(result["daily"]), 56)
         self.assertAlmostEqual(total, 1344.0, places=3)
         self.assertAlmostEqual(classified, total, places=2)
+        self.assertEqual(result["periodSummary"]["balanceStatus"], "VALID")
+        self.assertAlmostEqual(result["periodSummary"]["knownDataHours"], 1273.3072, places=3)
         self.assertEqual(len(result["traceability"]), result["quality"]["outputSamples"])

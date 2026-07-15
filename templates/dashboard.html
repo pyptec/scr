@@ -442,15 +442,17 @@
             <div class="card"><span>Horas de espera</span><strong id="estadoHorasEspera">--</strong><small>IDLE</small></div>
             <div class="card"><span>Horas apagado</span><strong id="estadoHorasApagado">--</strong><small>OFF</small></div>
             <div class="card"><span>Horas sin datos</span><strong id="estadoHorasSinDatos">--</strong><small>NO_DATA</small></div>
+            <div class="card"><span>Horas con datos</span><strong id="estadoHorasConDatos">--</strong><small>PRODUCTIVE + IDLE + OFF</small></div>
             <div class="card"><span>Cobertura de estados</span><strong id="estadoCobertura">--</strong><small>periodo con clasificación eléctrica</small></div>
             <div class="card"><span>Señal inconsistente</span><strong id="estadoInconsistencias">--</strong><small>segmentos para revisión</small></div>
+            <div class="card"><span>Balance temporal</span><strong id="estadoBalance">--</strong><small>suma de estados vs periodo</small></div>
         </div>
         <p id="estadoCriterio" class="periodo-efectivo">Criterio: --</p>
         <canvas id="chartEstadosAoki"></canvas>
         <h3>Resumen por jornada 06:00–06:00</h3>
         <div class="tabla-wrapper">
             <table>
-                <thead><tr><th>Jornada</th><th>Productivas</th><th>Espera</th><th>Apagado</th><th>Sin datos</th><th>Cobertura</th><th>Transiciones</th><th>Inconsistencias</th></tr></thead>
+                <thead><tr><th>Jornada</th><th>Productivas</th><th>Espera</th><th>Apagado</th><th>Sin datos</th><th>Con datos</th><th>Cobertura</th><th>Balance</th><th>Transiciones</th><th>Inconsistencias</th></tr></thead>
                 <tbody id="tablaEstadosAoki"></tbody>
             </table>
         </div>

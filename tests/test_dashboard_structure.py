@@ -74,6 +74,8 @@ class DashboardStructureTests(unittest.TestCase):
         self.assertIn("Operación reportada", self.html)
         self.assertIn("Clasificación eléctrica preliminar", self.html)
         self.assertIn("No equivalen necesariamente al estado productivo real", self.html)
+        self.assertIn('id="estadoHorasConDatos"', self.html)
+        self.assertIn('id="estadoBalance"', self.html)
 
     def test_dashboard_labels_historical_dataset_and_preliminary_baseline(self):
         self.assertIn("DATOS_HISTORICOS_DE_PRUEBA", self.html)

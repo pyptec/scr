@@ -274,7 +274,7 @@ def build_segments(intervals, config):
     return result
 
 
-def summarize_daily(segments):
+def summarize_daily(segments, tolerance_seconds=600):
     days = {}
     for segment in segments:
         day = days.setdefault(segment["productionDate"], {
@@ -297,10 +297,40 @@ def summarize_daily(segments):
             item[prefix + "Hours"] = round(day[state] / 3600, 4)
             item[prefix + "Pct"] = round(day[state] / total * 100, 3) if total else None
         item["coveragePct"] = round((total - day["NO_DATA"]) / total * 100, 3) if total else None
+        item["knownDataHours"] = round((total - day["NO_DATA"]) / 3600, 4)
+        state_total = sum(item[prefix + "Hours"] for prefix in ("productive", "idle", "off", "noData"))
+        balance_seconds = abs(state_total - item["scheduledHours"]) * 3600
+        item["balanceDifferenceSeconds"] = round(balance_seconds, 3)
+        item["balanceToleranceSeconds"] = int(tolerance_seconds)
+        item["balanceStatus"] = "VALID" if balance_seconds <= tolerance_seconds else "OUT_OF_TOLERANCE"
         item["stateTransitions"] = day["stateTransitions"]
         item["inconsistentSegments"] = day["inconsistentSegments"]
         output.append(item)
     return output
+
+
+def summarize_period(daily, start_utc, end_utc, tolerance_seconds=600):
+    fields = {
+        "productiveHours": sum(day["productiveHours"] for day in daily),
+        "idleHours": sum(day["idleHours"] for day in daily),
+        "offHours": sum(day["offHours"] for day in daily),
+        "noDataHours": sum(day["noDataHours"] for day in daily),
+    }
+    expected_hours = (int(end_utc) - int(start_utc)) / 3600
+    state_hours = sum(fields.values())
+    difference_seconds = abs(expected_hours - state_hours) * 3600
+    fields.update({
+        "scheduledHours": round(expected_hours, 4),
+        "knownDataHours": round(state_hours - fields["noDataHours"], 4),
+        "coveragePct": round((state_hours - fields["noDataHours"]) / expected_hours * 100, 3)
+        if expected_hours > 0 else None,
+        "balanceDifferenceSeconds": round(difference_seconds, 3),
+        "balanceToleranceSeconds": int(tolerance_seconds),
+        "balanceStatus": "VALID" if difference_seconds <= tolerance_seconds else "OUT_OF_TOLERANCE",
+    })
+    for key in ("productiveHours", "idleHours", "offHours", "noDataHours"):
+        fields[key] = round(fields[key], 4)
+    return fields
 
 
 def classify_aoki_states(rows, start_utc, end_utc, config=None):
@@ -309,13 +339,16 @@ def classify_aoki_states(rows, start_utc, end_utc, config=None):
     raw = _raw_intervals(preprocessed["samples"], int(start_utc), int(end_utc), config)
     classified = _apply_persistence(raw, config)
     segments = build_segments(classified, config)
+    tolerance_seconds = int(config["expectedIntervalMinutes"] * 60)
+    daily = summarize_daily(segments, tolerance_seconds)
     return {
         "datasetType": config.get("dataset", {}).get("type", "DATOS_HISTORICOS_DE_PRUEBA"),
         "dataset": config.get("dataset"), "source": "ME337_1",
         "gatewayId": GATEWAY_ID, "deviceId": int(DEVICE_ID),
         "thresholds": config, "quality": preprocessed["quality"],
         "traceability": preprocessed["samples"],
-        "segments": segments, "daily": summarize_daily(segments),
+        "segments": segments, "daily": daily,
+        "periodSummary": summarize_period(daily, start_utc, end_utc, tolerance_seconds),
     }
 
 

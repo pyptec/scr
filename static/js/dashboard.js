@@ -385,12 +385,17 @@ async function cargarEstadosAoki() {
     const apagado = sumar("offHours");
     const sinDatos = sumar("noDataHours");
     const cobertura = programadas > 0 ? (programadas - sinDatos) / programadas * 100 : null;
+    const resumenPeriodo = data.periodSummary || {};
     document.getElementById("estadoHorasProductivas").innerText = formatearNumero(productivas, 2);
     document.getElementById("estadoHorasEspera").innerText = formatearNumero(espera, 2);
     document.getElementById("estadoHorasApagado").innerText = formatearNumero(apagado, 2);
     document.getElementById("estadoHorasSinDatos").innerText = formatearNumero(sinDatos, 2);
+    document.getElementById("estadoHorasConDatos").innerText = formatearNumero(resumenPeriodo.knownDataHours, 2);
     document.getElementById("estadoCobertura").innerText = cobertura === null ? "Datos insuficientes" : `${formatearNumero(cobertura, 2)} %`;
     document.getElementById("estadoInconsistencias").innerText = formatearEntero(sumar("inconsistentSegments"));
+    document.getElementById("estadoBalance").innerText = resumenPeriodo.balanceStatus === "VALID"
+        ? `Válido (${formatearNumero(resumenPeriodo.balanceDifferenceSeconds, 2)} s)`
+        : "Fuera de tolerancia";
     document.getElementById("opHorasProgramadas").innerText = formatearNumero(operacion.horas_programadas, 2);
     document.getElementById("opHorasReales").innerText = operacion.horas_reales_trabajo === null ? "Dato pendiente" : formatearNumero(operacion.horas_reales_trabajo, 2);
     document.getElementById("opHorasParada").innerText = operacion.horas_parada_reportadas === null ? "Dato pendiente" : formatearNumero(operacion.horas_parada_reportadas, 2);
@@ -398,10 +403,10 @@ async function cargarEstadosAoki() {
     document.getElementById("estadoCriterio").innerText = `Criterio ${umbrales.version || "--"}: OFF < ${umbrales.offIdleCurrentA} A; IDLE < ${umbrales.idleProductiveCurrentA} A; persistencia ${umbrales.minimumConsecutiveSamples} muestras o ${umbrales.minimumPersistenceMinutes} min; hueco máximo ${umbrales.maximumGapMinutes} min.`;
 
     const tbody = document.getElementById("tablaEstadosAoki");
-    tbody.innerHTML = diarios.length ? "" : '<tr><td colspan="8">Sin datos para el periodo</td></tr>';
+    tbody.innerHTML = diarios.length ? "" : '<tr><td colspan="10">Sin datos para el periodo</td></tr>';
     diarios.forEach(dia => {
         const fila = document.createElement("tr");
-        fila.innerHTML = `<td>${escaparHtml(dia.productionDate)}</td><td>${formatearNumero(dia.productiveHours, 2)}</td><td>${formatearNumero(dia.idleHours, 2)}</td><td>${formatearNumero(dia.offHours, 2)}</td><td>${formatearNumero(dia.noDataHours, 2)}</td><td>${formatearNumero(dia.coveragePct, 2)} %</td><td>${formatearEntero(dia.stateTransitions)}</td><td>${formatearEntero(dia.inconsistentSegments)}</td>`;
+        fila.innerHTML = `<td>${escaparHtml(dia.productionDate)}</td><td>${formatearNumero(dia.productiveHours, 2)}</td><td>${formatearNumero(dia.idleHours, 2)}</td><td>${formatearNumero(dia.offHours, 2)}</td><td>${formatearNumero(dia.noDataHours, 2)}</td><td>${formatearNumero(dia.knownDataHours, 2)}</td><td>${formatearNumero(dia.coveragePct, 2)} %</td><td>${escaparHtml(dia.balanceStatus)}</td><td>${formatearEntero(dia.stateTransitions)}</td><td>${formatearEntero(dia.inconsistentSegments)}</td>`;
         tbody.appendChild(fila);
     });
     if (chartEstadosAoki) chartEstadosAoki.destroy();

@@ -91,6 +91,15 @@ class AokiStateTests(unittest.TestCase):
         day = result["daily"][0]
         total = day["productiveHours"] + day["idleHours"] + day["offHours"] + day["noDataHours"]
         self.assertAlmostEqual(total, day["scheduledHours"], places=3)
+        self.assertAlmostEqual(day["knownDataHours"], day["scheduledHours"] - day["noDataHours"], places=3)
+        self.assertEqual(day["balanceStatus"], "VALID")
+
+    def test_period_summary_validates_partial_range(self):
+        result = self.classify([(0, 60, 40), (600, 60, 40)], start=0, end=900)
+        summary = result["periodSummary"]
+        self.assertEqual(summary["scheduledHours"], 0.25)
+        self.assertEqual(summary["balanceStatus"], "VALID")
+        self.assertLessEqual(summary["balanceDifferenceSeconds"], summary["balanceToleranceSeconds"])
 
     def test_no_data_separates_equal_states(self):
         result = self.classify([(0, 60, 40), (1801, 60, 40)], end=2401)
