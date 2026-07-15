@@ -396,6 +396,19 @@ async function cargarEstadosAoki() {
     document.getElementById("estadoBalance").innerText = resumenPeriodo.balanceStatus === "VALID"
         ? `Válido (${formatearNumero(resumenPeriodo.balanceDifferenceSeconds, 2)} s)`
         : "Fuera de tolerancia";
+    const resumenEventos = data.summary || {};
+    document.getElementById("eventosDetectados").innerText = formatearEntero(resumenEventos.eventCount);
+    document.getElementById("eventosHorasIdle").innerText = formatearNumero(resumenEventos.idleHours, 2);
+    document.getElementById("eventosHorasOff").innerText = formatearNumero(resumenEventos.offHours, 2);
+    document.getElementById("eventosHorasTotal").innerText = formatearNumero(resumenEventos.nonProductiveHours, 2);
+    const tbodyEventos = document.getElementById("tablaEventosAoki");
+    const eventos = data.events || [];
+    tbodyEventos.innerHTML = eventos.length ? "" : '<tr><td colspan="10">No hay eventos eléctricos detectados en el periodo</td></tr>';
+    eventos.forEach(evento => {
+        const fila = document.createElement("tr");
+        fila.innerHTML = `<td>${escaparHtml(evento.startLocal)}</td><td>${escaparHtml(evento.endLocal)}</td><td>${formatearNumero(evento.durationMinutes, 2)}</td><td>${escaparHtml(evento.dominantState)}</td><td>${formatearNumero(evento.minimumCurrentA, 2)}</td><td>${formatearNumero(evento.averageCurrentA, 2)}</td><td>${formatearNumero(evento.averagePowerKW, 2)}</td><td>${formatearEntero(evento.sampleCount)}</td><td>${escaparHtml(evento.status)}</td><td>${escaparHtml(evento.classification)}</td>`;
+        tbodyEventos.appendChild(fila);
+    });
     document.getElementById("opHorasProgramadas").innerText = formatearNumero(operacion.horas_programadas, 2);
     document.getElementById("opHorasReales").innerText = operacion.horas_reales_trabajo === null ? "Dato pendiente" : formatearNumero(operacion.horas_reales_trabajo, 2);
     document.getElementById("opHorasParada").innerText = operacion.horas_parada_reportadas === null ? "Dato pendiente" : formatearNumero(operacion.horas_parada_reportadas, 2);

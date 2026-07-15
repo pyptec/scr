@@ -1168,32 +1168,341 @@ Presentar:
 Detenerse al finalizar. No avanzar a la subfase 2.4 ni reentrenar modelos sin autorización.
 
 
-## Subfase 2.4 — Cálculo de horas por estado
+## Subfase 2.4 — Consolidación de horas por estado eléctrico y cobertura
 
-Por jornada productiva 06:00–06:00 y por periodo seleccionado calcular:
+Esta es la siguiente subfase autorizada después de cerrar la subfase 2.3B.
+
+Trabaja únicamente en la subfase 2.4. No avances todavía a detección de eventos no productivos, conciliación de paradas, MTBF, MTTR, disponibilidad técnica, reentrenamiento de línea base, Índice Base 100 definitivo ni CUSUM definitivo.
+
+### Decisión metodológica vigente
+
+Los estados `PRODUCTIVE`, `IDLE`, `OFF` y `NO_DATA` se mantienen como una clasificación eléctrica preliminar derivada de las señales del sistema medido.
+
+Debido a que la relación entre producción diaria y horas `PRODUCTIVE` actuales presenta R² bajos, estas horas no deben presentarse todavía como horas productivas reales demostradas de Aoki.
+
+Usar esta terminología en el dashboard:
 
 ```text
-horas_productivas
-horas_espera
-horas_apagado
-horas_sin_datos
-horas_con_datos
-cobertura_pct
+Horas en estado eléctrico PRODUCTIVE
+Horas en estado eléctrico IDLE
+Horas en estado eléctrico OFF
+Horas sin clasificación eléctrica
 ```
 
-Validar:
+Agregar una nota visible:
 
 ```text
-horas_productivas
-+ horas_espera
-+ horas_apagado
-+ horas_sin_datos
-≈ horas_totales_periodo
+La clasificación representa niveles operativos inferidos desde las variables eléctricas del sistema medido. No equivale necesariamente al estado productivo real de Aoki y deberá revalidarse con datos nuevos.
 ```
 
-Permitir una tolerancia máxima equivalente a un intervalo de muestreo.
+### Objetivo
 
-Las horas productivas calculadas en esta fase serán las usadas posteriormente por la línea base oficial. No sustituirlas por 24 horas ni por horas programadas.
+Consolidar por jornada productiva 06:00–06:00 y por rango seleccionado:
+
+```text
+productiveElectricalHours
+idleElectricalHours
+offElectricalHours
+noDataHours
+hoursWithStateData
+stateCoveragePct
+inconsistentHours
+scheduledHours
+```
+
+No reconstruir `NO_DATA` con producción.
+
+No transformar estados eléctricos en paradas de producción.
+
+No utilizar todavía estas horas como entrada oficial definitiva para disponibilidad técnica ni confiabilidad.
+
+### Fuente de datos
+
+Usar exclusivamente la salida validada de la subfase 2.3 para:
+
+```text
+gateway_id = 10
+device_id = 24
+```
+
+Variables de soporte:
+
+```text
+unit_id 54 = corriente trifásica promedio
+unit_id 61 = potencia activa total en kW
+```
+
+La energía reconstruida de la subfase 2.2B puede usarse únicamente para mostrar cobertura energética y advertencias de coherencia. No debe usarse para repartir estados dentro de huecos largos.
+
+### Jornada productiva
+
+Usar:
+
+```text
+06:00 del día actual
+hasta
+06:00 del día siguiente
+America/Bogota
+```
+
+Para jornadas completas:
+
+```text
+scheduledHours = 24
+```
+
+Para rangos parciales:
+
+```text
+scheduledHours = duración real del rango dentro de la jornada
+```
+
+No redondear automáticamente a 24 horas.
+
+### Cálculo de horas
+
+Calcular las duraciones usando timestamps reales:
+
+```text
+durationHours = durationSeconds / 3600
+```
+
+Por jornada:
+
+```text
+productiveElectricalHours = suma de duración de segmentos PRODUCTIVE
+idleElectricalHours = suma de duración de segmentos IDLE
+offElectricalHours = suma de duración de segmentos OFF
+noDataHours = suma de duración de segmentos NO_DATA
+hoursWithStateData = productiveElectricalHours + idleElectricalHours + offElectricalHours
+```
+
+Cobertura:
+
+```text
+stateCoveragePct = hoursWithStateData / scheduledHours × 100
+```
+
+Horas inconsistentes:
+
+```text
+inconsistentHours = suma de segmentos con quality = INCONSISTENT_SIGNAL
+```
+
+No contar las horas inconsistentes dos veces. Deben formar parte de su estado eléctrico correspondiente y, adicionalmente, registrarse como indicador de calidad.
+
+### Validación del balance temporal
+
+Por jornada debe cumplirse:
+
+```text
+productiveElectricalHours + idleElectricalHours + offElectricalHours + noDataHours ≈ scheduledHours
+```
+
+Tolerancia máxima:
+
+```text
+máximo de:
+- un intervalo esperado de muestreo;
+- el error acumulado documentado por límites del rango.
+```
+
+Valor inicial de referencia:
+
+```text
+10 minutos
+```
+
+Si la diferencia supera la tolerancia, marcar:
+
+```text
+TIME_BALANCE_ERROR
+```
+
+No corregir silenciosamente distribuyendo la diferencia entre estados.
+
+### Tratamiento de límites del rango
+
+Los segmentos deben recortarse exactamente al rango solicitado.
+
+Ejemplo:
+
+```text
+segmento: 05:50–06:20
+rango solicitado: 06:00–06:15
+duración contabilizada: 15 minutos
+```
+
+No contabilizar tiempo fuera del filtro.
+
+Dividir segmentos que crucen las 06:00 para asignarlos a la jornada correcta.
+
+### Tratamiento de NO_DATA
+
+Mantener `NO_DATA` cuando:
+
+- el hueco supere el máximo permitido;
+- no exista corriente válida;
+- no exista evidencia suficiente para clasificar;
+- el rango comience antes de la primera muestra;
+- el rango termine después de la última muestra;
+- exista un tramo no cubierto por segmentos.
+
+No mostrar `NO_DATA` como cero.
+
+Distinguir:
+
+```text
+stateCoveragePct
+energyCoveragePct
+```
+
+Ambas coberturas pueden ser diferentes.
+
+Un hueco puede tener energía total recuperada mediante acumulador y continuar como `NO_DATA` para estados.
+
+### Comparación con operación reportada
+
+Mostrar en el módulo de eficiencia operacional dos bloques independientes.
+
+#### Operación reportada
+
+```text
+Horas programadas
+Horas de parada reportadas
+Horas reales reportadas
+Disponibilidad operacional reportada
+```
+
+#### Clasificación eléctrica preliminar
+
+```text
+Horas PRODUCTIVE eléctricas
+Horas IDLE eléctricas
+Horas OFF eléctricas
+Horas NO_DATA
+Cobertura de estados
+Horas inconsistentes
+```
+
+No combinar ambos bloques en una sola disponibilidad.
+
+No calcular:
+
+```text
+disponibilidad técnica
+MTBF
+MTTR
+```
+
+### Uso provisional en línea base
+
+No sustituir automáticamente las horas productivas oficiales por `productiveElectricalHours`.
+
+La línea base puede conservar el cálculo exploratorio existente, pero debe incluir:
+
+```text
+resultado = RESULTADO_PRELIMINAR
+productiveHoursSource = ELECTRICAL_CLASSIFICATION_PRELIMINARY
+```
+
+Agregar `stateCoveragePct`, `noDataHours` e `inconsistentHours` como información de calidad del resultado.
+
+Si la cobertura está por debajo del umbral configurable, mostrar:
+
+```text
+DATOS_INSUFICIENTES_PARA_EVALUACION
+```
+
+No inventar el umbral. Buscar si ya existe en configuración. Si no existe, crear un parámetro pendiente de aprobación y usarlo solo como advertencia, no como exclusión silenciosa.
+
+### API o contrato de salida
+
+Crear o ajustar una salida similar a:
+
+```typescript
+interface AokiElectricalStateDailySummary {
+  productionDate: string;
+  scheduledHours: number;
+  productiveElectricalHours: number;
+  idleElectricalHours: number;
+  offElectricalHours: number;
+  noDataHours: number;
+  hoursWithStateData: number;
+  stateCoveragePct: number;
+  inconsistentHours: number;
+  stateTransitions: number;
+  balanceDifferenceMinutes: number;
+  balanceStatus: "OK" | "TIME_BALANCE_ERROR";
+  classificationStatus: "PRELIMINARY_ELECTRICAL_CLASSIFICATION";
+}
+```
+
+Mantener compatibilidad con los campos actuales cuando sea necesario, pero documentar cualquier alias antiguo.
+
+### Actualización del dashboard
+
+En `Eficiencia operacional` mostrar:
+
+```text
+Horas PRODUCTIVE eléctricas
+Horas IDLE eléctricas
+Horas OFF eléctricas
+Horas NO_DATA
+Cobertura de estados
+Horas con señal inconsistente
+Horas de parada reportadas
+Horas reales reportadas
+```
+
+Agregar:
+
+- tabla diaria;
+- gráfica apilada diaria;
+- indicador de balance temporal;
+- nota metodológica;
+- diferenciación visual entre datos reportados y datos eléctricos.
+
+En `Resumen` no mostrar `Horas productivas reales` como dato definitivo. Usar `Horas PRODUCTIVE eléctricas` o `Clasificación eléctrica preliminar`.
+
+### Pruebas mínimas
+
+Agregar pruebas para:
+
+1. jornada completa de 24 horas;
+2. jornada parcial;
+3. segmento que cruza las 06:00;
+4. recorte por inicio de rango;
+5. recorte por fin de rango;
+6. suma de horas dentro de tolerancia;
+7. diferencia superior a tolerancia;
+8. hueco `NO_DATA`;
+9. segmento inconsistente;
+10. cobertura de estados;
+11. diferencia entre cobertura energética y cobertura de estados;
+12. no uso de producción para rellenar estados;
+13. no cálculo de disponibilidad técnica;
+14. salida con clasificación preliminar;
+15. datos faltantes mostrados como `NO_DATA` y no como cero.
+
+### Entrega de la subfase 2.4
+
+Presentar:
+
+1. archivos modificados;
+2. funciones de consolidación;
+3. contratos de salida;
+4. resultados por jornada;
+5. totales de mayo y junio de 2026;
+6. cobertura de estados;
+7. horas `NO_DATA`;
+8. horas inconsistentes;
+9. errores de balance temporal;
+10. diferencias frente al cálculo anterior;
+11. pruebas ejecutadas;
+12. limitaciones pendientes.
+
+Detenerse al finalizar. No avanzar a la subfase 2.5 sin autorización.
 
 ## Subfase 2.5 — Detección de eventos no productivos
 
@@ -1301,13 +1610,15 @@ No cambiar todavía la ecuación oficial de línea base.
 
 # Instrucción vigente para continuar la fase 2
 
-Las subfases 2.1 y 2.2 deben estar aprobadas. El siguiente trabajo autorizado es únicamente:
+Las subfases 2.1, 2.2, 2.2B, 2.3 y 2.3B se consideran cerradas o documentadas para continuar el ajuste del dashboard.
+
+El siguiente trabajo autorizado es únicamente:
 
 ```text
-SUBFASE 2.3 — Clasificación de estados eléctricos de Aoki
+SUBFASE 2.4 — Consolidación de horas por estado eléctrico y cobertura
 ```
 
-No avanzar a la subfase 2.4, conciliación de paradas, MTBF, MTTR ni disponibilidad técnica hasta recibir autorización.
+No avanzar a la subfase 2.5, conciliación de paradas, MTBF, MTTR, disponibilidad técnica, reentrenamiento de línea base, Índice Base 100 definitivo ni CUSUM definitivo hasta recibir autorización.
 
 
 ---

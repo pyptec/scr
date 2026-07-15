@@ -18,6 +18,7 @@ from db.produccion_samee200 import sumar_produccion_rango
 from db.produccion_samee200 import obtener_modulo_produccion
 from db.aoki_states import classify_aoki_states, query_aoki_rows
 from db.aoki_energy import reconstruct_aoki_energy, query_aoki_energy_rows
+from db.aoki_events import detect_aoki_downtime_events
 
 load_dotenv("/home/pi/SAMEE200/scr/.env")
 
@@ -223,7 +224,9 @@ def api_aoki_estados():
     conn = get_conn()
     try:
         rows = query_aoki_rows(conn, inicio, fin)
-        return jsonify(classify_aoki_states(rows, inicio, fin))
+        result = classify_aoki_states(rows, inicio, fin)
+        result.update(detect_aoki_downtime_events(result))
+        return jsonify(result)
     finally:
         conn.close()
 

@@ -449,6 +449,20 @@
         </div>
         <p id="estadoCriterio" class="periodo-efectivo">Criterio: --</p>
         <canvas id="chartEstadosAoki"></canvas>
+        <h3>Eventos no productivos detectados eléctricamente</h3>
+        <p class="aviso-metodologico">Estos eventos agrupan únicamente segmentos eléctricos consecutivos IDLE/OFF. No son fallas confirmadas y todavía no se han conciliado con las paradas reportadas.</p>
+        <div class="grid-kpi">
+            <div class="card"><span>Eventos detectados</span><strong id="eventosDetectados">--</strong><small>estado DETECTED</small></div>
+            <div class="card"><span>Duración total IDLE</span><strong id="eventosHorasIdle">--</strong><small>horas eléctricas</small></div>
+            <div class="card"><span>Duración total OFF</span><strong id="eventosHorasOff">--</strong><small>horas eléctricas</small></div>
+            <div class="card"><span>Duración no productiva</span><strong id="eventosHorasTotal">--</strong><small>IDLE + OFF</small></div>
+        </div>
+        <div class="tabla-wrapper">
+            <table>
+                <thead><tr><th>Inicio local</th><th>Fin local</th><th>Duración min</th><th>Dominante</th><th>I mín. A</th><th>I prom. A</th><th>P prom. kW</th><th>Muestras</th><th>Estado</th><th>Clasificación</th></tr></thead>
+                <tbody id="tablaEventosAoki"></tbody>
+            </table>
+        </div>
         <h3>Resumen por jornada 06:00–06:00</h3>
         <div class="tabla-wrapper">
             <table>

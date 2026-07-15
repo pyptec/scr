@@ -242,6 +242,8 @@ def build_segments(intervals, config):
             segment["weightedPower"] += (interval["power"] or 0) * duration
             segment["currentSeconds"] += duration if interval["current"] is not None else 0
             segment["powerSeconds"] += duration if interval["power"] is not None else 0
+            if interval["current"] is not None:
+                segment["minimumCurrentA"] = min(segment["minimumCurrentA"], interval["current"])
             segment["endEpoch"] = interval["end"]
             segment["sampleCount"] += interval["sampleCount"]
             if quality_rank[interval["quality"]] > quality_rank[segment["quality"]]:
@@ -255,6 +257,7 @@ def build_segments(intervals, config):
                 "weightedPower": (interval["power"] or 0) * duration,
                 "currentSeconds": duration if interval["current"] is not None else 0,
                 "powerSeconds": duration if interval["power"] is not None else 0,
+                "minimumCurrentA": interval["current"],
                 "quality": interval["quality"],
             })
     result = []
@@ -268,6 +271,7 @@ def build_segments(intervals, config):
             "durationSeconds": segment["endEpoch"] - segment["startEpoch"],
             "sampleCount": segment["sampleCount"],
             "averageCurrentA": round(segment["weightedCurrent"] / segment["currentSeconds"], 4) if segment["currentSeconds"] else None,
+            "minimumCurrentA": round(segment["minimumCurrentA"], 4) if segment["minimumCurrentA"] is not None else None,
             "averagePowerKW": round(segment["weightedPower"] / segment["powerSeconds"], 4) if segment["powerSeconds"] else None,
             "quality": segment["quality"], "thresholdVersion": config["version"],
         })
