@@ -758,6 +758,9 @@ def calcular_modulo_produccion(periodos, inicio_utc, fin_utc):
     horas_reales = None if horas_parada is None else max(total_horas_programadas - horas_parada, 0)
     productividad_buena = total_buenos / horas_reales if horas_reales and horas_reales > 0 else None
     productividad_total = produccion_total / horas_reales if horas_reales and horas_reales > 0 else None
+    eficiencia_calidad = total_buenos / produccion_total * 100 if produccion_total > 0 else None
+    tasa_rechazo = total_malos / produccion_total * 100 if produccion_total > 0 else None
+    rechazos_por_1000 = total_malos / produccion_total * 1000 if produccion_total > 0 else None
 
     return {
         "periodo": {"inicio_utc": inicio_utc, "fin_utc": fin_utc},
@@ -769,6 +772,9 @@ def calcular_modulo_produccion(periodos, inicio_utc, fin_utc):
         "horas_reales_trabajo": round(horas_reales, 3) if horas_reales is not None else None,
         "produccion_buena_hora_real": round(productividad_buena, 3) if productividad_buena is not None else None,
         "produccion_total_hora_real": round(productividad_total, 3) if productividad_total is not None else None,
+        "eficiencia_calidad_pct": round(eficiencia_calidad, 3) if eficiencia_calidad is not None else None,
+        "tasa_rechazo_pct": round(tasa_rechazo, 3) if tasa_rechazo is not None else None,
+        "rechazos_por_1000": round(rechazos_por_1000, 3) if rechazos_por_1000 is not None else None,
         "dias_produccion_incluidos": len(detalle),
         "estado_paradas": "DATO_PENDIENTE" if hay_paradas_pendientes else "VALIDO",
         "detalle_diario": detalle,

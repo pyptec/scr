@@ -101,6 +101,14 @@ class ProduccionModuloTests(unittest.TestCase):
         self.assertEqual(resultado["horas_reales_trabajo"], 23)
         self.assertEqual(resultado["produccion_buena_hora_real"], 100)
 
+    def test_calidad_se_calcula_desde_totales_reportados(self):
+        resultado = calcular_modulo_produccion([
+            periodo(0, 86400, buenos=900, malos=100)
+        ], 0, 86400)
+        self.assertEqual(resultado["eficiencia_calidad_pct"], 90)
+        self.assertEqual(resultado["tasa_rechazo_pct"], 10)
+        self.assertEqual(resultado["rechazos_por_1000"], 100)
+
     def test_parada_en_periodo_parcial_sin_hora_queda_pendiente(self):
         resultado = calcular_modulo_produccion([
             periodo(0, 86400, observaciones="Se para la máquina 60 minutos")

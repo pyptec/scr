@@ -67,6 +67,28 @@ class DashboardStructureTests(unittest.TestCase):
         self.assertIn('id="horasProductivasResumen"', self.html)
         self.assertIn('id="horasParadaResumen"', self.html)
         self.assertIn("No disponible", self.html)
+        self.assertIn('id="coberturaEstadosResumen"', self.html)
+        self.assertIn('id="coberturaEnergiaResumen"', self.html)
+
+    def test_dashboard_separates_reported_operation_and_electrical_classification(self):
+        self.assertIn("Operación reportada", self.html)
+        self.assertIn("Clasificación eléctrica preliminar", self.html)
+        self.assertIn("No equivalen necesariamente al estado productivo real", self.html)
+
+    def test_dashboard_labels_historical_dataset_and_preliminary_baseline(self):
+        self.assertIn("DATOS_HISTORICOS_DE_PRUEBA", self.html)
+        self.assertIn("RESULTADO_PRELIMINAR", self.html)
+        self.assertNotIn("Reentrenar línea base", self.html)
+        self.assertNotIn("entrenarLineaBase()", self.javascript)
+
+    def test_energy_distinguishes_state_and_energy_no_data(self):
+        self.assertIn('id="energiaReconNoDataHoras"', self.html)
+        self.assertIn("no deja de ser NO_DATA para estados", self.html)
+
+    def test_quality_uses_reported_production(self):
+        self.assertIn('id="calidadEficiencia"', self.html)
+        self.assertIn('id="calidadRechazo"', self.html)
+        self.assertIn('moduloActual === "calidad"', self.javascript)
 
     def test_base_100_and_cusum_are_separate_pending_phase_3_views(self):
         self.assertIn('data-linea-base-view="indice-base-100"', self.html)

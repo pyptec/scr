@@ -92,6 +92,32 @@ body {
     font-size: 14px;
 }
 
+.aviso-metodologico {
+    margin: 14px 0;
+    padding: 12px 14px;
+    border-left: 4px solid #d97706;
+    border-radius: 4px;
+    background: #fffbeb;
+    color: #78350f;
+    line-height: 1.45;
+}
+
+.aviso-historico {
+    border-left-color: #2563eb;
+    background: #eff6ff;
+    color: #1e3a8a;
+}
+
+.etiqueta-preliminar {
+    display: inline-block;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: #fef3c7;
+    color: #92400e;
+    font-size: 12px;
+    font-weight: 700;
+}
+
 .modulo-pendiente {
     border-left: 5px solid #94a3b8;
 }

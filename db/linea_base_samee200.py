@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 
 from db.samee200_db import get_conn
 from db.kpi_samee200 import resumen_kpi_samee200
+from db.aoki_states import classify_aoki_states, query_aoki_rows
 
 load_dotenv("/home/pi/SAMEE200/scr/.env")
 
@@ -334,9 +335,30 @@ def evaluar_desempeno_actual(inicio=None, fin=None):
 
     energia_real = float(kpi["proceso"]["energia_kwh"])
     envases_buenos = float(kpi["produccion"].get("envases_buenos", 0) or 0)
-    horas_productivas = float(kpi["produccion"].get("horas_productivas", 0) or 0)
+    if kpi["produccion"].get("fuente") != "archivo":
+        return {
+            "ok": False,
+            "error": "Datos de producción reportada insuficientes para evaluar la línea base",
+            "resultType": "DATOS_INSUFICIENTES",
+        }
+
+    inicio_efectivo = int(kpi["inicio"])
+    fin_efectivo = int(kpi["fin"])
+    conn = get_conn()
+    try:
+        filas_estado = query_aoki_rows(conn, inicio_efectivo, fin_efectivo)
+    finally:
+        conn.close()
+    estados = classify_aoki_states(filas_estado, inicio_efectivo, fin_efectivo)
+    horas_productivas = sum(float(dia["productiveHours"]) for dia in estados["daily"])
+    horas_sin_datos = sum(float(dia["noDataHours"]) for dia in estados["daily"])
+    horas_periodo_estados = sum(float(dia["scheduledHours"]) for dia in estados["daily"])
     horas_programadas = float(kpi["produccion"].get("horas_programadas", 0) or 0)
     jornadas_equivalentes = horas_programadas / 24
+    cobertura_estados = (
+        (horas_periodo_estados - horas_sin_datos) / horas_periodo_estados * 100
+        if horas_periodo_estados > 0 else None
+    )
 
     energia_esperada = (
         modelo["intercepto"] * jornadas_equivalentes
@@ -371,6 +393,15 @@ def evaluar_desempeno_actual(inicio=None, fin=None):
             "horas_programadas": round(horas_programadas, 3),
             "jornadas_equivalentes_24h": round(jornadas_equivalentes, 5)
         },
+        "trazabilidad": {
+            "resultType": "RESULTADO_PRELIMINAR",
+            "productiveHoursSource": "CLASIFICACION_ELECTRICA_PRELIMINAR_ME337_1",
+            "productionSource": "OPERACION_REPORTADA",
+            "stateCoveragePct": round(cobertura_estados, 3) if cobertura_estados is not None else None,
+            "stateNoDataHours": round(horas_sin_datos, 3),
+            "thresholdVersion": estados["thresholds"]["version"],
+            "datasetType": estados["datasetType"],
+        },
         "energia": {
             "real_kwh": round(energia_real, 3),
             "esperada_kwh": round(energia_esperada, 3),
@@ -390,13 +421,19 @@ def evaluar_desempeno_actual(inicio=None, fin=None):
     }
 
     if desviacion_pct <= -5:
-        resultado["clasificacion"] = "MEJORA_ENERGETICA"
+        clasificacion_exploratoria = "MEJORA_ENERGETICA"
         resultado["mensaje"] = "El consumo real está por debajo de la línea base."
     elif desviacion_pct >= 5:
-        resultado["clasificacion"] = "DESVIACION_SIGNIFICATIVA"
+        clasificacion_exploratoria = "DESVIACION_SIGNIFICATIVA"
         resultado["mensaje"] = "El consumo real supera la línea base esperada."
     else:
-        resultado["clasificacion"] = "DESEMPEÑO_NORMAL"
+        clasificacion_exploratoria = "DESEMPEÑO_NORMAL"
         resultado["mensaje"] = "El consumo está dentro del rango esperado."
 
+    resultado["clasificacionExploratoria"] = clasificacion_exploratoria
+    resultado["clasificacion"] = "RESULTADO_PRELIMINAR"
+    resultado["mensaje"] = (
+        "Evaluación exploratoria: las horas PRODUCTIVE provienen de una "
+        "clasificación eléctrica preliminar aún no revalidada contra producción."
+    )
     return resultado

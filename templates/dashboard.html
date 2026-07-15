@@ -80,6 +80,7 @@
             </div>
         </div>
         <p id="periodoEfectivo" class="periodo-efectivo">Periodo efectivo evaluado: --</p>
+        <p class="aviso-metodologico aviso-historico"><strong>DATOS_HISTORICOS_DE_PRUEBA</strong> · Copia histórica local del SAMEE200 · Periodo disponible: 1 de mayo a 25 de junio de 2026 · No representa telemetría actual.</p>
     </section>
 
     <section class="panel modulo" data-module="resumen">
@@ -139,15 +140,25 @@
             </div>
 
             <div class="card">
-                <span>Horas productivas</span>
+                <span>Horas PRODUCTIVE eléctricas</span>
                 <strong id="horasProductivasResumen">No disponible</strong>
-                <small>pendiente de cálculo validado</small>
+                <small>clasificación eléctrica preliminar</small>
             </div>
 
             <div class="card">
-                <span>Horas de parada</span>
+                <span>Horas de parada reportadas</span>
                 <strong id="horasParadaResumen">No disponible</strong>
-                <small>pendiente de extracción validada</small>
+                <small>operación reportada</small>
+            </div>
+            <div class="card">
+                <span>Cobertura de estados</span>
+                <strong id="coberturaEstadosResumen">No disponible</strong>
+                <small>excluye NO_DATA de estados</small>
+            </div>
+            <div class="card">
+                <span>Cobertura energética</span>
+                <strong id="coberturaEnergiaResumen">No disponible</strong>
+                <small>medida + reconstruida</small>
             </div>
         </div>
     </section>
@@ -186,7 +197,7 @@
                 </div>
 
                 <div class="card">
-                    <span>Horas reales de trabajo</span>
+                    <span>Horas reales reportadas</span>
                     <strong id="prodHorasReales">--</strong>
                     <small>programadas menos parada</small>
                 </div>
@@ -241,7 +252,7 @@
         <section class="panel modulo" data-module="linea-base" hidden>
             <div class="panel-header">
                 <h2>Línea base energética ISO 50001</h2>
-                <button onclick="entrenarLineaBase()">Reentrenar línea base</button>
+                <span class="etiqueta-preliminar">RESULTADO_PRELIMINAR</span>
             </div>
 
             <nav class="subnav-linea-base" aria-label="Vistas de línea base ISO 50001">
@@ -249,6 +260,8 @@
                 <button class="subnav-item" data-linea-base-target="indice-base-100">Índice Base 100</button>
                 <button class="subnav-item" data-linea-base-target="cusum">CUSUM</button>
             </nav>
+
+            <p class="aviso-metodologico">La ecuación oficial se conserva sin cambios. La evaluación usa horas PRODUCTIVE de la clasificación eléctrica preliminar; sus resultados son exploratorios hasta revalidar la relación con producción mediante datos nuevos.</p>
 
             <section class="vista-linea-base" data-linea-base-view="desempeno">
             <div class="grid-kpi">
@@ -365,6 +378,20 @@
         </div>
 
         <canvas id="chartPrincipal"></canvas>
+
+        <h3>Últimos valores</h3>
+        <input id="buscarTabla" type="text" placeholder="Buscar variable..." oninput="filtrarTablaUltimos()">
+        <div class="tabla-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Gateway</th><th>Equipo</th><th>Rol</th><th>Unit ID</th>
+                        <th>Variable</th><th>Valor</th><th>Unidad</th><th>Hora</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaUltimos"></tbody>
+            </table>
+        </div>
     </section>
 
     <section class="panel modulo" data-module="gateway" hidden>
@@ -384,46 +411,38 @@
         </div>
     </section>
 
-    <section class="panel modulo" data-module="variables" hidden>
-        <h2>Últimos valores</h2>
-
-        <input id="buscarTabla" type="text" placeholder="Buscar variable..." oninput="filtrarTablaUltimos()">
-
-        <div class="tabla-wrapper">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Gateway</th>
-                        <th>Equipo</th>
-                        <th>Rol</th>
-                        <th>Unit ID</th>
-                        <th>Variable</th>
-                        <th>Valor</th>
-                        <th>Unidad</th>
-                        <th>Hora</th>
-                    </tr>
-                </thead>
-                <tbody id="tablaUltimos"></tbody>
-            </table>
+    <section class="panel modulo" data-module="calidad" hidden>
+        <div class="panel-header"><div><h2>Calidad de producción reportada</h2><small>Fuente: envases buenos y malos reportados</small></div></div>
+        <div class="grid-kpi">
+            <div class="card"><span>Envases buenos</span><strong id="calidadBuenos">--</strong><small>operación reportada</small></div>
+            <div class="card"><span>Envases malos</span><strong id="calidadMalos">--</strong><small>operación reportada</small></div>
+            <div class="card"><span>Producción total</span><strong id="calidadTotal">--</strong><small>buenos + malos</small></div>
+            <div class="card"><span>Eficiencia de calidad</span><strong id="calidadEficiencia">--</strong><small>buenos / total</small></div>
+            <div class="card"><span>Tasa de rechazo</span><strong id="calidadRechazo">--</strong><small>malos / total</small></div>
+            <div class="card"><span>Malos por 1.000</span><strong id="calidadPorMil">--</strong><small>envases reportados</small></div>
         </div>
-    </section>
-
-    <section class="panel modulo modulo-pendiente" data-module="calidad" hidden>
-        <h2>Calidad</h2><p>Estructura preparada. Contenido pendiente de la subfase correspondiente.</p>
     </section>
     <section class="panel modulo" data-module="eficiencia-operacional" hidden>
         <div class="panel-header">
             <div>
-                <h2>Estados eléctricos de Aoki</h2>
+                <h2>Eficiencia operacional</h2>
                 <small>DATOS_HISTORICOS_DE_PRUEBA · ME337_1 · Clasificación preliminar</small>
             </div>
         </div>
+        <h3>Operación reportada</h3>
         <div class="grid-kpi">
-            <div class="card"><span>Horas productivas</span><strong id="estadoHorasProductivas">--</strong><small>PRODUCTIVE</small></div>
+            <div class="card"><span>Horas programadas</span><strong id="opHorasProgramadas">--</strong><small>jornadas reportadas</small></div>
+            <div class="card"><span>Horas reales reportadas</span><strong id="opHorasReales">--</strong><small>programadas menos paradas</small></div>
+            <div class="card"><span>Horas de parada reportadas</span><strong id="opHorasParada">--</strong><small>observaciones de producción</small></div>
+        </div>
+        <h3>Clasificación eléctrica preliminar</h3>
+        <p class="aviso-metodologico">Los estados se derivan de corriente y potencia del sistema medido. No equivalen necesariamente al estado productivo real de Aoki y no se usan para rellenar producción ni NO_DATA.</p>
+        <div class="grid-kpi">
+            <div class="card"><span>Horas clasificadas PRODUCTIVE</span><strong id="estadoHorasProductivas">--</strong><small>clasificación eléctrica preliminar</small></div>
             <div class="card"><span>Horas de espera</span><strong id="estadoHorasEspera">--</strong><small>IDLE</small></div>
             <div class="card"><span>Horas apagado</span><strong id="estadoHorasApagado">--</strong><small>OFF</small></div>
             <div class="card"><span>Horas sin datos</span><strong id="estadoHorasSinDatos">--</strong><small>NO_DATA</small></div>
-            <div class="card"><span>Cobertura</span><strong id="estadoCobertura">--</strong><small>periodo seleccionado</small></div>
+            <div class="card"><span>Cobertura de estados</span><strong id="estadoCobertura">--</strong><small>periodo con clasificación eléctrica</small></div>
             <div class="card"><span>Señal inconsistente</span><strong id="estadoInconsistencias">--</strong><small>segmentos para revisión</small></div>
         </div>
         <p id="estadoCriterio" class="periodo-efectivo">Criterio: --</p>
@@ -437,14 +456,16 @@
         </div>
     </section>
     <section class="panel modulo" data-module="eficiencia-energetica" hidden>
-        <div class="panel-header"><div><h2>Reconstrucción trazable de energía Aoki</h2><small>DATOS_HISTORICOS_DE_PRUEBA · ME337_1</small></div></div>
+        <div class="panel-header"><div><h2>Eficiencia energética Aoki</h2><small>DATOS_HISTORICOS_DE_PRUEBA · ME337_1</small></div></div>
+        <p class="aviso-metodologico">La energía medida por acumulador y la reconstruida mediante potencia se muestran por separado. Un intervalo energético recuperado no deja de ser NO_DATA para estados si no permite conocer su operación interna.</p>
         <div class="grid-kpi">
-            <div class="card"><span>Energía total calculada</span><strong id="energiaReconTotal">--</strong><small>kWh conocidos</small></div>
+            <div class="card"><span>Energía conocida total</span><strong id="energiaReconTotal">--</strong><small>medida + reconstruida</small></div>
             <div class="card"><span>Energía medida directamente</span><strong id="energiaReconMedida">--</strong><small>kWh · acumulador</small></div>
             <div class="card"><span>Energía reconstruida</span><strong id="energiaReconEstimada">--</strong><small>kWh · potencia</small></div>
             <div class="card"><span>Cobertura energética</span><strong id="energiaReconCobertura">--</strong><small>% duración con energía</small></div>
             <div class="card"><span>Porcentaje reconstruido</span><strong id="energiaReconPct">--</strong><small>% de energía conocida</small></div>
             <div class="card"><span>Intervalos NO_DATA</span><strong id="energiaReconNoData">--</strong><small>energía no recuperable</small></div>
+            <div class="card"><span>Duración energética NO_DATA</span><strong id="energiaReconNoDataHoras">--</strong><small>horas sin energía recuperable</small></div>
         </div>
         <p id="energiaReconCriterio" class="periodo-efectivo">Criterio: --</p>
         <h3>Detalle diario de calidad energética</h3>

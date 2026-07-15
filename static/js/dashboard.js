@@ -370,9 +370,13 @@ async function cargarProduccion() {
 
 async function cargarEstadosAoki() {
     const rango = obtenerRangoUnix();
-    const respuesta = await fetch(`/api/aoki/estados?inicio=${rango.inicio}&fin=${rango.fin}`);
-    const data = await respuesta.json();
+    const [respuesta, respuestaOperacion] = await Promise.all([
+        fetch(`/api/aoki/estados?inicio=${rango.inicio}&fin=${rango.fin}`),
+        fetch(`/api/produccion/modulo?inicio=${rango.inicio}&fin=${rango.fin}`)
+    ]);
+    const [data, operacion] = await Promise.all([respuesta.json(), respuestaOperacion.json()]);
     if (!respuesta.ok) throw new Error(data.error || "No fue posible clasificar los estados de Aoki");
+    if (!respuestaOperacion.ok) throw new Error(operacion.error || "No fue posible consultar la operación reportada");
     const diarios = data.daily || [];
     const sumar = campo => diarios.reduce((total, dia) => total + Number(dia[campo] || 0), 0);
     const programadas = sumar("scheduledHours");
@@ -387,6 +391,9 @@ async function cargarEstadosAoki() {
     document.getElementById("estadoHorasSinDatos").innerText = formatearNumero(sinDatos, 2);
     document.getElementById("estadoCobertura").innerText = cobertura === null ? "Datos insuficientes" : `${formatearNumero(cobertura, 2)} %`;
     document.getElementById("estadoInconsistencias").innerText = formatearEntero(sumar("inconsistentSegments"));
+    document.getElementById("opHorasProgramadas").innerText = formatearNumero(operacion.horas_programadas, 2);
+    document.getElementById("opHorasReales").innerText = operacion.horas_reales_trabajo === null ? "Dato pendiente" : formatearNumero(operacion.horas_reales_trabajo, 2);
+    document.getElementById("opHorasParada").innerText = operacion.horas_parada_reportadas === null ? "Dato pendiente" : formatearNumero(operacion.horas_parada_reportadas, 2);
     const umbrales = data.thresholds || {};
     document.getElementById("estadoCriterio").innerText = `Criterio ${umbrales.version || "--"}: OFF < ${umbrales.offIdleCurrentA} A; IDLE < ${umbrales.idleProductiveCurrentA} A; persistencia ${umbrales.minimumConsecutiveSamples} muestras o ${umbrales.minimumPersistenceMinutes} min; hueco máximo ${umbrales.maximumGapMinutes} min.`;
 
@@ -431,6 +438,7 @@ async function cargarEnergiaReconstruidaAoki() {
     document.getElementById("energiaReconCobertura").innerText = cobertura === null ? "Datos insuficientes" : `${formatearNumero(cobertura, 2)} %`;
     document.getElementById("energiaReconPct").innerText = porcentajeReconstruido === null ? "Datos insuficientes" : `${formatearNumero(porcentajeReconstruido, 2)} %`;
     document.getElementById("energiaReconNoData").innerText = formatearEntero(intervalosNoData);
+    document.getElementById("energiaReconNoDataHoras").innerText = formatearNumero(duracionNoData / 3600, 2);
     const config = data.config || {};
     document.getElementById("energiaReconCriterio").innerText = `Criterio ${config.version || "--"}: acumulador → potencia trapezoidal → potencia rectangular → NO_DATA. Corriente no usada como energía.`;
     const tbody = document.getElementById("tablaEnergiaReconstruida");
@@ -472,8 +480,9 @@ async function cargarLineaBase() {
     document.getElementById("lbClasificacion").innerText =
         data.clasificacion || "--";
 
-    document.getElementById("lbMensaje").innerText =
-        data.mensaje || "ISO 50001";
+    document.getElementById("lbMensaje").innerText = data.trazabilidad
+        ? `${data.mensaje || "Evaluación exploratoria"} Cobertura de estados: ${formatearNumero(data.trazabilidad.stateCoveragePct, 2)} %; NO_DATA: ${formatearNumero(data.trazabilidad.stateNoDataHours, 2)} h.`
+        : (data.mensaje || "ISO 50001");
 
     const beta0 = data.modelo?.intercepto;
     const betaEnvases = data.modelo?.coef_envases_buenos;
@@ -491,24 +500,17 @@ async function cargarLineaBase() {
         formatearNumero(data.modelo?.r2, 3);
 }
 
-
-async function entrenarLineaBase() {
-    const ok = confirm("¿Desea reentrenar la línea base energética con muestras simuladas?");
-
-    if (!ok) {
-        return;
-    }
-
-    const res = await fetch("/api/linea-base/entrenar?dias=30");
-    const data = await res.json();
-
-    if (data.ok) {
-        alert("Línea base reentrenada correctamente.");
-    } else {
-        alert("No fue posible entrenar la línea base.");
-    }
-
-    await cargarLineaBase();
+async function cargarCalidad() {
+    const rango = obtenerRangoUnix();
+    const respuesta = await fetch(`/api/produccion/modulo?inicio=${rango.inicio}&fin=${rango.fin}`);
+    const data = await respuesta.json();
+    if (!respuesta.ok) throw new Error(data.error || "No fue posible consultar la calidad reportada");
+    document.getElementById("calidadBuenos").innerText = formatearEntero(data.envases_buenos);
+    document.getElementById("calidadMalos").innerText = formatearEntero(data.envases_malos);
+    document.getElementById("calidadTotal").innerText = formatearEntero(data.produccion_total);
+    document.getElementById("calidadEficiencia").innerText = data.eficiencia_calidad_pct === null ? "Datos insuficientes" : `${formatearNumero(data.eficiencia_calidad_pct, 2)} %`;
+    document.getElementById("calidadRechazo").innerText = data.tasa_rechazo_pct === null ? "Datos insuficientes" : `${formatearNumero(data.tasa_rechazo_pct, 2)} %`;
+    document.getElementById("calidadPorMil").innerText = data.rechazos_por_1000 === null ? "Datos insuficientes" : formatearNumero(data.rechazos_por_1000, 2);
 }
 
 async function cargarDashboard() {
@@ -552,6 +554,27 @@ async function cargarDashboard() {
 
     document.getElementById("co2Proceso").innerText =
         formatearNumero(data.impacto?.co2_proceso_kg, 2);
+
+    const [respuestaOperacion, respuestaEstados, respuestaEnergia] = await Promise.all([
+        fetch(`/api/produccion/modulo?inicio=${rango.inicio}&fin=${rango.fin}`),
+        fetch(`/api/aoki/estados?inicio=${rango.inicio}&fin=${rango.fin}`),
+        fetch(`/api/aoki/energia-reconstruida?inicio=${rango.inicio}&fin=${rango.fin}`)
+    ]);
+    const [operacion, estados, energia] = await Promise.all([
+        respuestaOperacion.json(), respuestaEstados.json(), respuestaEnergia.json()
+    ]);
+    const diariosEstado = estados.daily || [];
+    const horasProgramadas = diariosEstado.reduce((s, d) => s + Number(d.scheduledHours || 0), 0);
+    const horasProductive = diariosEstado.reduce((s, d) => s + Number(d.productiveHours || 0), 0);
+    const horasNoData = diariosEstado.reduce((s, d) => s + Number(d.noDataHours || 0), 0);
+    const coberturaEstados = horasProgramadas > 0 ? (horasProgramadas - horasNoData) / horasProgramadas * 100 : null;
+    const duracionEnergia = (energia.intervals || []).reduce((s, i) => s + Number(i.durationSeconds || 0), 0);
+    const noDataEnergia = (energia.intervals || []).filter(i => i.source === "NO_DATA").reduce((s, i) => s + Number(i.durationSeconds || 0), 0);
+    const coberturaEnergia = duracionEnergia > 0 ? (duracionEnergia - noDataEnergia) / duracionEnergia * 100 : null;
+    document.getElementById("horasProductivasResumen").innerText = horasProgramadas > 0 ? formatearNumero(horasProductive, 2) : "Datos insuficientes";
+    document.getElementById("horasParadaResumen").innerText = operacion.horas_parada_reportadas === null ? "Dato pendiente" : formatearNumero(operacion.horas_parada_reportadas, 2);
+    document.getElementById("coberturaEstadosResumen").innerText = coberturaEstados === null ? "Datos insuficientes" : `${formatearNumero(coberturaEstados, 2)} %`;
+    document.getElementById("coberturaEnergiaResumen").innerText = coberturaEnergia === null ? "Datos insuficientes" : `${formatearNumero(coberturaEnergia, 2)} %`;
 }
 
 async function cargarEstado() {
@@ -1040,6 +1063,8 @@ async function actualizarTodo() {
             await cargarDashboard();
         } else if (moduloActual === "produccion") {
             await cargarProduccion();
+        } else if (moduloActual === "calidad") {
+            await cargarCalidad();
         } else if (moduloActual === "eficiencia-operacional") {
             await cargarEstadosAoki();
         } else if (moduloActual === "eficiencia-energetica") {

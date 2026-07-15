@@ -950,6 +950,224 @@ Presentar:
 
 Detenerse al finalizar. No avanzar a la subfase 2.4 sin autorización.
 
+
+## Subfase 2.3B — Ajuste del dashboard con los datos históricos disponibles
+
+Esta subfase se ejecuta después de la clasificación preliminar de estados de la subfase 2.3 y antes de cualquier reentrenamiento con datos nuevos.
+
+Trabaja únicamente en esta subfase. No avances todavía a MTBF, MTTR, disponibilidad técnica definitiva, reconstrucción productiva de huecos ni reentrenamiento de la línea base.
+
+### Decisión metodológica vigente
+
+Los datos históricos actuales permiten organizar, visualizar, auditar y documentar el comportamiento eléctrico y productivo del proceso, pero no permiten demostrar todavía una relación suficientemente fuerte entre producción diaria y horas clasificadas como `PRODUCTIVE`.
+
+Resultados observados:
+
+```text
+R² producción total diaria vs horas PRODUCTIVE:
+- todas las jornadas: 0.0285
+- jornadas con cobertura >= 98 %: 0.0245
+- jornadas con cobertura 100 % y producción positiva: 0.0719
+```
+
+Por tanto:
+
+- no construir todavía una productividad de referencia a partir de las horas `PRODUCTIVE`;
+- no usar producción para rellenar automáticamente segmentos `NO_DATA`;
+- no ajustar horas productivas para forzar concordancia con producción;
+- no modificar la ecuación oficial de línea base;
+- no declarar que los estados eléctricos equivalen directamente al estado productivo real de Aoki;
+- conservar los resultados actuales como clasificación eléctrica preliminar.
+
+La medición puede incluir cargas auxiliares o compartidas del proceso. Esta limitación debe documentarse en el dashboard y en los resultados técnicos.
+
+### Objetivo
+
+Continuar ajustando el dashboard con la base histórica local para:
+
+- corregir menús y navegación;
+- consolidar producción, calidad, energía y estados eléctricos;
+- mostrar cobertura y calidad de datos;
+- diferenciar datos medidos, reconstruidos y faltantes;
+- dejar preparada la arquitectura para reentrenamiento posterior con datos nuevos;
+- evitar conclusiones no demostradas.
+
+### Tratamiento de estados eléctricos
+
+Mantener la clasificación actual:
+
+```text
+PRODUCTIVE
+IDLE
+OFF
+NO_DATA
+```
+
+pero presentarla como:
+
+```text
+clasificación eléctrica preliminar
+```
+
+Agregar una nota metodológica visible:
+
+```text
+Los estados eléctricos se derivan de corriente y potencia del sistema medido.
+No equivalen necesariamente al estado productivo real de Aoki.
+La relación con producción debe revalidarse con datos nuevos y medición mejor aislada.
+```
+
+No renombrar todavía los estados internos del backend si eso rompe compatibilidad, pero sí aclarar su significado en la interfaz.
+
+### Tratamiento de NO_DATA
+
+Para esta subfase:
+
+- conservar `NO_DATA` cuando falte evidencia;
+- no completar huecos con producción;
+- no asignar valores fijos;
+- permitir únicamente la reconstrucción energética ya validada en la subfase 2.2B;
+- distinguir claramente cobertura energética y cobertura de estados;
+- mostrar cuánto tiempo permanece sin clasificación.
+
+### Uso de producción
+
+La producción debe mantenerse como módulo independiente con:
+
+```text
+envases buenos
+envases malos
+producción total
+horas programadas
+paradas reportadas
+horas reales reportadas
+productividad buena por hora reportada
+productividad total por hora reportada
+calidad
+```
+
+Puede compararse visualmente con energía y estados eléctricos, pero no debe usarse todavía como variable de imputación o reconstrucción automática.
+
+### Ajustes requeridos en Eficiencia operacional
+
+Mostrar:
+
+```text
+Horas clasificadas como PRODUCTIVE
+Horas clasificadas como IDLE
+Horas clasificadas como OFF
+Horas NO_DATA
+Cobertura de estados
+Segmentos inconsistentes
+Horas de parada reportadas
+Horas reales reportadas
+```
+
+Separar claramente:
+
+```text
+operación reportada
+clasificación eléctrica preliminar
+```
+
+No mezclar ambas como si fueran la misma fuente.
+
+### Ajustes requeridos en Eficiencia energética
+
+Mantener:
+
+```text
+Energía total calculada
+Energía medida directamente
+Energía reconstruida
+Cobertura energética
+Porcentaje reconstruido
+Intervalos NO_DATA
+```
+
+Usar la jerarquía ya validada:
+
+```text
+ACCUMULATOR_DELTA
+POWER_TRAPEZOIDAL
+POWER_RECTANGULAR
+NO_DATA
+```
+
+No usar corriente para estimar energía mientras no exista un modelo aprobado.
+
+### Ajustes requeridos en Línea base
+
+Mantener la ecuación oficial sin cambios:
+
+```text
+E_esperada_kWh =
+514.50
++ 0.005018 × envases_buenos
++ 16.5198 × horas_productivas
+```
+
+Pero agregar una advertencia metodológica:
+
+```text
+La evaluación actual usa horas productivas clasificadas eléctricamente de forma preliminar.
+Los resultados deben considerarse exploratorios hasta revalidar la relación entre estados eléctricos y producción con datos nuevos.
+```
+
+La clasificación de mejora o sobreconsumo debe mostrarse como:
+
+```text
+RESULTADO_PRELIMINAR
+```
+
+cuando dependa de horas productivas todavía no revalidadas.
+
+### Preparación para datos nuevos
+
+Dejar configurada la arquitectura para que, cuando existan nuevos datos, sea posible:
+
+1. recalibrar umbrales de corriente y potencia;
+2. separar mejor cargas compartidas;
+3. incorporar señal de ciclo, PLC o entrada digital si se dispone;
+4. evaluar nuevamente producción vs horas productivas;
+5. reentrenar la línea base;
+6. recalcular Índice Base 100 y CUSUM;
+7. comparar el modelo histórico con el modelo actualizado.
+
+No ejecutar estas tareas todavía.
+
+### Validaciones mínimas
+
+Verificar:
+
+1. que todos los módulos usen el mismo rango 06:00–06:00;
+2. que producción y energía usen las mismas fechas efectivas;
+3. que los estados eléctricos muestren cobertura;
+4. que `NO_DATA` no se convierta en cero;
+5. que energía medida y reconstruida estén separadas;
+6. que el dashboard no presente estados eléctricos como verdad productiva;
+7. que la línea base indique carácter preliminar;
+8. que no se use producción para imputar horas;
+9. que no se modifique la base local maestra sin respaldo;
+10. que no exista ninguna escritura hacia la Raspberry.
+
+### Entrega
+
+Presentar:
+
+1. archivos modificados;
+2. menús y vistas corregidos;
+3. textos metodológicos agregados;
+4. separación entre operación reportada y clasificación eléctrica;
+5. cobertura energética y cobertura de estados;
+6. resultados preliminares del periodo mayo-junio de 2026;
+7. pruebas ejecutadas;
+8. limitaciones pendientes;
+9. estructura preparada para reentrenamiento futuro.
+
+Detenerse al finalizar. No avanzar a la subfase 2.4 ni reentrenar modelos sin autorización.
+
+
 ## Subfase 2.4 — Cálculo de horas por estado
 
 Por jornada productiva 06:00–06:00 y por periodo seleccionado calcular:
