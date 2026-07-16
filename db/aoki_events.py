@@ -1,4 +1,7 @@
 from collections import Counter
+import hashlib
+
+
 NON_PRODUCTIVE_STATES = {"IDLE", "OFF"}
 QUALITY_RANK = {"VALID_STATE": 0, "PARTIAL_SIGNAL": 1, "INCONSISTENT_SIGNAL": 2}
 
@@ -9,6 +12,12 @@ def _weighted_average(parts, value_key):
     if not seconds:
         return None
     return round(sum(part[value_key] * part["durationSeconds"] for part in valid) / seconds, 4)
+
+
+def _electrical_event_id(start_utc, end_utc, threshold_version):
+    payload = f"ME337_1|10|24|{start_utc}|{end_utc}|{threshold_version}"
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:20]
+    return f"electrical-{digest}"
 
 
 def _build_event(parts, thresholds):
@@ -29,9 +38,12 @@ def _build_event(parts, thresholds):
         (part.get("quality", "VALID_STATE") for part in parts),
         key=lambda item: QUALITY_RANK.get(item, 3),
     )
+    start_utc = parts[0]["startUtc"]
+    end_utc = parts[-1]["endUtc"]
     return {
-        "startUtc": parts[0]["startUtc"],
-        "endUtc": parts[-1]["endUtc"],
+        "eventId": _electrical_event_id(start_utc, end_utc, thresholds["version"]),
+        "startUtc": start_utc,
+        "endUtc": end_utc,
         "startLocal": parts[0]["startLocal"],
         "endLocal": parts[-1]["endLocal"],
         "productionDates": production_dates,

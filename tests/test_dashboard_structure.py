@@ -80,6 +80,24 @@ class DashboardStructureTests(unittest.TestCase):
         self.assertIn("No son fallas confirmadas", self.html)
         self.assertIn("const resumenEventos = data.summary || {}", self.javascript)
 
+    def test_dashboard_exposes_traceable_reconciliation_without_failures(self):
+        for identifier in (
+            "conciliacionReportadas", "conciliacionDetectadas", "conciliacionAmbas",
+            "conciliacionSoloReportadas", "conciliacionSoloDetectadas",
+            "conciliacionPendientes", "tablaConciliacionAoki",
+            "filtroConciliacionClasificacion", "filtroConciliacionConfianza",
+            "filtroConciliacionEstado", "filtroConciliacionJornada",
+            "filtroConciliacionRevision",
+        ):
+            self.assertIn(f'id="{identifier}"', self.html)
+        self.assertIn("Los eventos eléctricos no son fallas confirmadas", self.html)
+        self.assertIn("/api/aoki/conciliacion", self.javascript)
+        self.assertIn("item.reportedDurationMinutes", self.javascript)
+        self.assertIn("item.electricalDurationMinutes", self.javascript)
+        self.assertIn("item.overlapMinutes", self.javascript)
+        self.assertNotIn("MTBF", self.html)
+        self.assertNotIn("MTTR", self.html)
+
     def test_dashboard_labels_historical_dataset_and_preliminary_baseline(self):
         self.assertIn("DATOS_HISTORICOS_DE_PRUEBA", self.html)
         self.assertIn("RESULTADO_PRELIMINAR", self.html)

@@ -8,6 +8,7 @@ let mesesProduccion = [];
 let moduloActual = "resumen";
 let actualizacionEnCurso = false;
 let chartEstadosAoki = null;
+let conciliacionActual = [];
 
 function obtenerKeyVariable(v) {
     if (!v) return null;
@@ -252,6 +253,16 @@ function formatearHoraColombia(timestampUtc) {
     });
 }
 
+function formatearIsoColombia(valor) {
+    if (!valor) return "--";
+    const fecha = new Date(valor);
+    if (Number.isNaN(fecha.getTime())) return String(valor);
+    return fecha.toLocaleString("es-CO", {
+        timeZone: "America/Bogota", year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false
+    });
+}
+
 function formatearEdadSegundos(segundos) {
     if (segundos === null || segundos === undefined) return "--";
 
@@ -370,13 +381,17 @@ async function cargarProduccion() {
 
 async function cargarEstadosAoki() {
     const rango = obtenerRangoUnix();
-    const [respuesta, respuestaOperacion] = await Promise.all([
+    const [respuesta, respuestaOperacion, respuestaConciliacion] = await Promise.all([
         fetch(`/api/aoki/estados?inicio=${rango.inicio}&fin=${rango.fin}`),
-        fetch(`/api/produccion/modulo?inicio=${rango.inicio}&fin=${rango.fin}`)
+        fetch(`/api/produccion/modulo?inicio=${rango.inicio}&fin=${rango.fin}`),
+        fetch(`/api/aoki/conciliacion?inicio=${rango.inicio}&fin=${rango.fin}`)
     ]);
-    const [data, operacion] = await Promise.all([respuesta.json(), respuestaOperacion.json()]);
+    const [data, operacion, conciliacion] = await Promise.all([
+        respuesta.json(), respuestaOperacion.json(), respuestaConciliacion.json()
+    ]);
     if (!respuesta.ok) throw new Error(data.error || "No fue posible clasificar los estados de Aoki");
     if (!respuestaOperacion.ok) throw new Error(operacion.error || "No fue posible consultar la operación reportada");
+    if (!respuestaConciliacion.ok) throw new Error(conciliacion.error || "No fue posible conciliar las paradas");
     const diarios = data.daily || [];
     const sumar = campo => diarios.reduce((total, dia) => total + Number(dia[campo] || 0), 0);
     const programadas = sumar("scheduledHours");
@@ -409,6 +424,7 @@ async function cargarEstadosAoki() {
         fila.innerHTML = `<td>${escaparHtml(evento.startLocal)}</td><td>${escaparHtml(evento.endLocal)}</td><td>${formatearNumero(evento.durationMinutes, 2)}</td><td>${escaparHtml(evento.dominantState)}</td><td>${formatearNumero(evento.minimumCurrentA, 2)}</td><td>${formatearNumero(evento.averageCurrentA, 2)}</td><td>${formatearNumero(evento.averagePowerKW, 2)}</td><td>${formatearEntero(evento.sampleCount)}</td><td>${escaparHtml(evento.status)}</td><td>${escaparHtml(evento.classification)}</td>`;
         tbodyEventos.appendChild(fila);
     });
+    cargarConciliacionAoki(conciliacion);
     document.getElementById("opHorasProgramadas").innerText = formatearNumero(operacion.horas_programadas, 2);
     document.getElementById("opHorasReales").innerText = operacion.horas_reales_trabajo === null ? "Dato pendiente" : formatearNumero(operacion.horas_reales_trabajo, 2);
     document.getElementById("opHorasParada").innerText = operacion.horas_parada_reportadas === null ? "Dato pendiente" : formatearNumero(operacion.horas_parada_reportadas, 2);
@@ -432,6 +448,84 @@ async function cargarEstadosAoki() {
             { label: "NO_DATA", data: diarios.map(d => d.noDataHours), backgroundColor: "#dc2626" }
         ]},
         options: { responsive: true, scales: { x: { stacked: true }, y: { stacked: true, title: { display: true, text: "Horas" } } } }
+    });
+}
+
+function jornadaConciliacion(evento) {
+    return evento.reportedEvents?.[0]?.productionDate
+        || evento.electricalEvents?.[0]?.productionDates?.[0]
+        || "";
+}
+
+function poblarFiltroConciliacion(id, valores) {
+    const selector = document.getElementById(id);
+    if (!selector) return;
+    const seleccionado = selector.value;
+    selector.innerHTML = '<option value="">Todas</option>';
+    [...new Set(valores.filter(Boolean))].sort().forEach(valor => {
+        const option = document.createElement("option");
+        option.value = valor;
+        option.textContent = valor;
+        selector.appendChild(option);
+    });
+    if ([...selector.options].some(option => option.value === seleccionado)) selector.value = seleccionado;
+}
+
+function cargarConciliacionAoki(data) {
+    const resumen = data.summary || {};
+    document.getElementById("conciliacionReportadas").innerText = formatearEntero(resumen.totalReportadas);
+    document.getElementById("conciliacionDetectadas").innerText = formatearEntero(resumen.totalDetectadas);
+    document.getElementById("conciliacionAmbas").innerText = formatearEntero(resumen.totalReportadasYDetectadas);
+    document.getElementById("conciliacionSoloReportadas").innerText = formatearEntero(resumen.totalSoloReportadas);
+    document.getElementById("conciliacionSoloDetectadas").innerText = formatearEntero(resumen.totalSoloDetectadas);
+    document.getElementById("conciliacionPendientes").innerText = formatearEntero(resumen.totalPendientesRevision);
+    const rango = data.effectiveRange;
+    document.getElementById("conciliacionPeriodo").innerText = rango
+        ? `Periodo conciliable: ${formatearIsoColombia(rango.startLocal)} – ${formatearIsoColombia(rango.endLocal)} · tolerancia ±${data.config?.matchingToleranceMinutes ?? "--"} min`
+        : "Periodo conciliable: sin intersección entre producción y mediciones eléctricas";
+    conciliacionActual = data.events || [];
+    poblarFiltroConciliacion("filtroConciliacionClasificacion", conciliacionActual.map(item => item.classification));
+    poblarFiltroConciliacion("filtroConciliacionConfianza", conciliacionActual.map(item => item.confidence));
+    renderizarConciliacionAoki();
+}
+
+function renderizarConciliacionAoki() {
+    const clasificacion = document.getElementById("filtroConciliacionClasificacion")?.value || "";
+    const confianza = document.getElementById("filtroConciliacionConfianza")?.value || "";
+    const estado = document.getElementById("filtroConciliacionEstado")?.value || "";
+    const jornada = document.getElementById("filtroConciliacionJornada")?.value || "";
+    const revision = document.getElementById("filtroConciliacionRevision")?.value || "";
+    const filtrados = conciliacionActual.filter(item => {
+        const estados = (item.electricalEvents || []).map(evento => evento.dominantState);
+        return (!clasificacion || item.classification === clasificacion)
+            && (!confianza || item.confidence === confianza)
+            && (!estado || estados.includes(estado))
+            && (!jornada || jornadaConciliacion(item) === jornada)
+            && (!revision || item.status === revision);
+    });
+    const tbody = document.getElementById("tablaConciliacionAoki");
+    tbody.innerHTML = filtrados.length ? "" : '<tr><td colspan="16">No hay eventos para los filtros seleccionados</td></tr>';
+    filtrados.forEach(item => {
+        const fila = document.createElement("tr");
+        const coberturas = `${formatearNumero(item.reportedCoveragePct, 1)} % / ${formatearNumero(item.electricalCoveragePct, 1)} %`;
+        fila.innerHTML = `
+            <td>${escaparHtml(jornadaConciliacion(item) || "--")}</td>
+            <td>${escaparHtml(formatearIsoColombia(item.startReported))}</td>
+            <td>${escaparHtml(formatearIsoColombia(item.endReported))}</td>
+            <td>${formatearNumero(item.reportedDurationMinutes, 2)}</td>
+            <td>${escaparHtml(formatearIsoColombia(item.startElectrical))}</td>
+            <td>${escaparHtml(formatearIsoColombia(item.endElectrical))}</td>
+            <td>${formatearNumero(item.electricalDurationMinutes, 2)}</td>
+            <td>${formatearNumero(item.durationDifferenceMinutes, 2)}</td>
+            <td>${formatearNumero(item.overlapMinutes, 2)}</td>
+            <td>${escaparHtml(coberturas)}</td>
+            <td>${escaparHtml(item.classification)}</td>
+            <td>${escaparHtml(item.confidence || "NOT_APPLICABLE")}</td>
+            <td>${escaparHtml(item.cause || "--")}</td>
+            <td>${escaparHtml(item.rawText || "--")}</td>
+            <td>${escaparHtml(item.reason || "--")}</td>
+            <td>${escaparHtml(item.status || "--")}</td>`;
+        tbody.appendChild(fila);
     });
 }
 
@@ -1180,9 +1274,18 @@ function inicializarFiltros() {
     obtenerRangoUnix();
 }
 
+function inicializarFiltrosConciliacion() {
+    [
+        "filtroConciliacionClasificacion", "filtroConciliacionConfianza",
+        "filtroConciliacionEstado", "filtroConciliacionJornada",
+        "filtroConciliacionRevision"
+    ].forEach(id => document.getElementById(id)?.addEventListener("change", renderizarConciliacionAoki));
+}
+
 async function iniciarDashboard() {
     await cargarRangosProduccion();
     inicializarFiltros();
+    inicializarFiltrosConciliacion();
     inicializarVistasLineaBase();
     obtenerRangoUnix();
 

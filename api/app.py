@@ -19,6 +19,12 @@ from db.produccion_samee200 import obtener_modulo_produccion
 from db.aoki_states import classify_aoki_states, query_aoki_rows
 from db.aoki_energy import reconstruct_aoki_energy, query_aoki_energy_rows
 from db.aoki_events import detect_aoki_downtime_events
+from db.aoki_reconciliation import (
+    empty_reconciliation_result,
+    extract_reported_events,
+    reconcile_aoki_downtimes,
+    resolve_reconciliation_range,
+)
 
 load_dotenv("/home/pi/SAMEE200/scr/.env")
 
@@ -243,6 +249,33 @@ def api_aoki_energia_reconstruida():
     try:
         rows = query_aoki_energy_rows(conn, inicio, fin)
         return jsonify(reconstruct_aoki_energy(rows, start_utc=inicio, end_utc=fin))
+    finally:
+        conn.close()
+
+
+@app.route("/api/aoki/conciliacion")
+def api_aoki_conciliacion():
+    inicio = request.args.get("inicio", type=int)
+    fin = request.args.get("fin", type=int)
+    if inicio is None or fin is None or fin <= inicio:
+        return jsonify({"error": "Rango de fechas inválido"}), 400
+    if fin - inicio > 90 * 86400:
+        return jsonify({"error": "El rango máximo local es de 90 días"}), 400
+    conn = get_conn()
+    try:
+        effective_range = resolve_reconciliation_range(conn, inicio, fin)
+        if effective_range is None:
+            return jsonify(empty_reconciliation_result())
+        effective_start, effective_end = effective_range
+        rows = query_aoki_rows(conn, effective_start, effective_end)
+        classification = classify_aoki_states(rows, effective_start, effective_end)
+        detected = detect_aoki_downtime_events(classification)
+        periods = obtener_produccion_periodos(effective_start, effective_end)
+        reported = extract_reported_events(periods)
+        return jsonify(reconcile_aoki_downtimes(
+            detected["events"], reported, classification["segments"],
+            effective_start, effective_end,
+        ))
     finally:
         conn.close()
 

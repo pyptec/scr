@@ -463,6 +463,44 @@
                 <tbody id="tablaEventosAoki"></tbody>
             </table>
         </div>
+        <h3>Conciliación preliminar de paradas reportadas y eventos eléctricos</h3>
+        <p class="aviso-metodologico">Los eventos eléctricos no son fallas confirmadas. La conciliación es preliminar y requiere revisión cuando la evidencia sea incompleta.</p>
+        <div class="grid-kpi">
+            <div class="card"><span>Paradas reportadas</span><strong id="conciliacionReportadas">--</strong><small>eventos normalizados</small></div>
+            <div class="card"><span>Eventos eléctricos</span><strong id="conciliacionDetectadas">--</strong><small>ME337_1 dentro del rango conciliable</small></div>
+            <div class="card"><span>Reportadas y detectadas</span><strong id="conciliacionAmbas">--</strong><small>coincidencia temporal suficiente</small></div>
+            <div class="card"><span>Solo reportadas</span><strong id="conciliacionSoloReportadas">--</strong><small>con cobertura eléctrica suficiente</small></div>
+            <div class="card"><span>Solo detectadas</span><strong id="conciliacionSoloDetectadas">--</strong><small>no son fallas confirmadas</small></div>
+            <div class="card"><span>Pendientes de revisión</span><strong id="conciliacionPendientes">--</strong><small>evidencia ambigua o incompleta</small></div>
+        </div>
+        <p id="conciliacionPeriodo" class="periodo-efectivo">Periodo conciliable: --</p>
+        <div class="filtros-grid">
+            <label>Clasificación
+                <select id="filtroConciliacionClasificacion"><option value="">Todas</option></select>
+            </label>
+            <label>Confianza
+                <select id="filtroConciliacionConfianza"><option value="">Todas</option></select>
+            </label>
+            <label>Estado dominante
+                <select id="filtroConciliacionEstado">
+                    <option value="">Todos</option><option value="IDLE">IDLE</option><option value="OFF">OFF</option>
+                </select>
+            </label>
+            <label>Jornada
+                <input id="filtroConciliacionJornada" type="date">
+            </label>
+            <label>Estado de revisión
+                <select id="filtroConciliacionRevision">
+                    <option value="">Todos</option><option value="PENDING_REVIEW">PENDING_REVIEW</option><option value="VALIDATED">VALIDATED</option>
+                </select>
+            </label>
+        </div>
+        <div class="tabla-wrapper">
+            <table>
+                <thead><tr><th>Jornada</th><th>Inicio reportado</th><th>Fin reportado</th><th>Duración reportada</th><th>Inicio eléctrico</th><th>Fin eléctrico</th><th>Duración eléctrica</th><th>Diferencia</th><th>Solapamiento</th><th>Cobertura R/E</th><th>Clasificación</th><th>Confianza</th><th>Causa</th><th>Observación</th><th>Motivo</th><th>Revisión</th></tr></thead>
+                <tbody id="tablaConciliacionAoki"></tbody>
+            </table>
+        </div>
         <h3>Resumen por jornada 06:00–06:00</h3>
         <div class="tabla-wrapper">
             <table>

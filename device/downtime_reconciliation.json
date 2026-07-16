@@ -1,0 +1,11 @@
+{
+  "version": "aoki-downtime-reconciliation-v1-2026-07",
+  "matchingToleranceMinutes": 20,
+  "minimumOverlapMinutes": 10,
+  "minimumOverlapPct": 30,
+  "dataset": {
+    "type": "DATOS_HISTORICOS_DE_PRUEBA",
+    "origin": "copia histórica local del SAMEE200",
+    "usage": "conciliación preliminar local; no confirma fallas"
+  }
+}

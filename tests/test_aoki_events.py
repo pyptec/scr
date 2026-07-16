@@ -82,6 +82,13 @@ class AokiEventTests(unittest.TestCase):
         event = self.detect([first, second])["events"][0]
         self.assertEqual(event["quality"], "INCONSISTENT_SIGNAL")
 
+    def test_electrical_event_id_is_stable_and_traceable(self):
+        segments = [segment("IDLE", "10:00", "10:20")]
+        first = self.detect(segments)["events"][0]
+        second = self.detect(segments)["events"][0]
+        self.assertEqual(first["eventId"], second["eventId"])
+        self.assertTrue(first["eventId"].startswith("electrical-"))
+
 
 if __name__ == "__main__":
     unittest.main()
