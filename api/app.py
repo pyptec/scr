@@ -25,6 +25,10 @@ from db.aoki_reconciliation import (
     reconcile_aoki_downtimes,
     resolve_reconciliation_range,
 )
+from db.fase2_dashboard import (
+    attach_temporal_contract,
+    build_phase2_dashboard,
+)
 
 load_dotenv("/home/pi/SAMEE200/scr/.env")
 
@@ -85,8 +89,23 @@ def api_dashboard():
         inicio = fin - 86400
 
     data = resumen_kpi_samee200(inicio=inicio, fin=fin)
-
+    attach_temporal_contract(data, inicio, fin)
     return jsonify(data)
+
+
+@app.route("/api/fase2/dashboard")
+def api_fase2_dashboard():
+    inicio = request.args.get("inicio", type=int)
+    fin = request.args.get("fin", type=int)
+    if inicio is None or fin is None or fin <= inicio:
+        return jsonify({"error": "Rango de fechas inválido"}), 400
+    if fin - inicio > 90 * 86400:
+        return jsonify({"error": "El rango máximo local es de 90 días"}), 400
+    conn = get_conn()
+    try:
+        return jsonify(build_phase2_dashboard(conn, inicio, fin))
+    finally:
+        conn.close()
 
 
 @app.route("/api/estado")
@@ -232,6 +251,7 @@ def api_aoki_estados():
         rows = query_aoki_rows(conn, inicio, fin)
         result = classify_aoki_states(rows, inicio, fin)
         result.update(detect_aoki_downtime_events(result))
+        attach_temporal_contract(result, inicio, fin)
         return jsonify(result)
     finally:
         conn.close()
@@ -248,7 +268,9 @@ def api_aoki_energia_reconstruida():
     conn = get_conn()
     try:
         rows = query_aoki_energy_rows(conn, inicio, fin)
-        return jsonify(reconstruct_aoki_energy(rows, start_utc=inicio, end_utc=fin))
+        result = reconstruct_aoki_energy(rows, start_utc=inicio, end_utc=fin)
+        attach_temporal_contract(result, inicio, fin)
+        return jsonify(result)
     finally:
         conn.close()
 
@@ -265,17 +287,24 @@ def api_aoki_conciliacion():
     try:
         effective_range = resolve_reconciliation_range(conn, inicio, fin)
         if effective_range is None:
-            return jsonify(empty_reconciliation_result())
+            result = empty_reconciliation_result()
+            attach_temporal_contract(result, inicio, fin, reconciliable=None)
+            return jsonify(result)
         effective_start, effective_end = effective_range
         rows = query_aoki_rows(conn, effective_start, effective_end)
         classification = classify_aoki_states(rows, effective_start, effective_end)
         detected = detect_aoki_downtime_events(classification)
         periods = obtener_produccion_periodos(effective_start, effective_end)
         reported = extract_reported_events(periods)
-        return jsonify(reconcile_aoki_downtimes(
+        result = reconcile_aoki_downtimes(
             detected["events"], reported, classification["segments"],
             effective_start, effective_end,
-        ))
+        )
+        attach_temporal_contract(
+            result, inicio, fin, effective=effective_range,
+            reconciliable=effective_range,
+        )
+        return jsonify(result)
     finally:
         conn.close()
 
@@ -355,11 +384,36 @@ def api_variables():
 
 @app.route("/api/ultimos")
 def api_ultimos():
+    inicio = request.args.get("inicio", type=int)
+    fin = request.args.get("fin", type=int)
+    if (inicio is None) != (fin is None) or (
+        inicio is not None and fin is not None and fin <= inicio
+    ):
+        return jsonify({"error": "Rango de fechas inválido"}), 400
     conn = get_conn()
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
 
-    cur.execute("""
+    historical_where = ""
+    params = []
+    if inicio is not None and fin is not None:
+        historical_where = """
+            WHERE CAST(md.timestamp_utc AS INTEGER) >= ?
+              AND CAST(md.timestamp_utc AS INTEGER) < ?
+        """
+        params = [int(inicio), int(fin)]
+
+    cur.execute(f"""
+        WITH ranked AS (
+            SELECT md.*,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY gateway_id, source_type,
+                                    NULLIF(TRIM(device_id), ''), unit_id
+                       ORDER BY CAST(timestamp_utc AS INTEGER) DESC, id DESC
+                   ) AS row_number
+            FROM mediciones_detalle md
+            {historical_where}
+        )
         SELECT
             md.gateway_id,
             g.nombre AS gateway,
@@ -375,42 +429,35 @@ def api_ultimos():
             u.simbol AS simbol,
             md.valor,
             md.timestamp_utc
-        FROM mediciones_detalle md
-        INNER JOIN (
-            SELECT
-                gateway_id,
-                source_type,
-                NULLIF(TRIM(device_id), '') AS device_id,
-                unit_id,
-                MAX(id) AS max_id
-            FROM mediciones_detalle
-            GROUP BY
-                gateway_id,
-                source_type,
-                NULLIF(TRIM(device_id), ''),
-                unit_id
-        ) ult
-            ON md.id = ult.max_id
+        FROM ranked md
         LEFT JOIN dispositivos d
             ON CAST(NULLIF(TRIM(md.device_id), '') AS INTEGER) = d.device_id
         LEFT JOIN gateways g
             ON md.gateway_id = g.gateway_id
         LEFT JOIN unidades u
             ON md.unit_id = u.unit_id
+        WHERE md.row_number = 1
         ORDER BY
             md.gateway_id ASC,
             md.source_type ASC,
             CAST(NULLIF(TRIM(md.device_id), '') AS INTEGER) ASC,
             md.unit_id ASC
-    """)
+    """, params)
 
     rows = [dict(r) for r in cur.fetchall()]
     conn.close()
 
-    return jsonify({
+    result = {
         "total": len(rows),
-        "datos": rows
-    })
+        "datos": rows,
+        "scope": (
+            "HISTORICO_DENTRO_DEL_FILTRO" if inicio is not None
+            else "INSTANTANEO_FUERA_DEL_FILTRO_HISTORICO"
+        ),
+    }
+    if inicio is not None:
+        attach_temporal_contract(result, inicio, fin)
+    return jsonify(result)
 
 
 @app.route("/api/serie/<int:unit_id>")
@@ -430,7 +477,7 @@ def api_serie(unit_id):
     where = """
         md.unit_id = ?
         AND CAST(md.timestamp_utc AS INTEGER) >= ?
-        AND CAST(md.timestamp_utc AS INTEGER) <= ?
+        AND CAST(md.timestamp_utc AS INTEGER) < ?
     """
 
     params = [
@@ -479,11 +526,13 @@ def api_serie(unit_id):
     rows = [dict(r) for r in cur.fetchall()]
     conn.close()
 
-    return jsonify({
+    result = {
         "unit_id": unit_id,
         "total": len(rows),
         "serie": rows
-    })
+    }
+    attach_temporal_contract(result, int(inicio), int(fin))
+    return jsonify(result)
 
 
 @app.route("/api/series")
@@ -522,7 +571,7 @@ def api_series():
         where = """
             md.unit_id = ?
             AND CAST(md.timestamp_utc AS INTEGER) >= ?
-            AND CAST(md.timestamp_utc AS INTEGER) <= ?
+            AND CAST(md.timestamp_utc AS INTEGER) < ?
         """
 
         sql_params = [uid, int(inicio), int(fin)]
@@ -560,10 +609,12 @@ def api_series():
         resultado[str(uid)] = [dict(r) for r in cur.fetchall()]
         conn.close()
 
-    return jsonify({
+    result = {
         "unit_ids": unit_ids,
         "series": resultado
-    })
+    }
+    attach_temporal_contract(result, int(inicio), int(fin))
+    return jsonify(result)
 
 @app.route("/api/linea-base")
 def api_linea_base():
@@ -571,7 +622,8 @@ def api_linea_base():
     fin = request.args.get("fin", type=int)
 
     data = evaluar_desempeno_actual(inicio=inicio, fin=fin)
-
+    if inicio is not None and fin is not None:
+        attach_temporal_contract(data, inicio, fin)
     return jsonify(data)
 
 
@@ -600,10 +652,13 @@ def api_produccion():
 
     data = obtener_produccion_periodos(inicio_utc=inicio, fin_utc=fin)
 
-    return jsonify({
+    result = {
         "total": len(data),
         "periodos": data
-    })
+    }
+    if inicio is not None and fin is not None:
+        attach_temporal_contract(result, inicio, fin)
+    return jsonify(result)
 
 
 @app.route("/api/produccion/resumen")
@@ -619,6 +674,7 @@ def api_produccion_resumen():
 
     data = sumar_produccion_rango(inicio, fin)
 
+    attach_temporal_contract(data, inicio, fin)
     return jsonify(data)
 
 
@@ -628,7 +684,9 @@ def api_produccion_modulo():
     fin = request.args.get("fin", type=int)
     if inicio is None or fin is None or fin <= inicio:
         return jsonify({"error": "Rango de fechas inválido"}), 400
-    return jsonify(obtener_modulo_produccion(inicio, fin))
+    result = obtener_modulo_produccion(inicio, fin)
+    attach_temporal_contract(result, inicio, fin)
+    return jsonify(result)
 
 
 @app.route("/api/produccion/meses")
@@ -698,7 +756,7 @@ def api_serie_agregada(unit_id):
     where = """
         md.unit_id = ?
         AND CAST(md.timestamp_utc AS INTEGER) >= ?
-        AND CAST(md.timestamp_utc AS INTEGER) <= ?
+        AND CAST(md.timestamp_utc AS INTEGER) < ?
     """
 
     params = [int(unit_id), int(inicio), int(fin)]
@@ -740,13 +798,15 @@ def api_serie_agregada(unit_id):
         rows = [dict(r) for r in cur.fetchall()]
         conn.close()
 
-        return jsonify({
+        result = {
             "unit_id": unit_id,
             "granularidad": granularidad,
             "tipo_calculo": "muestra",
             "total": len(rows),
             "serie": rows
-        })
+        }
+        attach_temporal_contract(result, inicio, fin)
+        return jsonify(result)
 
     bucket_expr = f"CAST((CAST(md.timestamp_utc AS INTEGER) / {intervalo}) AS INTEGER) * {intervalo}"
 
@@ -815,13 +875,15 @@ def api_serie_agregada(unit_id):
     rows = [dict(r) for r in cur.fetchall()]
     conn.close()
 
-    return jsonify({
+    result = {
         "unit_id": unit_id,
         "granularidad": granularidad,
         "tipo_calculo": tipo_calculo,
         "total": len(rows),
         "serie": rows
-    })
+    }
+    attach_temporal_contract(result, inicio, fin)
+    return jsonify(result)
     
     
 @app.route("/api/variable-historica")
@@ -860,7 +922,7 @@ def api_variable_historica():
         WHERE md.device_id = ?
           AND md.unit_id = ?
           AND CAST(md.timestamp_utc AS INTEGER) >= ?
-          AND CAST(md.timestamp_utc AS INTEGER) <= ?
+          AND CAST(md.timestamp_utc AS INTEGER) < ?
         ORDER BY CAST(md.timestamp_utc AS INTEGER) ASC
         LIMIT ?
     """, (
@@ -874,13 +936,15 @@ def api_variable_historica():
     rows = [dict(r) for r in cur.fetchall()]
     conn.close()
 
-    return jsonify({
+    result = {
         "ok": True,
         "device_id": device_id,
         "unit_id": unit_id,
         "total": len(rows),
         "data": rows
-    })
+    }
+    attach_temporal_contract(result, inicio, fin)
+    return jsonify(result)
 
 if __name__ == "__main__":
     app.run(

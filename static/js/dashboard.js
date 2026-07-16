@@ -9,6 +9,10 @@ let moduloActual = "resumen";
 let actualizacionEnCurso = false;
 let chartEstadosAoki = null;
 let conciliacionActual = [];
+let rangoSnapshotActual = null;
+let actualizacionPendiente = false;
+const cacheHistorico = new Map();
+const CACHE_VERSION = "fase2-dashboard-v1";
 
 function obtenerKeyVariable(v) {
     if (!v) return null;
@@ -23,23 +27,21 @@ function obtenerKeyVariable(v) {
 
 function datetimeLocalAUnix(valor) {
     if (!valor) return null;
-
-    const fecha = new Date(valor);
-
-    if (Number.isNaN(fecha.getTime())) {
-        return null;
-    }
-
-    return Math.floor(fecha.getTime() / 1000);
+    const match = String(valor).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/);
+    if (!match) return null;
+    const [, year, month, day, hour, minute, second = "0"] = match;
+    return unixDesdeColombia(
+        Number(year), Number(month), Number(day), Number(hour), Number(minute), Number(second)
+    );
 }
 
 function unixADatetimeLocal(timestamp) {
-    const fecha = new Date(timestamp * 1000);
-    const year = fecha.getFullYear();
-    const month = String(fecha.getMonth() + 1).padStart(2, "0");
-    const day = String(fecha.getDate()).padStart(2, "0");
-    const hour = String(fecha.getHours()).padStart(2, "0");
-    const minute = String(fecha.getMinutes()).padStart(2, "0");
+    const fecha = new Date((timestamp - 5 * 3600) * 1000);
+    const year = fecha.getUTCFullYear();
+    const month = String(fecha.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(fecha.getUTCDate()).padStart(2, "0");
+    const hour = String(fecha.getUTCHours()).padStart(2, "0");
+    const minute = String(fecha.getUTCMinutes()).padStart(2, "0");
 
     return `${year}-${month}-${day}T${hour}:${minute}`;
 }
@@ -190,6 +192,58 @@ function formatearPeriodoEfectivo(rango) {
     if (texto) texto.textContent = `Periodo efectivo evaluado: ${inicio} – ${fin} (jornada 06:00–06:00)`;
 }
 
+function crearInstantaneaRango() {
+    const rango = obtenerRangoUnix();
+    const requestedRange = Object.freeze({ startUtc: rango.inicio, endUtc: rango.fin });
+    const snapshot = Object.freeze({
+        requestedRange,
+        effectiveRange: requestedRange,
+        reconciliableRange: null,
+        timezone: "America/Bogota",
+        startInclusive: true,
+        endExclusive: true,
+        inicio: rango.inicio,
+        fin: rango.fin
+    });
+    const anterior = rangoSnapshotActual
+        ? `${rangoSnapshotActual.inicio}:${rangoSnapshotActual.fin}`
+        : null;
+    const actual = `${snapshot.inicio}:${snapshot.fin}`;
+    if (anterior !== actual) cacheHistorico.clear();
+    rangoSnapshotActual = snapshot;
+    return snapshot;
+}
+
+function requerirSnapshot(snapshot) {
+    if (!snapshot) throw new Error("No existe una instantánea activa del rango");
+    return snapshot;
+}
+
+async function fetchJsonCacheado(endpoint, snapshot) {
+    snapshot = requerirSnapshot(snapshot);
+    const key = `${CACHE_VERSION}|${endpoint}|${snapshot.inicio}|${snapshot.fin}`;
+    if (!cacheHistorico.has(key)) {
+        const promise = fetch(endpoint).then(async respuesta => {
+            const data = await respuesta.json();
+            if (!respuesta.ok) throw new Error(data.error || `Error consultando ${endpoint}`);
+            return data;
+        }).catch(error => {
+            cacheHistorico.delete(key);
+            throw error;
+        });
+        cacheHistorico.set(key, promise);
+    }
+    return cacheHistorico.get(key);
+}
+
+function obtenerFase2(snapshot) {
+    snapshot = requerirSnapshot(snapshot);
+    return fetchJsonCacheado(
+        `/api/fase2/dashboard?inicio=${snapshot.inicio}&fin=${snapshot.fin}`,
+        snapshot
+    );
+}
+
 function rangoJornadaActual(dias = 1) {
     const ahora = new Date();
     const partes = new Intl.DateTimeFormat("en-CA", {
@@ -329,11 +383,8 @@ function reconstruirIpv4DesdeDigitos(valor) {
     return privadas[0] || resultados[0];
 }
 
-async function cargarProduccion() {
-    const rango = obtenerRangoUnix();
-
-    const resResumen = await fetch(`/api/produccion/modulo?inicio=${rango.inicio}&fin=${rango.fin}`);
-    const resumen = await resResumen.json();
+async function cargarProduccion(snapshot = rangoSnapshotActual) {
+    const resumen = (await obtenerFase2(snapshot)).production || {};
 
     document.getElementById("prodBuenos").innerText =
         formatearEntero(resumen.envases_buenos);
@@ -379,45 +430,31 @@ async function cargarProduccion() {
     });
 }
 
-async function cargarEstadosAoki() {
-    const rango = obtenerRangoUnix();
-    const [respuesta, respuestaOperacion, respuestaConciliacion] = await Promise.all([
-        fetch(`/api/aoki/estados?inicio=${rango.inicio}&fin=${rango.fin}`),
-        fetch(`/api/produccion/modulo?inicio=${rango.inicio}&fin=${rango.fin}`),
-        fetch(`/api/aoki/conciliacion?inicio=${rango.inicio}&fin=${rango.fin}`)
-    ]);
-    const [data, operacion, conciliacion] = await Promise.all([
-        respuesta.json(), respuestaOperacion.json(), respuestaConciliacion.json()
-    ]);
-    if (!respuesta.ok) throw new Error(data.error || "No fue posible clasificar los estados de Aoki");
-    if (!respuestaOperacion.ok) throw new Error(operacion.error || "No fue posible consultar la operación reportada");
-    if (!respuestaConciliacion.ok) throw new Error(conciliacion.error || "No fue posible conciliar las paradas");
+async function cargarEstadosAoki(snapshot = rangoSnapshotActual) {
+    const integrado = await obtenerFase2(snapshot);
+    const data = integrado.electricalStates || {};
+    const operacion = integrado.production || {};
+    const conciliacion = integrado.reconciliation || {};
+    const eventosData = integrado.electricalEvents || {};
     const diarios = data.daily || [];
-    const sumar = campo => diarios.reduce((total, dia) => total + Number(dia[campo] || 0), 0);
-    const programadas = sumar("scheduledHours");
-    const productivas = sumar("productiveHours");
-    const espera = sumar("idleHours");
-    const apagado = sumar("offHours");
-    const sinDatos = sumar("noDataHours");
-    const cobertura = programadas > 0 ? (programadas - sinDatos) / programadas * 100 : null;
     const resumenPeriodo = data.periodSummary || {};
-    document.getElementById("estadoHorasProductivas").innerText = formatearNumero(productivas, 2);
-    document.getElementById("estadoHorasEspera").innerText = formatearNumero(espera, 2);
-    document.getElementById("estadoHorasApagado").innerText = formatearNumero(apagado, 2);
-    document.getElementById("estadoHorasSinDatos").innerText = formatearNumero(sinDatos, 2);
+    document.getElementById("estadoHorasProductivas").innerText = formatearNumero(resumenPeriodo.productiveHours, 2);
+    document.getElementById("estadoHorasEspera").innerText = formatearNumero(resumenPeriodo.idleHours, 2);
+    document.getElementById("estadoHorasApagado").innerText = formatearNumero(resumenPeriodo.offHours, 2);
+    document.getElementById("estadoHorasSinDatos").innerText = formatearNumero(resumenPeriodo.noDataHours, 2);
     document.getElementById("estadoHorasConDatos").innerText = formatearNumero(resumenPeriodo.knownDataHours, 2);
-    document.getElementById("estadoCobertura").innerText = cobertura === null ? "Datos insuficientes" : `${formatearNumero(cobertura, 2)} %`;
-    document.getElementById("estadoInconsistencias").innerText = formatearEntero(sumar("inconsistentSegments"));
+    document.getElementById("estadoCobertura").innerText = resumenPeriodo.coveragePct === null ? "Datos insuficientes" : `${formatearNumero(resumenPeriodo.coveragePct, 2)} %`;
+    document.getElementById("estadoInconsistencias").innerText = formatearNumero(resumenPeriodo.inconsistentHours, 2);
     document.getElementById("estadoBalance").innerText = resumenPeriodo.balanceStatus === "VALID"
         ? `Válido (${formatearNumero(resumenPeriodo.balanceDifferenceSeconds, 2)} s)`
         : "Fuera de tolerancia";
-    const resumenEventos = data.summary || {};
+    const resumenEventos = eventosData.summary || {};
     document.getElementById("eventosDetectados").innerText = formatearEntero(resumenEventos.eventCount);
     document.getElementById("eventosHorasIdle").innerText = formatearNumero(resumenEventos.idleHours, 2);
     document.getElementById("eventosHorasOff").innerText = formatearNumero(resumenEventos.offHours, 2);
     document.getElementById("eventosHorasTotal").innerText = formatearNumero(resumenEventos.nonProductiveHours, 2);
     const tbodyEventos = document.getElementById("tablaEventosAoki");
-    const eventos = data.events || [];
+    const eventos = eventosData.events || [];
     tbodyEventos.innerHTML = eventos.length ? "" : '<tr><td colspan="10">No hay eventos eléctricos detectados en el periodo</td></tr>';
     eventos.forEach(evento => {
         const fila = document.createElement("tr");
@@ -428,6 +465,9 @@ async function cargarEstadosAoki() {
     document.getElementById("opHorasProgramadas").innerText = formatearNumero(operacion.horas_programadas, 2);
     document.getElementById("opHorasReales").innerText = operacion.horas_reales_trabajo === null ? "Dato pendiente" : formatearNumero(operacion.horas_reales_trabajo, 2);
     document.getElementById("opHorasParada").innerText = operacion.horas_parada_reportadas === null ? "Dato pendiente" : formatearNumero(operacion.horas_parada_reportadas, 2);
+    document.getElementById("opDisponibilidadReportada").innerText = operacion.disponibilidad_operacional_reportada_pct === null
+        ? "Dato pendiente"
+        : `${formatearNumero(operacion.disponibilidad_operacional_reportada_pct, 2)} %`;
     const umbrales = data.thresholds || {};
     document.getElementById("estadoCriterio").innerText = `Criterio ${umbrales.version || "--"}: OFF < ${umbrales.offIdleCurrentA} A; IDLE < ${umbrales.idleProductiveCurrentA} A; persistencia ${umbrales.minimumConsecutiveSamples} muestras o ${umbrales.minimumPersistenceMinutes} min; hueco máximo ${umbrales.maximumGapMinutes} min.`;
 
@@ -435,7 +475,7 @@ async function cargarEstadosAoki() {
     tbody.innerHTML = diarios.length ? "" : '<tr><td colspan="10">Sin datos para el periodo</td></tr>';
     diarios.forEach(dia => {
         const fila = document.createElement("tr");
-        fila.innerHTML = `<td>${escaparHtml(dia.productionDate)}</td><td>${formatearNumero(dia.productiveHours, 2)}</td><td>${formatearNumero(dia.idleHours, 2)}</td><td>${formatearNumero(dia.offHours, 2)}</td><td>${formatearNumero(dia.noDataHours, 2)}</td><td>${formatearNumero(dia.knownDataHours, 2)}</td><td>${formatearNumero(dia.coveragePct, 2)} %</td><td>${escaparHtml(dia.balanceStatus)}</td><td>${formatearEntero(dia.stateTransitions)}</td><td>${formatearEntero(dia.inconsistentSegments)}</td>`;
+        fila.innerHTML = `<td>${escaparHtml(dia.productionDate)}</td><td>${formatearNumero(dia.productiveHours, 2)}</td><td>${formatearNumero(dia.idleHours, 2)}</td><td>${formatearNumero(dia.offHours, 2)}</td><td>${formatearNumero(dia.noDataHours, 2)}</td><td>${formatearNumero(dia.knownDataHours, 2)}</td><td>${formatearNumero(dia.coveragePct, 2)} %</td><td>${escaparHtml(dia.balanceStatus)}</td><td>${formatearEntero(dia.stateTransitions)}</td><td>${formatearNumero(dia.inconsistentHours, 2)}</td>`;
         tbody.appendChild(fila);
     });
     if (chartEstadosAoki) chartEstadosAoki.destroy();
@@ -529,28 +569,23 @@ function renderizarConciliacionAoki() {
     });
 }
 
-async function cargarEnergiaReconstruidaAoki() {
-    const rango = obtenerRangoUnix();
-    const respuesta = await fetch(`/api/aoki/energia-reconstruida?inicio=${rango.inicio}&fin=${rango.fin}`);
-    const data = await respuesta.json();
-    if (!respuesta.ok) throw new Error(data.error || "No fue posible reconstruir la energía de Aoki");
+async function cargarEnergiaReconstruidaAoki(snapshot = rangoSnapshotActual) {
+    const data = (await obtenerFase2(snapshot)).energy || {};
     const diarios = data.daily || [];
-    const sumar = campo => diarios.reduce((total, dia) => total + Number(dia[campo] || 0), 0);
-    const total = sumar("calculatedEnergyKWh");
-    const medida = sumar("measuredEnergyKWh");
-    const reconstruida = sumar("reconstructedEnergyKWh");
-    const intervalosNoData = sumar("noDataIntervals");
-    const duracionTotal = (data.intervals || []).reduce((suma, intervalo) => suma + Number(intervalo.durationSeconds || 0), 0);
-    const duracionNoData = (data.intervals || []).filter(i => i.source === "NO_DATA").reduce((suma, intervalo) => suma + Number(intervalo.durationSeconds || 0), 0);
-    const cobertura = duracionTotal > 0 ? (duracionTotal - duracionNoData) / duracionTotal * 100 : null;
-    const porcentajeReconstruido = total > 0 ? reconstruida / total * 100 : null;
+    const resumen = data.periodSummary || {};
+    const total = resumen.knownEnergyKWh;
+    const medida = resumen.measuredEnergyKWh;
+    const reconstruida = resumen.reconstructedEnergyKWh;
+    const intervalosNoData = resumen.noDataIntervals;
+    const cobertura = resumen.energyCoveragePct;
+    const porcentajeReconstruido = resumen.reconstructedPct;
     document.getElementById("energiaReconTotal").innerText = formatearNumero(total, 3);
     document.getElementById("energiaReconMedida").innerText = formatearNumero(medida, 3);
     document.getElementById("energiaReconEstimada").innerText = formatearNumero(reconstruida, 3);
     document.getElementById("energiaReconCobertura").innerText = cobertura === null ? "Datos insuficientes" : `${formatearNumero(cobertura, 2)} %`;
     document.getElementById("energiaReconPct").innerText = porcentajeReconstruido === null ? "Datos insuficientes" : `${formatearNumero(porcentajeReconstruido, 2)} %`;
     document.getElementById("energiaReconNoData").innerText = formatearEntero(intervalosNoData);
-    document.getElementById("energiaReconNoDataHoras").innerText = formatearNumero(duracionNoData / 3600, 2);
+    document.getElementById("energiaReconNoDataHoras").innerText = formatearNumero(resumen.noDataDurationHours, 2);
     const config = data.config || {};
     document.getElementById("energiaReconCriterio").innerText = `Criterio ${config.version || "--"}: acumulador → potencia trapezoidal → potencia rectangular → NO_DATA. Corriente no usada como energía.`;
     const tbody = document.getElementById("tablaEnergiaReconstruida");
@@ -562,10 +597,9 @@ async function cargarEnergiaReconstruidaAoki() {
     });
 }
 
-async function cargarLineaBase() {
-    const rango = obtenerRangoUnix();
-
-    const res = await fetch(`/api/linea-base?inicio=${rango.inicio}&fin=${rango.fin}`);
+async function cargarLineaBase(snapshot = rangoSnapshotActual) {
+    snapshot = requerirSnapshot(snapshot);
+    const res = await fetch(`/api/linea-base?inicio=${snapshot.inicio}&fin=${snapshot.fin}`);
     const data = await res.json();
 
     if (data.ok === false || data.error) {
@@ -612,11 +646,8 @@ async function cargarLineaBase() {
         formatearNumero(data.modelo?.r2, 3);
 }
 
-async function cargarCalidad() {
-    const rango = obtenerRangoUnix();
-    const respuesta = await fetch(`/api/produccion/modulo?inicio=${rango.inicio}&fin=${rango.fin}`);
-    const data = await respuesta.json();
-    if (!respuesta.ok) throw new Error(data.error || "No fue posible consultar la calidad reportada");
+async function cargarCalidad(snapshot = rangoSnapshotActual) {
+    const data = (await obtenerFase2(snapshot)).production || {};
     document.getElementById("calidadBuenos").innerText = formatearEntero(data.envases_buenos);
     document.getElementById("calidadMalos").innerText = formatearEntero(data.envases_malos);
     document.getElementById("calidadTotal").innerText = formatearEntero(data.produccion_total);
@@ -625,17 +656,18 @@ async function cargarCalidad() {
     document.getElementById("calidadPorMil").innerText = data.rechazos_por_1000 === null ? "Datos insuficientes" : formatearNumero(data.rechazos_por_1000, 2);
 }
 
-async function cargarDashboard() {
-    const rango = obtenerRangoUnix();
-
-    const res = await fetch(`/api/dashboard?inicio=${rango.inicio}&fin=${rango.fin}`);
-    const data = await res.json();
+async function cargarDashboard(snapshot = rangoSnapshotActual) {
+    const integrado = await obtenerFase2(snapshot);
+    const data = integrado.legacyDashboard || {};
+    const operacion = integrado.production || {};
+    const resumenEstados = integrado.electricalStates?.periodSummary || {};
+    const resumenEnergia = integrado.energy?.periodSummary || {};
 
     document.getElementById("energiaTotalizador").innerText =
         formatearNumero(data.totalizador?.energia_kwh, 3);
 
     document.getElementById("energiaProceso").innerText =
-        formatearNumero(data.proceso?.energia_kwh, 3);
+        formatearNumero(resumenEnergia.knownEnergyKWh, 3);
 
     document.getElementById("potenciaTotalizador").innerText =
         formatearNumero(data.totalizador?.potencia_actual_kw, 2);
@@ -667,26 +699,10 @@ async function cargarDashboard() {
     document.getElementById("co2Proceso").innerText =
         formatearNumero(data.impacto?.co2_proceso_kg, 2);
 
-    const [respuestaOperacion, respuestaEstados, respuestaEnergia] = await Promise.all([
-        fetch(`/api/produccion/modulo?inicio=${rango.inicio}&fin=${rango.fin}`),
-        fetch(`/api/aoki/estados?inicio=${rango.inicio}&fin=${rango.fin}`),
-        fetch(`/api/aoki/energia-reconstruida?inicio=${rango.inicio}&fin=${rango.fin}`)
-    ]);
-    const [operacion, estados, energia] = await Promise.all([
-        respuestaOperacion.json(), respuestaEstados.json(), respuestaEnergia.json()
-    ]);
-    const diariosEstado = estados.daily || [];
-    const horasProgramadas = diariosEstado.reduce((s, d) => s + Number(d.scheduledHours || 0), 0);
-    const horasProductive = diariosEstado.reduce((s, d) => s + Number(d.productiveHours || 0), 0);
-    const horasNoData = diariosEstado.reduce((s, d) => s + Number(d.noDataHours || 0), 0);
-    const coberturaEstados = horasProgramadas > 0 ? (horasProgramadas - horasNoData) / horasProgramadas * 100 : null;
-    const duracionEnergia = (energia.intervals || []).reduce((s, i) => s + Number(i.durationSeconds || 0), 0);
-    const noDataEnergia = (energia.intervals || []).filter(i => i.source === "NO_DATA").reduce((s, i) => s + Number(i.durationSeconds || 0), 0);
-    const coberturaEnergia = duracionEnergia > 0 ? (duracionEnergia - noDataEnergia) / duracionEnergia * 100 : null;
-    document.getElementById("horasProductivasResumen").innerText = horasProgramadas > 0 ? formatearNumero(horasProductive, 2) : "Datos insuficientes";
+    document.getElementById("horasProductivasResumen").innerText = resumenEstados.productiveHours == null ? "Datos insuficientes" : formatearNumero(resumenEstados.productiveHours, 2);
     document.getElementById("horasParadaResumen").innerText = operacion.horas_parada_reportadas === null ? "Dato pendiente" : formatearNumero(operacion.horas_parada_reportadas, 2);
-    document.getElementById("coberturaEstadosResumen").innerText = coberturaEstados === null ? "Datos insuficientes" : `${formatearNumero(coberturaEstados, 2)} %`;
-    document.getElementById("coberturaEnergiaResumen").innerText = coberturaEnergia === null ? "Datos insuficientes" : `${formatearNumero(coberturaEnergia, 2)} %`;
+    document.getElementById("coberturaEstadosResumen").innerText = resumenEstados.coveragePct == null ? "Datos insuficientes" : `${formatearNumero(resumenEstados.coveragePct, 2)} %`;
+    document.getElementById("coberturaEnergiaResumen").innerText = resumenEnergia.energyCoveragePct == null ? "Datos insuficientes" : `${formatearNumero(resumenEnergia.energyCoveragePct, 2)} %`;
 }
 
 async function cargarEstado() {
@@ -694,7 +710,7 @@ async function cargarEstado() {
     const data = await res.json();
 
     const estadoDatos = document.getElementById("estadoDatos");
-    estadoDatos.innerText = data.estado_datos || "--";
+    estadoDatos.innerText = `Estado actual: ${data.estado_datos || "--"}`;
     estadoDatos.classList.remove("estado-ok", "estado-alerta", "estado-error");
 
     if (data.estado_datos === "OK") {
@@ -704,7 +720,7 @@ async function cargarEstado() {
     }
 
     document.getElementById("ultimaMedicion").innerText =
-        `Última medición: ${data.ultima_medicion_colombia || "--"}`;
+        `Última medición disponible (fuera del filtro): ${data.ultima_medicion_colombia || "--"}`;
 
     document.getElementById("estadoGateway").innerText =
         `${data.gateway || "--"} ID ${data.gateway_id || ""}`;
@@ -863,13 +879,13 @@ function destruirGrafica() {
     }
 }
 
-async function obtenerSerie(unitId, deviceId, gatewayId = 10, limite = 5000) {
-    const rango = obtenerRangoUnix();
+async function obtenerSerie(unitId, deviceId, gatewayId = 10, limite = 5000, snapshot = rangoSnapshotActual) {
+    snapshot = requerirSnapshot(snapshot);
     const granularidad = obtenerGranularidad();
 
     const params = new URLSearchParams({
-        inicio: rango.inicio,
-        fin: rango.fin,
+        inicio: snapshot.inicio,
+        fin: snapshot.fin,
         limite: limite,
         gateway_id: gatewayId,
         device_id: deviceId,
@@ -877,13 +893,13 @@ async function obtenerSerie(unitId, deviceId, gatewayId = 10, limite = 5000) {
         granularidad: granularidad
     });
 
-    const res = await fetch(`/api/serie-agregada/${unitId}?${params.toString()}`);
-    const data = await res.json();
+    const data = await fetchJsonCacheado(`/api/serie-agregada/${unitId}?${params.toString()}`, snapshot);
 
     return data.serie || [];
 }
 
-async function mostrarGrafica(tipo) {
+async function mostrarGrafica(tipo, snapshot = rangoSnapshotActual) {
+    snapshot = requerirSnapshot(snapshot);
     graficaActual = tipo;
     destruirGrafica();
 
@@ -893,8 +909,10 @@ async function mostrarGrafica(tipo) {
         document.getElementById("tituloGrafica").innerText =
             "Potencia activa total: Totalizador vs Proceso";
 
-        const serieTotal = await obtenerSerie(61, 25);
-        const serieProceso = await obtenerSerie(61, 24);
+        const [serieTotal, serieProceso] = await Promise.all([
+            obtenerSerie(61, 25, 10, 5000, snapshot),
+            obtenerSerie(61, 24, 10, 5000, snapshot)
+        ]);
 
         chartPrincipal = new Chart(ctx, {
             type: "line",
@@ -903,13 +921,13 @@ async function mostrarGrafica(tipo) {
                 datasets: [
                     {
                         label: "Totalizador kW",
-                        data: serieTotal.map(x => Number(x.valor) / 1000),
+                        data: serieTotal.map(x => Number(x.valor)),
                         tension: 0.25,
                         pointRadius: 2
                     },
                     {
                         label: "Proceso kW",
-                        data: serieProceso.map(x => Number(x.valor) / 1000),
+                        data: serieProceso.map(x => Number(x.valor)),
                         tension: 0.25,
                         pointRadius: 2
                     }
@@ -922,8 +940,10 @@ async function mostrarGrafica(tipo) {
         document.getElementById("tituloGrafica").innerText =
             "Energía activa acumulada: Totalizador vs Proceso";
 
-        const serieTotal = await obtenerSerie(100, 25);
-        const serieProceso = await obtenerSerie(100, 24);
+        const [serieTotal, serieProceso] = await Promise.all([
+            obtenerSerie(100, 25, 10, 5000, snapshot),
+            obtenerSerie(100, 24, 10, 5000, snapshot)
+        ]);
 
         chartPrincipal = new Chart(ctx, {
             type: "line",
@@ -951,9 +971,7 @@ async function mostrarGrafica(tipo) {
         document.getElementById("tituloGrafica").innerText =
             "EnPI del periodo";
 
-        const rango = obtenerRangoUnix();
-        const res = await fetch(`/api/dashboard?inicio=${rango.inicio}&fin=${rango.fin}`);
-        const data = await res.json();
+        const data = (await obtenerFase2(snapshot)).legacyDashboard || {};
 
         chartPrincipal = new Chart(ctx, {
             type: "bar",
@@ -973,9 +991,7 @@ async function mostrarGrafica(tipo) {
         document.getElementById("tituloGrafica").innerText =
             "Línea base ISO 50001: Energía real vs esperada";
 
-        const rango = obtenerRangoUnix();
-
-        const res = await fetch(`/api/linea-base?inicio=${rango.inicio}&fin=${rango.fin}`);
+        const res = await fetch(`/api/linea-base?inicio=${snapshot.inicio}&fin=${snapshot.fin}`);
         const data = await res.json();
 
         const energiaReal = data.energia?.real_kwh || 0;
@@ -1003,17 +1019,12 @@ async function mostrarGrafica(tipo) {
         document.getElementById("tituloGrafica").innerText =
             "Producción de envases por periodo";
 
-        const rango = obtenerRangoUnix();
-
-        const res = await fetch(`/api/produccion?inicio=${rango.inicio}&fin=${rango.fin}`);
-        const data = await res.json();
-
-        const periodos = data.periodos || [];
+        const periodos = (await obtenerFase2(snapshot)).production?.detalle_diario || [];
 
         chartPrincipal = new Chart(ctx, {
             type: "bar",
             data: {
-                labels: periodos.map(x => x.fecha_hora_inicio_local),
+                labels: periodos.map(x => x.fecha),
                 datasets: [
                     {
                         label: "Envases buenos",
@@ -1028,12 +1039,12 @@ async function mostrarGrafica(tipo) {
         });
     }
     if (tipo === "variable") {
-        await graficarVariableSeleccionada();
+        await graficarVariableSeleccionada(snapshot);
     }
 }
 
 
-async function graficarVariableSeleccionada() {
+async function graficarVariableSeleccionada(snapshot = rangoSnapshotActual) {
     const selector = document.getElementById("selectorVariable");
 
     if (!selector.value) {
@@ -1052,11 +1063,11 @@ async function graficarVariableSeleccionada() {
     document.getElementById("tituloGrafica").innerText =
         `${v.dispositivo || "Gateway"} | Unit ${v.unit_id} | ${v.variable}`;
 
-    const rango = obtenerRangoUnix();
+    snapshot = requerirSnapshot(snapshot);
 
     const params = new URLSearchParams({
-        inicio: rango.inicio,
-        fin: rango.fin,
+        inicio: snapshot.inicio,
+        fin: snapshot.fin,
         limite: 5000,
         gateway_id: v.gateway_id,
         source_type: v.source_type,
@@ -1067,8 +1078,7 @@ async function graficarVariableSeleccionada() {
         params.append("device_id", v.device_id);
     }
 
-    const res = await fetch(`/api/serie-agregada/${v.unit_id}?${params.toString()}`);
-    const data = await res.json();
+    const data = await fetchJsonCacheado(`/api/serie-agregada/${v.unit_id}?${params.toString()}`, snapshot);
     const serie = data.serie || [];
 
     const ctx = document.getElementById("chartPrincipal").getContext("2d");
@@ -1087,9 +1097,12 @@ async function graficarVariableSeleccionada() {
     });
 }
 
-async function cargarUltimosValores() {
-    const res = await fetch("/api/ultimos");
-    const data = await res.json();
+async function cargarUltimosValores(snapshot = rangoSnapshotActual) {
+    snapshot = requerirSnapshot(snapshot);
+    const data = await fetchJsonCacheado(
+        `/api/ultimos?inicio=${snapshot.inicio}&fin=${snapshot.fin}`,
+        snapshot
+    );
 
     ultimosValores = data.datos || [];
 
@@ -1104,7 +1117,7 @@ function formatearValorVariable(item) {
         return reconstruirIpv4DesdeDigitos(valor);
     }
 
-    if ([58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69].includes(unitId)) {
+    if ([58, 59, 60, 62, 63, 64, 65, 66, 67, 68, 69].includes(unitId)) {
         return formatearNumero(Number(valor) / 1000, 3);
     }
 
@@ -1164,32 +1177,39 @@ function filtrarTablaUltimos() {
 }
 
 async function actualizarTodo() {
-    if (actualizacionEnCurso) return;
+    if (actualizacionEnCurso) {
+        actualizacionPendiente = true;
+        return;
+    }
     actualizacionEnCurso = true;
 
     try {
-        obtenerRangoUnix();
+        const snapshot = crearInstantaneaRango();
         await cargarEstado();
 
         if (moduloActual === "resumen" || moduloActual === "impacto") {
-            await cargarDashboard();
+            await cargarDashboard(snapshot);
         } else if (moduloActual === "produccion") {
-            await cargarProduccion();
+            await cargarProduccion(snapshot);
         } else if (moduloActual === "calidad") {
-            await cargarCalidad();
+            await cargarCalidad(snapshot);
         } else if (moduloActual === "eficiencia-operacional") {
-            await cargarEstadosAoki();
+            await cargarEstadosAoki(snapshot);
         } else if (moduloActual === "eficiencia-energetica") {
-            await cargarEnergiaReconstruidaAoki();
+            await cargarEnergiaReconstruidaAoki(snapshot);
         } else if (moduloActual === "linea-base") {
-            await cargarLineaBase();
+            await cargarLineaBase(snapshot);
         } else if (moduloActual === "variables") {
             if (!variablesDisponibles.length) await cargarSelectorVariables();
-            await cargarUltimosValores();
-            if (graficaActual) await mostrarGrafica(graficaActual);
+            await cargarUltimosValores(snapshot);
+            if (graficaActual) await mostrarGrafica(graficaActual, snapshot);
         }
     } finally {
         actualizacionEnCurso = false;
+        if (actualizacionPendiente) {
+            actualizacionPendiente = false;
+            await actualizarTodo();
+        }
     }
 }
 
@@ -1246,7 +1266,6 @@ function inicializarFiltros() {
 
         selectorRango.addEventListener("change", async (e) => {
             rangoActual = e.target.value;
-            obtenerRangoUnix();
             await actualizarTodo();
         });
     }
@@ -1271,7 +1290,6 @@ function inicializarFiltros() {
         });
     }
 
-    obtenerRangoUnix();
 }
 
 function inicializarFiltrosConciliacion() {
@@ -1287,8 +1305,6 @@ async function iniciarDashboard() {
     inicializarFiltros();
     inicializarFiltrosConciliacion();
     inicializarVistasLineaBase();
-    obtenerRangoUnix();
-
     await inicializarNavegacion();
 
     setInterval(actualizarTodo, 30000);
@@ -1340,4 +1356,8 @@ async function cargarRangosProduccion() {
 
     selector.value = rangoActual;
 }
-iniciarDashboard();
+if (typeof document !== "undefined") iniciarDashboard();
+
+if (typeof module !== "undefined" && module.exports) {
+    module.exports = { datetimeLocalAUnix, unixADatetimeLocal, unixDesdeColombia, rangoMesProduccion };
+}

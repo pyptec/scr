@@ -1,6 +1,10 @@
 import unittest
 import sys
 import types
+import sqlite3
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
 
 if "dotenv" not in sys.modules:
     dotenv_stub = types.ModuleType("dotenv")
@@ -11,6 +15,7 @@ samee200_db_stub = types.ModuleType("db.samee200_db")
 samee200_db_stub.get_conn = lambda: None
 sys.modules["db.samee200_db"] = samee200_db_stub
 
+import db.produccion_samee200 as produccion_module
 from db.produccion_samee200 import calcular_modulo_produccion, extraer_paradas_reportadas
 
 
@@ -164,6 +169,7 @@ class ProduccionModuloTests(unittest.TestCase):
         self.assertEqual(resultado["horas_reales_trabajo"], 24)
         self.assertEqual(resultado["produccion_buena_hora_real"], 100)
         self.assertEqual(resultado["produccion_total_hora_real"], 101)
+        self.assertEqual(resultado["disponibilidad_operacional_reportada_pct"], 100)
 
     def test_prorratea_un_periodo_parcial_por_duracion_real(self):
         resultado = calcular_modulo_produccion(
@@ -188,6 +194,7 @@ class ProduccionModuloTests(unittest.TestCase):
         self.assertEqual(resultado["horas_parada_reportadas"], 1)
         self.assertEqual(resultado["horas_reales_trabajo"], 23)
         self.assertEqual(resultado["produccion_buena_hora_real"], 100)
+        self.assertAlmostEqual(resultado["disponibilidad_operacional_reportada_pct"], 95.833, places=3)
 
     def test_calidad_se_calcula_desde_totales_reportados(self):
         resultado = calcular_modulo_produccion([
@@ -223,6 +230,42 @@ class ProduccionModuloTests(unittest.TestCase):
     def test_rechaza_rango_invalido(self):
         with self.assertRaises(ValueError):
             calcular_modulo_produccion([], 100, 100)
+
+    def test_consulta_excluye_periodos_que_solo_tocan_las_fronteras(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "production.sqlite"
+            connection = sqlite3.connect(database)
+            connection.execute("""
+                CREATE TABLE produccion_periodo (
+                    id INTEGER, fecha TEXT, fecha_hora_inicio_local TEXT,
+                    fecha_hora_fin_local TEXT, fecha_hora_inicio_utc INTEGER,
+                    fecha_hora_fin_utc INTEGER, linea TEXT, producto TEXT,
+                    envases_buenos REAL, envases_malos REAL, eficiencia REAL,
+                    turnos REAL, observaciones TEXT, fuente TEXT, archivo_origen TEXT
+                )
+            """)
+            base = ("2026-05-01", "", "", "AOKI", "Botella", 10, 0, 1, 3, "", "test", "test")
+            rows = [
+                (1, base[0], base[1], base[2], 0, 100, *base[3:]),
+                (2, base[0], base[1], base[2], 200, 300, *base[3:]),
+                (3, base[0], base[1], base[2], 100, 200, *base[3:]),
+            ]
+            connection.executemany(
+                "INSERT INTO produccion_periodo VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                rows,
+            )
+            connection.commit()
+            connection.close()
+
+            def open_connection():
+                conn = sqlite3.connect(database)
+                conn.row_factory = sqlite3.Row
+                return conn
+
+            with patch.object(produccion_module, "init_produccion_db", lambda: None), \
+                    patch.object(produccion_module, "get_conn", open_connection):
+                result = produccion_module.obtener_produccion_periodos(100, 200)
+            self.assertEqual([row["id"] for row in result], [3])
 
 
 if __name__ == "__main__":

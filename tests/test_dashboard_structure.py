@@ -76,9 +76,11 @@ class DashboardStructureTests(unittest.TestCase):
         self.assertIn("No equivalen necesariamente al estado productivo real", self.html)
         self.assertIn('id="estadoHorasConDatos"', self.html)
         self.assertIn('id="estadoBalance"', self.html)
+        self.assertIn('id="opDisponibilidadReportada"', self.html)
+        self.assertIn("Horas de señal inconsistente", self.html)
         self.assertIn('id="tablaEventosAoki"', self.html)
         self.assertIn("No son fallas confirmadas", self.html)
-        self.assertIn("const resumenEventos = data.summary || {}", self.javascript)
+        self.assertIn("const resumenEventos = eventosData.summary || {}", self.javascript)
 
     def test_dashboard_exposes_traceable_reconciliation_without_failures(self):
         for identifier in (
@@ -91,7 +93,7 @@ class DashboardStructureTests(unittest.TestCase):
         ):
             self.assertIn(f'id="{identifier}"', self.html)
         self.assertIn("Los eventos eléctricos no son fallas confirmadas", self.html)
-        self.assertIn("/api/aoki/conciliacion", self.javascript)
+        self.assertIn("/api/fase2/dashboard", self.javascript)
         self.assertIn("item.reportedDurationMinutes", self.javascript)
         self.assertIn("item.electricalDurationMinutes", self.javascript)
         self.assertIn("item.overlapMinutes", self.javascript)
@@ -103,6 +105,30 @@ class DashboardStructureTests(unittest.TestCase):
         self.assertIn("RESULTADO_PRELIMINAR", self.html)
         self.assertNotIn("Reentrenar línea base", self.html)
         self.assertNotIn("entrenarLineaBase()", self.javascript)
+
+    def test_phase2_uses_one_integrated_contract_and_immutable_range(self):
+        summary = self.javascript.split("async function cargarDashboard", 1)[1].split(
+            "async function cargarEstado", 1
+        )[0]
+        self.assertIn("obtenerFase2(snapshot)", summary)
+        self.assertNotIn("/api/dashboard", summary)
+        self.assertNotIn("/api/produccion/modulo", summary)
+        self.assertNotIn("/api/aoki/estados", summary)
+        self.assertNotIn("reduce(", summary)
+        self.assertIn("Object.freeze", self.javascript)
+        self.assertIn("crearInstantaneaRango()", self.javascript)
+        self.assertIn("CACHE_VERSION", self.javascript)
+
+    def test_instantaneous_gateway_is_separated_from_historical_period(self):
+        self.assertIn("Estado actual del gateway", self.html)
+        self.assertIn("Información instantánea fuera del filtro histórico", self.html)
+        self.assertIn("Últimos valores dentro del periodo seleccionado", self.html)
+        self.assertIn("no es telemetría actual", self.html)
+
+    def test_productive_is_never_presented_as_confirmed_real_production(self):
+        self.assertIn("clasificación eléctrica preliminar", self.html)
+        self.assertNotIn("PRODUCTIVE real demostrado", self.html)
+        self.assertNotIn("disponibilidad técnica", self.html.lower())
 
     def test_energy_distinguishes_state_and_energy_no_data(self):
         self.assertIn('id="energiaReconNoDataHoras"', self.html)

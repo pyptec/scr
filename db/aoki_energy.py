@@ -197,6 +197,44 @@ def summarize_energy_daily(intervals, config):
     return output
 
 
+def summarize_energy_period(intervals):
+    """Resume el periodo sin mezclar energía medida, reconstruida y NO_DATA."""
+    measured = 0.0
+    reconstructed = 0.0
+    known_duration = 0.0
+    no_data_duration = 0.0
+    no_data_intervals = 0
+    reconstructed_sources = {"POWER_TRAPEZOIDAL", "POWER_RECTANGULAR", "CURRENT_MODEL"}
+    for interval in intervals:
+        duration = float(interval.get("durationSeconds") or 0)
+        source = interval.get("source")
+        if source == "ACCUMULATOR_DELTA":
+            measured += float(interval.get("energyKWh") or 0)
+            known_duration += duration
+        elif source in reconstructed_sources:
+            reconstructed += float(interval.get("energyKWh") or 0)
+            known_duration += duration
+        else:
+            no_data_duration += duration
+            no_data_intervals += 1
+    total_duration = known_duration + no_data_duration
+    known_energy = measured + reconstructed
+    return {
+        "measuredEnergyKWh": round(measured, 6),
+        "reconstructedEnergyKWh": round(reconstructed, 6),
+        "knownEnergyKWh": round(known_energy, 6),
+        "knownDurationHours": round(known_duration / 3600, 4),
+        "noDataDurationHours": round(no_data_duration / 3600, 4),
+        "energyCoveragePct": (
+            round(known_duration / total_duration * 100, 4) if total_duration else None
+        ),
+        "reconstructedPct": (
+            round(reconstructed / known_energy * 100, 4) if known_energy else None
+        ),
+        "noDataIntervals": no_data_intervals,
+    }
+
+
 def _boundary_no_data(start_utc, end_utc, config, reason):
     return {
         "startUtc": datetime.fromtimestamp(start_utc, timezone.utc).isoformat(),
@@ -228,6 +266,7 @@ def reconstruct_aoki_energy(rows, config=None, start_utc=None, end_utc=None):
         "datasetType": "DATOS_HISTORICOS_DE_PRUEBA", "source": "ME337_1",
         "gatewayId": GATEWAY_ID, "deviceId": int(DEVICE_ID),
         "daily": summarize_energy_daily(result["intervals"], config),
+        "periodSummary": summarize_energy_period(result["intervals"]),
         "currentModelUsed": False,
     })
     return result

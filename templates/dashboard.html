@@ -18,8 +18,8 @@
     </div>
 
     <div class="estado-box">
-        <span id="estadoDatos" class="estado">--</span>
-        <small id="ultimaMedicion">Última medición: --</small>
+        <span id="estadoDatos" class="estado">Estado actual: --</span>
+        <small id="ultimaMedicion">Última medición disponible (fuera del filtro): --</small>
     </div>
 </header>
 
@@ -106,13 +106,13 @@
             <div class="card">
                 <span>Potencia totalizador</span>
                 <strong id="potenciaTotalizador">--</strong>
-                <small>kW actual</small>
+                <small>kW · último valor dentro del periodo</small>
             </div>
 
             <div class="card">
                 <span>Potencia proceso</span>
                 <strong id="potenciaProceso">--</strong>
-                <small>kW actual</small>
+                <small>kW · último valor dentro del periodo</small>
             </div>
 
             <div class="card">
@@ -379,7 +379,8 @@
 
         <canvas id="chartPrincipal"></canvas>
 
-        <h3>Últimos valores</h3>
+        <h3>Últimos valores dentro del periodo seleccionado</h3>
+        <p class="aviso-metodologico">Cada fila corresponde al último timestamp disponible en <code>[inicio, fin)</code>; no es telemetría actual.</p>
         <input id="buscarTabla" type="text" placeholder="Buscar variable..." oninput="filtrarTablaUltimos()">
         <div class="tabla-wrapper">
             <table>
@@ -395,7 +396,9 @@
     </section>
 
     <section class="panel modulo" data-module="gateway" hidden>
-        <h2>Estado del gateway</h2>
+        <h2>Estado actual del gateway</h2>
+        <p class="aviso-metodologico aviso-historico"><strong>DATOS_HISTORICOS_DE_PRUEBA</strong> · Información instantánea disponible en la copia local, fuera del filtro histórico. RAM, CPU, IP y última medición no son KPI del periodo seleccionado.</p>
+        <h3>Información instantánea fuera del filtro histórico</h3>
 
         <div class="estado-grid">
             <div><b>Gateway:</b> <span id="estadoGateway">--</span></div>
@@ -434,6 +437,7 @@
             <div class="card"><span>Horas programadas</span><strong id="opHorasProgramadas">--</strong><small>jornadas reportadas</small></div>
             <div class="card"><span>Horas reales reportadas</span><strong id="opHorasReales">--</strong><small>programadas menos paradas</small></div>
             <div class="card"><span>Horas de parada reportadas</span><strong id="opHorasParada">--</strong><small>observaciones de producción</small></div>
+            <div class="card"><span>Disponibilidad operacional reportada</span><strong id="opDisponibilidadReportada">--</strong><small>horas reales reportadas / programadas</small></div>
         </div>
         <h3>Clasificación eléctrica preliminar</h3>
         <p class="aviso-metodologico">Los estados se derivan de corriente y potencia del sistema medido. No equivalen necesariamente al estado productivo real de Aoki y no se usan para rellenar producción ni NO_DATA.</p>
@@ -444,13 +448,13 @@
             <div class="card"><span>Horas sin datos</span><strong id="estadoHorasSinDatos">--</strong><small>NO_DATA</small></div>
             <div class="card"><span>Horas con datos</span><strong id="estadoHorasConDatos">--</strong><small>PRODUCTIVE + IDLE + OFF</small></div>
             <div class="card"><span>Cobertura de estados</span><strong id="estadoCobertura">--</strong><small>periodo con clasificación eléctrica</small></div>
-            <div class="card"><span>Señal inconsistente</span><strong id="estadoInconsistencias">--</strong><small>segmentos para revisión</small></div>
+            <div class="card"><span>Horas de señal inconsistente</span><strong id="estadoInconsistencias">--</strong><small>duración eléctrica para revisión</small></div>
             <div class="card"><span>Balance temporal</span><strong id="estadoBalance">--</strong><small>suma de estados vs periodo</small></div>
         </div>
         <p id="estadoCriterio" class="periodo-efectivo">Criterio: --</p>
         <canvas id="chartEstadosAoki"></canvas>
         <h3>Eventos no productivos detectados eléctricamente</h3>
-        <p class="aviso-metodologico">Estos eventos agrupan únicamente segmentos eléctricos consecutivos IDLE/OFF. No son fallas confirmadas y todavía no se han conciliado con las paradas reportadas.</p>
+        <p class="aviso-metodologico">Estos eventos agrupan únicamente segmentos eléctricos consecutivos IDLE/OFF. Se conservan separados de las paradas reportadas. No son fallas confirmadas.</p>
         <div class="grid-kpi">
             <div class="card"><span>Eventos detectados</span><strong id="eventosDetectados">--</strong><small>estado DETECTED</small></div>
             <div class="card"><span>Duración total IDLE</span><strong id="eventosHorasIdle">--</strong><small>horas eléctricas</small></div>
@@ -504,7 +508,7 @@
         <h3>Resumen por jornada 06:00–06:00</h3>
         <div class="tabla-wrapper">
             <table>
-                <thead><tr><th>Jornada</th><th>Productivas</th><th>Espera</th><th>Apagado</th><th>Sin datos</th><th>Con datos</th><th>Cobertura</th><th>Balance</th><th>Transiciones</th><th>Inconsistencias</th></tr></thead>
+                <thead><tr><th>Jornada</th><th>Productivas</th><th>Espera</th><th>Apagado</th><th>Sin datos</th><th>Con datos</th><th>Cobertura</th><th>Balance</th><th>Transiciones</th><th>Horas inconsistentes</th></tr></thead>
                 <tbody id="tablaEstadosAoki"></tbody>
             </table>
         </div>

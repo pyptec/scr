@@ -79,7 +79,7 @@ def obtener_ultimo_valor(unit_id, device_id=None, gateway_id=None, inicio=None, 
         params.append(int(inicio))
 
     if fin is not None:
-        where += " AND CAST(timestamp_utc AS INTEGER) <= ?"
+        where += " AND CAST(timestamp_utc AS INTEGER) < ?"
         params.append(int(fin))
 
     cur.execute(f"""
@@ -121,7 +121,8 @@ def calcular_delta_acumulado(unit_id, device_id, gateway_id=None, inicio=0, fin=
     where = """
         unit_id = ?
         AND TRIM(device_id) = ?
-        AND CAST(timestamp_utc AS INTEGER) BETWEEN ? AND ?
+        AND CAST(timestamp_utc AS INTEGER) >= ?
+        AND CAST(timestamp_utc AS INTEGER) < ?
     """
 
     params = [
@@ -202,7 +203,7 @@ def generar_produccion_simulada(inicio, fin):
     }
 
 
-def obtener_produccion_periodo(inicio, fin):
+def obtener_produccion_periodo(inicio, fin, modulo_produccion=None):
     """
     Obtiene producción real desde la tabla produccion_periodo.
 
@@ -215,7 +216,20 @@ def obtener_produccion_periodo(inicio, fin):
     """
 
     try:
-        produccion_real = sumar_produccion_rango(inicio, fin)
+        if modulo_produccion is None:
+            produccion_real = sumar_produccion_rango(inicio, fin)
+        else:
+            produccion_real = {
+                "envases_buenos": modulo_produccion.get("envases_buenos"),
+                "envases_malos": modulo_produccion.get("envases_malos"),
+                "envases_total": modulo_produccion.get("produccion_total"),
+                "eficiencia_calc": (
+                    (modulo_produccion.get("eficiencia_calidad_pct") or 0) / 100
+                ),
+                "horas_programadas": modulo_produccion.get("horas_programadas"),
+                "horas_productivas": modulo_produccion.get("horas_reales_trabajo"),
+                "periodos_usados": modulo_produccion.get("dias_produccion_incluidos"),
+            }
 
         periodos_usados = int(produccion_real.get("periodos_usados", 0) or 0)
 
@@ -250,7 +264,9 @@ def obtener_produccion_periodo(inicio, fin):
 
     return generar_produccion_simulada(inicio, fin)
 
-def resumen_kpi_samee200(inicio=None, fin=None):
+def resumen_kpi_samee200(
+    inicio=None, fin=None, modulo_produccion=None, energia_proceso_kwh=None
+):
     """
     KPI principal SAMEE200.
 
@@ -264,7 +280,7 @@ def resumen_kpi_samee200(inicio=None, fin=None):
         unit_id 100 = energía activa importada total kWh
 
     Potencia principal:
-        unit_id 61 = potencia activa total W
+        unit_id 61 = potencia activa total kW
     """
 
     if fin is None:
@@ -307,15 +323,16 @@ def resumen_kpi_samee200(inicio=None, fin=None):
         fin=fin
     )
 
-    energia_proceso_kwh = calcular_delta_acumulado(
-        unit_id=100,
-        device_id=proceso_device,
-        gateway_id=proceso["gateway_id"],
-        inicio=inicio,
-        fin=fin
-    )
+    if energia_proceso_kwh is None:
+        energia_proceso_kwh = calcular_delta_acumulado(
+            unit_id=100,
+            device_id=proceso_device,
+            gateway_id=proceso["gateway_id"],
+            inicio=inicio,
+            fin=fin
+        )
 
-    potencia_totalizador_w = obtener_ultimo_valor(
+    potencia_totalizador_kw = obtener_ultimo_valor(
         unit_id=61,
         device_id=totalizador_device,
         gateway_id=gateway_id,
@@ -323,7 +340,7 @@ def resumen_kpi_samee200(inicio=None, fin=None):
         fin=fin
     )
 
-    potencia_proceso_w = obtener_ultimo_valor(
+    potencia_proceso_kw = obtener_ultimo_valor(
         unit_id=61,
         device_id=proceso_device,
         gateway_id=proceso["gateway_id"],
@@ -331,10 +348,11 @@ def resumen_kpi_samee200(inicio=None, fin=None):
         fin=fin
     )
 
-    potencia_totalizador_kw = round((potencia_totalizador_w or 0) / 1000, 3)
-    potencia_proceso_kw = round((potencia_proceso_w or 0) / 1000, 3)
+    # unit_id 61 está catalogada y validada en kW; no se reescala a W.
+    potencia_totalizador_kw = round((potencia_totalizador_kw or 0), 3)
+    potencia_proceso_kw = round((potencia_proceso_kw or 0), 3)
 
-    produccion = obtener_produccion_periodo(inicio, fin)
+    produccion = obtener_produccion_periodo(inicio, fin, modulo_produccion)
     envases = produccion["envases_periodo"]
 
     if envases > 0:

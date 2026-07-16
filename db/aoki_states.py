@@ -284,6 +284,7 @@ def summarize_daily(segments, tolerance_seconds=600):
         day = days.setdefault(segment["productionDate"], {
             "productionDate": segment["productionDate"], "PRODUCTIVE": 0, "IDLE": 0,
             "OFF": 0, "NO_DATA": 0, "stateTransitions": 0, "inconsistentSegments": 0,
+            "inconsistentSeconds": 0,
             "lastState": None,
         })
         day[segment["state"]] += segment["durationSeconds"]
@@ -292,6 +293,7 @@ def summarize_daily(segments, tolerance_seconds=600):
         day["lastState"] = segment["state"]
         if segment["quality"] == "INCONSISTENT_SIGNAL":
             day["inconsistentSegments"] += 1
+            day["inconsistentSeconds"] += segment["durationSeconds"]
     output = []
     for key in sorted(days):
         day = days[key]
@@ -309,6 +311,7 @@ def summarize_daily(segments, tolerance_seconds=600):
         item["balanceStatus"] = "VALID" if balance_seconds <= tolerance_seconds else "OUT_OF_TOLERANCE"
         item["stateTransitions"] = day["stateTransitions"]
         item["inconsistentSegments"] = day["inconsistentSegments"]
+        item["inconsistentHours"] = round(day["inconsistentSeconds"] / 3600, 4)
         output.append(item)
     return output
 
@@ -319,6 +322,8 @@ def summarize_period(daily, start_utc, end_utc, tolerance_seconds=600):
         "idleHours": sum(day["idleHours"] for day in daily),
         "offHours": sum(day["offHours"] for day in daily),
         "noDataHours": sum(day["noDataHours"] for day in daily),
+        "inconsistentHours": sum(day.get("inconsistentHours", 0) for day in daily),
+        "inconsistentSegments": sum(day.get("inconsistentSegments", 0) for day in daily),
     }
     expected_hours = (int(end_utc) - int(start_utc)) / 3600
     state_hours = sum(fields.values())
@@ -332,7 +337,7 @@ def summarize_period(daily, start_utc, end_utc, tolerance_seconds=600):
         "balanceToleranceSeconds": int(tolerance_seconds),
         "balanceStatus": "VALID" if difference_seconds <= tolerance_seconds else "OUT_OF_TOLERANCE",
     })
-    for key in ("productiveHours", "idleHours", "offHours", "noDataHours"):
+    for key in ("productiveHours", "idleHours", "offHours", "noDataHours", "inconsistentHours"):
         fields[key] = round(fields[key], 4)
     return fields
 
