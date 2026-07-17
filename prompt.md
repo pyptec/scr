@@ -3644,26 +3644,633 @@ Fase 4 — Confiabilidad, mantenimiento y alarmas
 
 sin autorización.
 
+
+
+# FASE 4 — Confiabilidad, mantenimiento y alarmas
+
+La fase 3 se considera cerrada técnicamente después de aprobar la subfase 3.4.
+
+La fase 4 debe ejecutarse por subfases. No avanzar sin autorización.
+
+## Principio metodológico
+
+Los eventos eléctricos `IDLE`, `OFF`, `SOLO_DETECTADA` o `REPORTADA_Y_DETECTADA` no equivalen automáticamente a una falla.
+
+Antes de calcular:
+
+```text
+MTBF
+MTTR
+disponibilidad técnica
+tasa de fallas
+tiempo correctivo
+alarmas de mantenimiento
+```
+
+debe existir una clasificación explícita, trazable y validable de los eventos.
+
+Solo los eventos clasificados como fallas correctivas confirmadas podrán alimentar los KPI de confiabilidad.
+
+## Secuencia prevista de la fase 4
+
+```text
+4.1 Taxonomía y validación de eventos de mantenimiento
+4.2 KPI de confiabilidad: MTBF, MTTR y disponibilidad técnica
+4.3 Alarmas operacionales y energéticas
+4.4 Integración final de mantenimiento y cierre de la fase
+```
+
+La siguiente subfase autorizada es únicamente la 4.1.
+
+## Subfase 4.1 — Taxonomía y validación de eventos de mantenimiento
+
+### Objetivo
+
+Construir un contrato trazable que permita clasificar eventos conciliados y reportados según su naturaleza operacional y de mantenimiento, sin convertir automáticamente una anomalía eléctrica en una falla.
+
+Esta subfase debe preparar los datos para MTBF, MTTR y disponibilidad técnica, pero no calcular todavía esos KPI.
+
+### Fuentes permitidas
+
+Consumir exclusivamente contratos ya implementados:
+
+```text
+Subfase 2.5:
+eventos eléctricos
+
+Subfase 2.6A:
+paradas reportadas normalizadas
+
+Subfase 2.6:
+conciliaciones trazables
+
+Subfase 2.7:
+rango global integrado
+```
+
+Puede consultar catálogos o configuraciones locales versionadas.
+
+No volver a reconstruir:
+
+- estados eléctricos;
+- eventos eléctricos;
+- paradas reportadas;
+- conciliaciones;
+- energía;
+- Base 100;
+- CUSUM.
+
+### Regla fundamental
+
+No clasificar automáticamente como falla:
+
+```text
+IDLE
+OFF
+SOLO_DETECTADA
+REPORTADA_Y_DETECTADA
+PENDIENTE_REVISION
+SIN_DATOS
+```
+
+La clasificación de mantenimiento debe basarse en evidencia explícita:
+
+- texto reportado;
+- causa registrada;
+- intervención descrita;
+- tipo de mantenimiento;
+- confirmación humana;
+- relación temporal trazable.
+
+### Taxonomía principal
+
+Usar una taxonomía versionada con categorías como:
+
+```text
+CORRECTIVE_FAILURE
+PREVENTIVE_MAINTENANCE
+PREDICTIVE_MAINTENANCE
+PLANNED_OPERATIONAL_STOP
+UNPLANNED_OPERATIONAL_STOP
+CLEANING_OR_CHANGEOVER
+MATERIAL_OR_SUPPLY_STOP
+QUALITY_ADJUSTMENT
+ENERGY_OR_UTILITY_STOP
+EXTERNAL_PROCESS_STOP
+NO_DATA_EVENT
+UNCLASSIFIED
+PENDING_REVIEW
+```
+
+No crear sinónimos duplicados en frontend y backend.
+
+### Estado de validación
+
+Cada clasificación debe tener:
+
+```text
+AUTO_SUGGESTED
+HUMAN_VALIDATED
+HUMAN_REJECTED
+PENDING_REVIEW
+INSUFFICIENT_DATA
+```
+
+Solo:
+
+```text
+classification = CORRECTIVE_FAILURE
+validationStatus = HUMAN_VALIDATED
+```
+
+podrá considerarse en fases posteriores como falla confirmada.
+
+### Sugerencias automáticas
+
+Se permite generar una sugerencia automática conservadora a partir de palabras clave, causa o estructura temporal.
+
+Ejemplos orientativos:
+
+```text
+daño
+avería
+falla
+reparación
+cambio de componente
+motor
+sensor
+variador
+contactor
+fusible
+rodamiento
+```
+
+pueden sugerir:
+
+```text
+CORRECTIVE_FAILURE
+```
+
+Pero la sugerencia no equivale a validación.
+
+Términos como:
+
+```text
+limpieza
+cambio de molde
+ajuste
+falta de material
+descanso
+programada
+mantenimiento preventivo
+```
+
+no deben convertirse en falla correctiva.
+
+No usar coincidencia parcial ingenua que clasifique términos ambiguos fuera de contexto.
+
+### Causa y sistema afectado
+
+Conservar o extraer, cuando sea posible:
+
+```text
+causeCategory
+causeText
+affectedSystem
+affectedComponent
+maintenanceType
+interventionDescription
+```
+
+Catálogos sugeridos:
+
+```text
+ELECTRICAL
+MECHANICAL
+PNEUMATIC
+HYDRAULIC
+CONTROL_AUTOMATION
+INSTRUMENTATION
+UTILITIES
+PROCESS
+MATERIAL
+QUALITY
+EXTERNAL
+UNKNOWN
+```
+
+No inventar componente ni causa cuando el texto no lo soporte.
+
+### Tiempos del evento
+
+Conservar separados:
+
+```text
+reportedStart
+reportedEnd
+electricalStart
+electricalEnd
+validatedStart
+validatedEnd
+reportedDurationMinutes
+electricalDurationMinutes
+validatedDowntimeMinutes
+```
+
+Regla:
+
+```text
+validatedDowntimeMinutes
+```
+
+solo puede calcularse cuando exista una fuente temporal aprobada y trazable.
+
+No usar automáticamente la duración eléctrica como duración de reparación.
+
+### Eventos múltiples y solapamientos
+
+Un evento de mantenimiento puede asociarse a:
+
+- un evento reportado;
+- uno o varios eventos eléctricos;
+- una conciliación múltiple.
+
+Conservar listas de IDs.
+
+No duplicar un mismo evento validado.
+
+Detectar y marcar:
+
+```text
+OVERLAPPING_MAINTENANCE_EVENTS
+DUPLICATE_CLASSIFICATION
+AMBIGUOUS_TEMPORAL_SCOPE
+```
+
+### Contrato esperado
+
+```typescript
+interface MaintenanceEventClassification {
+  maintenanceEventId: string;
+
+  reconciliationId: string | null;
+  reportedEventIds: string[];
+  electricalEventIds: string[];
+
+  productionDate: string | null;
+
+  suggestedClassification:
+    | "CORRECTIVE_FAILURE"
+    | "PREVENTIVE_MAINTENANCE"
+    | "PREDICTIVE_MAINTENANCE"
+    | "PLANNED_OPERATIONAL_STOP"
+    | "UNPLANNED_OPERATIONAL_STOP"
+    | "CLEANING_OR_CHANGEOVER"
+    | "MATERIAL_OR_SUPPLY_STOP"
+    | "QUALITY_ADJUSTMENT"
+    | "ENERGY_OR_UTILITY_STOP"
+    | "EXTERNAL_PROCESS_STOP"
+    | "NO_DATA_EVENT"
+    | "UNCLASSIFIED"
+    | "PENDING_REVIEW";
+
+  validatedClassification: string | null;
+
+  validationStatus:
+    | "AUTO_SUGGESTED"
+    | "HUMAN_VALIDATED"
+    | "HUMAN_REJECTED"
+    | "PENDING_REVIEW"
+    | "INSUFFICIENT_DATA";
+
+  causeCategory: string | null;
+  causeText: string | null;
+  affectedSystem: string | null;
+  affectedComponent: string | null;
+  maintenanceType: string | null;
+  interventionDescription: string | null;
+
+  reportedStart: string | null;
+  reportedEnd: string | null;
+  electricalStart: string | null;
+  electricalEnd: string | null;
+  validatedStart: string | null;
+  validatedEnd: string | null;
+
+  reportedDurationMinutes: number | null;
+  electricalDurationMinutes: number | null;
+  validatedDowntimeMinutes: number | null;
+
+  rawText: string | null;
+  matchedText: string | null;
+
+  evidence: string[];
+  qualityFlags: string[];
+  reviewReason: string | null;
+
+  taxonomyVersion: string;
+  classifierVersion: string;
+}
+```
+
+### Identificador estable
+
+Crear:
+
+```text
+maintenanceEventId
+```
+
+a partir de información estable:
+
+- reconciliationId;
+- reportedEventIds;
+- electricalEventIds;
+- rango temporal validado;
+- versión de taxonomía.
+
+No usar índices de posición ni orden de la tabla.
+
+### Configuración versionada
+
+Crear, si no existe equivalente:
+
+```text
+device/aoki_maintenance_taxonomy.json
+```
+
+Debe contener:
+
+- versión;
+- categorías;
+- estados de validación;
+- categorías de causa;
+- palabras clave sugeridas;
+- exclusiones;
+- reglas de ambigüedad.
+
+Las reglas automáticas deben quedar claramente marcadas como heurísticas.
+
+### Persistencia de validación humana
+
+Antes de implementar persistencia, auditar la arquitectura existente.
+
+Preferencia inicial:
+
+- no modificar la base histórica maestra;
+- mantener una capa local separada para clasificaciones y validaciones;
+- usar un archivo o base auxiliar versionada solo si existe autorización explícita;
+- no escribir sobre tablas históricas de medición o producción.
+
+En esta auditoría previa, Codex debe proponer el mecanismo más seguro.
+
+No implementar escritura hasta que el diagnóstico sea aprobado.
+
+### Endpoint de lectura
+
+Proponer un endpoint como:
+
+```text
+GET /api/mantenimiento/eventos
+```
+
+Parámetros:
+
+```text
+inicio
+fin
+clasificacion
+estado_validacion
+```
+
+Debe respetar:
+
+```text
+[inicio, fin)
+America/Bogota
+06:00–06:00
+```
+
+### Endpoint de validación
+
+No implementar todavía sin auditar seguridad, persistencia, concurrencia y trazabilidad.
+
+Codex debe proponer un contrato como:
+
+```text
+POST /api/mantenimiento/eventos/{maintenanceEventId}/validacion
+```
+
+con:
+
+```text
+validatedClassification
+validatedStart
+validatedEnd
+causeCategory
+affectedSystem
+affectedComponent
+interventionDescription
+reviewComment
+```
+
+Debe contemplar:
+
+- usuario o actor;
+- fecha de validación;
+- versión anterior;
+- historial de cambios;
+- validación de campos;
+- protección contra sobrescritura accidental.
+
+### Dashboard
+
+Diseñar una vista:
+
+```text
+Confiabilidad y mantenimiento
+```
+
+Para esta subfase mostrar:
+
+```text
+Eventos pendientes de revisión
+Sugerencias de falla correctiva
+Mantenimientos preventivos sugeridos
+Paradas operacionales
+Eventos sin datos suficientes
+Eventos validados
+```
+
+Tabla:
+
+```text
+ID
+fecha
+clasificación sugerida
+clasificación validada
+estado
+causa
+sistema
+componente
+inicio reportado
+inicio eléctrico
+duración reportada
+duración eléctrica
+duración validada
+evidencia
+motivo de revisión
+```
+
+No mostrar todavía:
+
+```text
+MTBF
+MTTR
+disponibilidad técnica
+tasa de fallas
+```
+
+### Reglas para KPI futuros
+
+Dejar documentado que en 4.2:
+
+```text
+confirmedFailure =
+validatedClassification = CORRECTIVE_FAILURE
+AND validationStatus = HUMAN_VALIDATED
+AND validatedStart != null
+```
+
+Para MTTR se requerirá además:
+
+```text
+validatedEnd != null
+validatedDowntimeMinutes > 0
+```
+
+Los eventos sin validación humana no deberán entrar en KPI definitivos.
+
+### Prueba obligatoria de mayo
+
+Usar:
+
+```text
+inicio = 2026-05-01 06:00 America/Bogota
+fin exclusivo = 2026-06-01 06:00 America/Bogota
+```
+
+Auditar:
+
+- eventos reportados normalizados;
+- eventos eléctricos;
+- conciliaciones;
+- causas disponibles;
+- textos con evidencia de falla;
+- textos de limpieza, ajustes, material o paradas programadas;
+- eventos ambiguos;
+- eventos sin datos.
+
+No asumir de antemano cuántas fallas existen.
+
+### Pruebas mínimas futuras
+
+Preparar pruebas para:
+
+1. falla correctiva sugerida;
+2. mantenimiento preventivo;
+3. limpieza;
+4. cambio de molde;
+5. falta de material;
+6. ajuste de calidad;
+7. parada programada;
+8. evento eléctrico sin reporte;
+9. reporte sin evidencia temporal;
+10. evento SIN_DATOS;
+11. texto ambiguo;
+12. no clasificación automática definitiva;
+13. validación humana;
+14. rechazo humano;
+15. identificador estable;
+16. no duplicación;
+17. solapamientos;
+18. conservación de rawText;
+19. clasificación por rango;
+20. exclusión exacta del fin;
+21. no cálculo de MTBF;
+22. no cálculo de MTTR;
+23. no disponibilidad técnica;
+24. no modificación de base histórica;
+25. trazabilidad de versiones.
+
+### Archivos previstos
+
+Antes de implementar, Codex debe auditar y proponer.
+
+Preferencia arquitectónica:
+
+Nuevos:
+
+```text
+db/aoki_maintenance_events.py
+device/aoki_maintenance_taxonomy.json
+tests/test_aoki_maintenance_events.py
+tests/test_aoki_maintenance_events_integration.py
+docs/fase4_subfase4.1_taxonomia_mantenimiento.md
+```
+
+Posibles modificaciones:
+
+```text
+api/app.py
+templates/dashboard.html
+static/js/dashboard.js
+tests/test_dashboard_structure.py
+```
+
+No implementar todavía persistencia humana sin aprobación posterior al diagnóstico.
+
+### Entrega del diagnóstico previo
+
+Antes de modificar código, presentar:
+
+1. contratos reales disponibles;
+2. conteo de eventos por fuente;
+3. textos y causas útiles;
+4. candidatos posibles por categoría;
+5. casos ambiguos;
+6. eventos sin información suficiente;
+7. propuesta de taxonomía;
+8. propuesta de identificador;
+9. propuesta de persistencia separada;
+10. propuesta de endpoints;
+11. archivos previstos;
+12. riesgos;
+13. confirmación de que no se calcularon KPI.
+
+Detenerse antes de implementar.
+
 # Instrucción vigente para continuar
 
-La subfase 3.3 se considera implementada y aprobada.
+La fase 3 se considera cerrada técnicamente.
 
 El siguiente trabajo autorizado es únicamente:
 
 ```text
-SUBFASE 3.4 — Evaluación económica y ambiental
+SUBFASE 4.1 — Taxonomía y validación de eventos de mantenimiento
 ```
 
 Antes de modificar código, Codex debe:
 
-1. auditar los contratos reales de 3.1, 3.2 y 3.3;
-2. confirmar el residuo consolidado de mayo;
-3. buscar si ya existe tarifa o factor de emisión configurado;
-4. verificar unidades, fuentes y vigencia;
-5. proponer el tratamiento cuando falten factores;
-6. identificar archivos previstos;
-7. presentar el diagnóstico;
-8. detenerse antes de implementar.
+1. auditar contratos 2.5, 2.6A, 2.6 y 2.7;
+2. identificar evidencia real de mantenimiento;
+3. separar fallas correctivas de paradas operacionales;
+4. proponer taxonomía y reglas heurísticas;
+5. proponer almacenamiento de validaciones sin tocar la base histórica;
+6. proponer endpoints;
+7. identificar archivos previstos;
+8. presentar el diagnóstico;
+9. detenerse antes de implementar.
 
 ---
 

@@ -13,6 +13,7 @@ let chartCusumDiario = null;
 let chartImpactoEconomico = null;
 let chartImpactoAmbiental = null;
 let conciliacionActual = [];
+let mantenimientoActual = [];
 let rangoSnapshotActual = null;
 let actualizacionPendiente = false;
 const cacheHistorico = new Map();
@@ -571,6 +572,61 @@ function renderizarConciliacionAoki() {
             <td>${escaparHtml(item.status || "--")}</td>`;
         tbody.appendChild(fila);
     });
+}
+
+function renderizarMantenimiento() {
+    const sugerencia = document.getElementById("filtroMantSugerencia")?.value || "";
+    const validacion = document.getElementById("filtroMantValidacion")?.value || "";
+    const filtrados = mantenimientoActual.filter(evento =>
+        (!sugerencia || evento.suggestedClassification === sugerencia)
+        && (!validacion || evento.validationStatus === validacion)
+    );
+    const tbody = document.getElementById("tablaMantenimiento");
+    tbody.innerHTML = filtrados.length
+        ? ""
+        : '<tr><td colspan="12">No hay eventos para los filtros seleccionados</td></tr>';
+    filtrados.forEach(evento => {
+        const fila = document.createElement("tr");
+        fila.innerHTML = `
+            <td>${escaparHtml(evento.maintenanceEventId)}</td>
+            <td>${escaparHtml(evento.productionDate || "--")}</td>
+            <td>${escaparHtml(evento.suggestedClassification)}</td>
+            <td>${evento.validatedClassification === null ? "Sin validar" : escaparHtml(evento.validatedClassification)}</td>
+            <td>${escaparHtml(evento.validationStatus)}</td>
+            <td>${escaparHtml(evento.cause || "--")}</td>
+            <td>${escaparHtml(formatearIsoColombia(evento.reportedStart))}</td>
+            <td>${escaparHtml(formatearIsoColombia(evento.electricalStart))}</td>
+            <td>${formatearNumero(evento.reportedDurationMinutes, 2)}</td>
+            <td>${formatearNumero(evento.electricalDurationMinutes, 2)}</td>
+            <td>${escaparHtml(evento.rawText || "Solo evidencia eléctrica")}</td>
+            <td>${escaparHtml((evento.suggestionReasons || []).join(" "))}</td>`;
+        tbody.appendChild(fila);
+    });
+}
+
+async function cargarMantenimiento(snapshot = rangoSnapshotActual) {
+    snapshot = requerirSnapshot(snapshot);
+    const data = await fetchJsonCacheado(
+        `/api/mantenimiento/eventos?inicio=${snapshot.inicio}&fin=${snapshot.fin}`,
+        snapshot
+    );
+    const resumen = data.summary || {};
+    const sugerencias = resumen.suggestionsByClassification || {};
+    document.getElementById("mantPendientes").innerText = formatearEntero(resumen.pendingHumanReview);
+    document.getElementById("mantCorrectivas").innerText = formatearEntero(sugerencias.CORRECTIVE_FAILURE || 0);
+    document.getElementById("mantPreventivos").innerText = formatearEntero(sugerencias.PREVENTIVE_MAINTENANCE || 0);
+    document.getElementById("mantOperacionales").innerText = formatearEntero(sugerencias.OPERATIONAL_STOP || 0);
+    document.getElementById("mantSinDatos").innerText = formatearEntero(sugerencias.DATA_QUALITY_EVENT || 0);
+    document.getElementById("mantValidados").innerText = formatearEntero(resumen.humanValidated);
+    document.getElementById("mantFallasConfirmadas").innerText = formatearEntero(resumen.confirmedFailures);
+    document.getElementById("mantTaxonomia").innerText =
+        `Taxonomía: ${data.taxonomyVersion || "--"} · sugerencias automáticas, sin persistencia humana`;
+    mantenimientoActual = data.events || [];
+    poblarFiltroConciliacion(
+        "filtroMantSugerencia",
+        mantenimientoActual.map(evento => evento.suggestedClassification)
+    );
+    renderizarMantenimiento();
 }
 
 async function cargarEnergiaReconstruidaAoki(snapshot = rangoSnapshotActual) {
@@ -1381,6 +1437,8 @@ async function actualizarTodo() {
             if (vistaBase100 && !vistaBase100.hidden) await cargarBase100(snapshot);
             const vistaCusum = document.querySelector('[data-linea-base-view="cusum"]');
             if (vistaCusum && !vistaCusum.hidden) await cargarCusum(snapshot);
+        } else if (moduloActual === "confiabilidad") {
+            await cargarMantenimiento(snapshot);
         } else if (moduloActual === "variables") {
             if (!variablesDisponibles.length) await cargarSelectorVariables();
             await cargarUltimosValores(snapshot);
@@ -1487,10 +1545,17 @@ function inicializarFiltrosConciliacion() {
     ].forEach(id => document.getElementById(id)?.addEventListener("change", renderizarConciliacionAoki));
 }
 
+function inicializarFiltrosMantenimiento() {
+    ["filtroMantSugerencia", "filtroMantValidacion"].forEach(
+        id => document.getElementById(id)?.addEventListener("change", renderizarMantenimiento)
+    );
+}
+
 async function iniciarDashboard() {
     await cargarRangosProduccion();
     inicializarFiltros();
     inicializarFiltrosConciliacion();
+    inicializarFiltrosMantenimiento();
     inicializarVistasLineaBase();
     await inicializarNavegacion();
 

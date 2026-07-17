@@ -175,6 +175,22 @@ class DashboardStructureTests(unittest.TestCase):
         self.assertIn('"Variables del gateway"', self.javascript)
         self.assertIn("v.source_type", self.javascript)
 
+    def test_maintenance_view_exposes_suggestions_without_human_writes_or_kpi(self):
+        for identifier in (
+            "mantPendientes", "mantCorrectivas", "mantPreventivos",
+            "mantOperacionales", "mantSinDatos", "mantValidados",
+            "mantFallasConfirmadas", "tablaMantenimiento",
+            "filtroMantSugerencia", "filtroMantValidacion",
+        ):
+            self.assertIn(f'id="{identifier}"', self.html)
+        self.assertIn("/api/mantenimiento/eventos", self.javascript)
+        self.assertIn("PENDING_HUMAN_REVIEW", self.html)
+        self.assertIn("Una sugerencia CORRECTIVE_FAILURE tampoco constituye", self.html)
+        self.assertIn('moduloActual === "confiabilidad"', self.javascript)
+        self.assertNotIn("/validacion", self.javascript)
+        self.assertNotIn("MTBF", self.html)
+        self.assertNotIn("MTTR", self.html)
+
 
 if __name__ == "__main__":
     unittest.main()

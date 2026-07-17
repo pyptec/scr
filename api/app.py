@@ -33,6 +33,11 @@ from db.aoki_daily_performance import build_daily_performance
 from db.aoki_base100 import build_base100_contract
 from db.aoki_cusum import build_cusum_contract
 from db.aoki_impact import build_impact_contract, load_impact_factors
+from db.aoki_maintenance_events import (
+    build_maintenance_events,
+    find_maintenance_event,
+    load_maintenance_taxonomy,
+)
 
 load_dotenv("/home/pi/SAMEE200/scr/.env")
 
@@ -110,6 +115,57 @@ def api_fase2_dashboard():
         return jsonify(build_phase2_dashboard(conn, inicio, fin))
     finally:
         conn.close()
+
+
+def _maintenance_range():
+    inicio = request.args.get("inicio", type=int)
+    fin = request.args.get("fin", type=int)
+    if inicio is None or fin is None or fin <= inicio:
+        return None, None, (jsonify({"error": "Rango de fechas inválido"}), 400)
+    if fin - inicio > 90 * 86400:
+        return None, None, (
+            jsonify({"error": "El rango máximo local es de 90 días"}), 400
+        )
+    return inicio, fin, None
+
+
+def _maintenance_contract(inicio, fin):
+    conn = get_conn()
+    try:
+        phase2 = build_phase2_dashboard(conn, inicio, fin)
+        return build_maintenance_events(phase2)
+    finally:
+        conn.close()
+
+
+@app.route("/api/mantenimiento/taxonomia")
+def api_mantenimiento_taxonomia():
+    return jsonify(load_maintenance_taxonomy())
+
+
+@app.route("/api/mantenimiento/eventos")
+def api_mantenimiento_eventos():
+    inicio, fin, error = _maintenance_range()
+    if error:
+        return error
+    return jsonify(_maintenance_contract(inicio, fin))
+
+
+@app.route("/api/mantenimiento/eventos/<maintenance_event_id>")
+def api_mantenimiento_evento(maintenance_event_id):
+    inicio, fin, error = _maintenance_range()
+    if error:
+        return error
+    contract = _maintenance_contract(inicio, fin)
+    event = find_maintenance_event(contract, maintenance_event_id)
+    if event is None:
+        return jsonify({"error": "Evento de mantenimiento no encontrado en el rango"}), 404
+    return jsonify({
+        "taxonomyVersion": contract["taxonomyVersion"],
+        "ranges": contract["ranges"],
+        "event": event,
+        "methodology": contract["methodology"],
+    })
 
 
 @app.route("/api/estado")

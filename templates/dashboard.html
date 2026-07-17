@@ -582,8 +582,43 @@
         <h3>Detalle diario de calidad energética</h3>
         <div class="tabla-wrapper"><table><thead><tr><th>Jornada</th><th>Total kWh</th><th>Medida kWh</th><th>Reconstruida kWh</th><th>Reconstruido</th><th>Cobertura</th><th>NO_DATA</th><th>Resultado</th></tr></thead><tbody id="tablaEnergiaReconstruida"></tbody></table></div>
     </section>
-    <section class="panel modulo modulo-pendiente" data-module="confiabilidad" hidden>
-        <h2>Confiabilidad y mantenimiento</h2><p>Estructura preparada. Contenido pendiente de la subfase correspondiente.</p>
+    <section class="panel modulo" data-module="confiabilidad" hidden>
+        <div class="panel-header">
+            <div>
+                <h2>Confiabilidad y mantenimiento</h2>
+                <small>DATOS_HISTORICOS_DE_PRUEBA · Sugerencias automáticas pendientes de validación humana</small>
+            </div>
+        </div>
+        <p class="aviso-metodologico">Las clasificaciones mostradas son sugerencias conservadoras. IDLE, OFF y SOLO_DETECTADA no son fallas. Una sugerencia CORRECTIVE_FAILURE tampoco constituye una falla confirmada sin clasificación y validación humanas.</p>
+        <div class="grid-kpi">
+            <div class="card"><span>Eventos pendientes de revisión</span><strong id="mantPendientes">--</strong><small>PENDING_HUMAN_REVIEW</small></div>
+            <div class="card"><span>Sugerencias correctivas</span><strong id="mantCorrectivas">--</strong><small>no son fallas confirmadas</small></div>
+            <div class="card"><span>Preventivos sugeridos</span><strong id="mantPreventivos">--</strong><small>incluye mantenimiento preventivo</small></div>
+            <div class="card"><span>Paradas operacionales</span><strong id="mantOperacionales">--</strong><small>sin atribuir falla</small></div>
+            <div class="card"><span>Eventos de calidad de datos</span><strong id="mantSinDatos">--</strong><small>NO_DATA</small></div>
+            <div class="card"><span>Eventos validados</span><strong id="mantValidados">--</strong><small>persistencia humana no implementada</small></div>
+            <div class="card"><span>Fallas confirmadas</span><strong id="mantFallasConfirmadas">--</strong><small>requiere CORRECTIVE_FAILURE + HUMAN_VALIDATED</small></div>
+        </div>
+        <p id="mantTaxonomia" class="periodo-efectivo">Taxonomía: --</p>
+        <div class="filtros-grid">
+            <label>Clasificación sugerida
+                <select id="filtroMantSugerencia"><option value="">Todas</option></select>
+            </label>
+            <label>Estado de validación
+                <select id="filtroMantValidacion">
+                    <option value="">Todos</option>
+                    <option value="PENDING_HUMAN_REVIEW">PENDING_HUMAN_REVIEW</option>
+                    <option value="HUMAN_VALIDATED">HUMAN_VALIDATED</option>
+                    <option value="HUMAN_REJECTED">HUMAN_REJECTED</option>
+                </select>
+            </label>
+        </div>
+        <div class="tabla-wrapper">
+            <table>
+                <thead><tr><th>ID</th><th>Jornada</th><th>Sugerencia</th><th>Clasificación validada</th><th>Estado</th><th>Causa</th><th>Inicio reportado</th><th>Inicio eléctrico</th><th>Duración reportada</th><th>Duración eléctrica</th><th>Evidencia</th><th>Motivo de revisión</th></tr></thead>
+                <tbody id="tablaMantenimiento"></tbody>
+            </table>
+        </div>
     </section>
 
 </main>

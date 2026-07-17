@@ -1,0 +1,34 @@
+{
+  "version": "aoki-maintenance-taxonomy-v1-2026-07",
+  "classifications": [
+    "CORRECTIVE_FAILURE",
+    "PREVENTIVE_MAINTENANCE",
+    "PREDICTIVE_MAINTENANCE",
+    "OPERATIONAL_STOP",
+    "PLANNED_STOP",
+    "QUALITY_ADJUSTMENT",
+    "MATERIAL_SHORTAGE",
+    "CLEANING",
+    "CHANGEOVER",
+    "DATA_QUALITY_EVENT",
+    "OTHER",
+    "UNDETERMINED"
+  ],
+  "validationStatuses": [
+    "PENDING_HUMAN_REVIEW",
+    "HUMAN_VALIDATED",
+    "HUMAN_REJECTED",
+    "SUPERSEDED"
+  ],
+  "confirmedFailureRule": {
+    "validatedClassification": "CORRECTIVE_FAILURE",
+    "validationStatus": "HUMAN_VALIDATED"
+  },
+  "methodology": {
+    "automaticSuggestionsAreDefinitive": false,
+    "idleOrOffAlone": "UNDETERMINED",
+    "soloDetectadaAlone": "UNDETERMINED",
+    "noData": "DATA_QUALITY_EVENT",
+    "maintenanceWithoutDamage": "UNDETERMINED"
+  }
+}
