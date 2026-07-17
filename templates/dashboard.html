@@ -261,14 +261,24 @@
                 <button class="subnav-item" data-linea-base-target="cusum">CUSUM</button>
             </nav>
 
-            <p class="aviso-metodologico">La ecuación oficial se conserva sin cambios. La evaluación usa horas PRODUCTIVE de la clasificación eléctrica preliminar; sus resultados son exploratorios hasta revalidar la relación con producción mediante datos nuevos.</p>
+            <p class="aviso-metodologico">Resultado preliminar basado en la línea base histórica y en horas derivadas de clasificación eléctrica. Requiere revalidación con datos nuevos antes de declararse mejora energética sostenida.</p>
 
             <section class="vista-linea-base" data-linea-base-view="desempeno">
             <div class="grid-kpi">
                 <div class="card">
-                    <span>Energía real Aoki</span>
+                    <span>Energía conocida Aoki</span>
                     <strong id="lbEnergiaReal">--</strong>
-                    <small>kWh periodo</small>
+                    <small>medida + reconstruida, kWh</small>
+                </div>
+                <div class="card">
+                    <span>Energía medida</span>
+                    <strong id="lbEnergiaMedida">--</strong>
+                    <small>kWh desde acumulador</small>
+                </div>
+                <div class="card">
+                    <span>Energía reconstruida</span>
+                    <strong id="lbEnergiaReconstruida">--</strong>
+                    <small>kWh desde potencia permitida</small>
                 </div>
 
                 <div class="card">
@@ -284,15 +294,19 @@
                 </div>
 
                 <div class="card">
-                    <span>Ahorro</span>
-                    <strong id="lbAhorroKwh">--</strong>
-                    <small>kWh evitados</small>
+                    <span>Diferencia preliminar</span>
+                    <strong id="lbDiferenciaKwh">--</strong>
+                    <small>favorable o desfavorable, kWh</small>
                 </div>
-
                 <div class="card">
-                    <span>Ahorro económico</span>
-                    <strong id="lbAhorroCop">--</strong>
-                    <small>COP estimados</small>
+                    <span>Cobertura energética</span>
+                    <strong id="lbCoberturaEnergia">--</strong>
+                    <small>energía conocida</small>
+                </div>
+                <div class="card">
+                    <span>Cobertura de estados</span>
+                    <strong id="lbCoberturaEstados">--</strong>
+                    <small>clasificación eléctrica</small>
                 </div>
 
                 <div class="card">
@@ -312,7 +326,22 @@
                     <strong id="lbR2">--</strong>
                     <small>calidad del ajuste</small>
                 </div>
+                <div class="card">
+                    <span>Días válidos</span>
+                    <strong id="lbDiasValidos">--</strong>
+                    <small>evaluación preliminar</small>
+                </div>
+                <div class="card">
+                    <span>Días excluidos</span>
+                    <strong id="lbDiasExcluidos">--</strong>
+                    <small>calidad o entradas insuficientes</small>
+                </div>
             </div>
+            <h3>Desempeño energético diario</h3>
+            <div class="tabla-wrapper"><table>
+                <thead><tr><th>Fecha</th><th>Buenos</th><th>PRODUCTIVE eléctricas</th><th>Medida kWh</th><th>Reconstruida kWh</th><th>Conocida kWh</th><th>Esperada kWh</th><th>Residuo kWh</th><th>Desviación</th><th>Clasificación</th><th>Cobertura energía/estados</th><th>Banderas de calidad</th></tr></thead>
+                <tbody id="tablaLineaBaseDiaria"></tbody>
+            </table></div>
             </section>
 
             <section class="vista-linea-base estado-pendiente" data-linea-base-view="indice-base-100" hidden>

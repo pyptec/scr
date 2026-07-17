@@ -29,6 +29,7 @@ from db.fase2_dashboard import (
     attach_temporal_contract,
     build_phase2_dashboard,
 )
+from db.aoki_daily_performance import build_daily_performance
 
 load_dotenv("/home/pi/SAMEE200/scr/.env")
 
@@ -625,6 +626,21 @@ def api_linea_base():
     if inicio is not None and fin is not None:
         attach_temporal_contract(data, inicio, fin)
     return jsonify(data)
+
+
+@app.route("/api/linea-base/desempeno-diario")
+def api_linea_base_desempeno_diario():
+    inicio = request.args.get("inicio", type=int)
+    fin = request.args.get("fin", type=int)
+    if inicio is None or fin is None or fin <= inicio:
+        return jsonify({"error": "Rango de fechas inválido"}), 400
+    if fin - inicio > 90 * 86400:
+        return jsonify({"error": "El rango máximo local es de 90 días"}), 400
+    conn = get_conn()
+    try:
+        return jsonify(build_daily_performance(conn, inicio, fin))
+    finally:
+        conn.close()
 
 
 @app.route("/api/linea-base/entrenar")

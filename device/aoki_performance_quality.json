@@ -1,0 +1,7 @@
+{
+  "version": "aoki-performance-quality-v1-2026-07",
+  "status": "PROVISIONAL_QUALITY_THRESHOLDS",
+  "minimumEnergyCoveragePct": 98.0,
+  "minimumStateCoveragePct": 98.0,
+  "maximumReconstructedEnergyPct": 20.0
+}

@@ -599,40 +599,51 @@ async function cargarEnergiaReconstruidaAoki(snapshot = rangoSnapshotActual) {
 
 async function cargarLineaBase(snapshot = rangoSnapshotActual) {
     snapshot = requerirSnapshot(snapshot);
-    const res = await fetch(`/api/linea-base?inicio=${snapshot.inicio}&fin=${snapshot.fin}`);
+    const res = await fetch(`/api/linea-base/desempeno-diario?inicio=${snapshot.inicio}&fin=${snapshot.fin}`);
     const data = await res.json();
 
-    if (data.ok === false || data.error) {
-        document.getElementById("lbClasificacion").innerText = "Sin modelo";
+    if (!res.ok || data.error) {
+        document.getElementById("lbClasificacion").innerText = "Sin datos";
         document.getElementById("lbMensaje").innerText = data.error || "No hay datos suficientes";
         return;
     }
 
+    const resumen = data.summary || {};
     document.getElementById("lbEnergiaReal").innerText =
-        formatearNumero(data.energia?.real_kwh, 3);
-
+        formatearNumero(resumen.totalKnownEnergyKWh, 3);
+    document.getElementById("lbEnergiaMedida").innerText =
+        formatearNumero(resumen.totalMeasuredEnergyKWh, 3);
+    document.getElementById("lbEnergiaReconstruida").innerText =
+        formatearNumero(resumen.totalReconstructedEnergyKWh, 3);
     document.getElementById("lbEnergiaEsperada").innerText =
-        formatearNumero(data.energia?.esperada_kwh, 3);
-
+        formatearNumero(resumen.totalExpectedEnergyKWh, 3);
     document.getElementById("lbDesviacionPct").innerText =
-        formatearNumero(data.energia?.desviacion_pct, 2);
-
-    document.getElementById("lbAhorroKwh").innerText =
-        formatearNumero(data.energia?.ahorro_kwh, 3);
-
-    document.getElementById("lbAhorroCop").innerText =
-        formatearEntero(data.impacto?.ahorro_cop);
-
+        resumen.totalDeviationPct === null ? "Datos insuficientes" : `${formatearNumero(resumen.totalDeviationPct, 2)} %`;
+    document.getElementById("lbDiferenciaKwh").innerText =
+        resumen.favorableDifferenceKWh > 0
+            ? `${formatearNumero(resumen.favorableDifferenceKWh, 3)} favorable`
+            : (resumen.unfavorableDifferenceKWh > 0
+                ? `${formatearNumero(resumen.unfavorableDifferenceKWh, 3)} desfavorable`
+                : (resumen.totalResidualKWh === null ? "Datos insuficientes" : "Neutral"));
+    document.getElementById("lbCoberturaEnergia").innerText =
+        resumen.energyCoveragePct === null ? "Datos insuficientes" : `${formatearNumero(resumen.energyCoveragePct, 2)} %`;
+    document.getElementById("lbCoberturaEstados").innerText =
+        resumen.stateCoveragePct === null ? "Datos insuficientes" : `${formatearNumero(resumen.stateCoveragePct, 2)} %`;
+    document.getElementById("lbDiasValidos").innerText = formatearEntero(resumen.validDays);
+    document.getElementById("lbDiasExcluidos").innerText =
+        `${formatearEntero(resumen.excludedDays)} (+${formatearEntero(resumen.insufficientDays)} insuf.)`;
+    const clasificacionesValidas = (data.daily || [])
+        .filter(dia => dia.evaluationStatus === "VALID_PRELIMINARY")
+        .map(dia => dia.performanceClassification);
     document.getElementById("lbClasificacion").innerText =
-        data.clasificacion || "--";
+        clasificacionesValidas.length === 0 ? "INSUFFICIENT_DATA"
+            : (new Set(clasificacionesValidas).size === 1 ? clasificacionesValidas[0] : "RESULTADO_MIXTO_PRELIMINAR");
+    document.getElementById("lbMensaje").innerText =
+        `${data.quality?.status || "--"}; resultado no definitivo.`;
 
-    document.getElementById("lbMensaje").innerText = data.trazabilidad
-        ? `${data.mensaje || "Evaluación exploratoria"} Cobertura de estados: ${formatearNumero(data.trazabilidad.stateCoveragePct, 2)} %; NO_DATA: ${formatearNumero(data.trazabilidad.stateNoDataHours, 2)} h.`
-        : (data.mensaje || "ISO 50001");
-
-    const beta0 = data.modelo?.intercepto;
-    const betaEnvases = data.modelo?.coef_envases_buenos;
-    const betaHoras = data.modelo?.coef_horas_productivas;
+    const beta0 = data.model?.intercepto;
+    const betaEnvases = data.model?.coef_envases_buenos;
+    const betaHoras = data.model?.coef_horas_productivas;
 
     if (beta0 !== undefined && betaEnvases !== undefined && betaHoras !== undefined) {
         document.getElementById("lbModelo").innerText =
@@ -643,7 +654,18 @@ async function cargarLineaBase(snapshot = rangoSnapshotActual) {
     }
 
     document.getElementById("lbR2").innerText =
-        formatearNumero(data.modelo?.r2, 3);
+        formatearNumero(data.model?.r2, 3);
+
+    const tbody = document.getElementById("tablaLineaBaseDiaria");
+    const diarios = data.daily || [];
+    tbody.innerHTML = diarios.length ? "" : '<tr><td colspan="12">Sin datos para el periodo</td></tr>';
+    diarios.forEach(dia => {
+        const fila = document.createElement("tr");
+        const coberturaEnergia = dia.energyCoveragePct === null ? "No disponible" : `${formatearNumero(dia.energyCoveragePct, 2)} %`;
+        const coberturaEstados = dia.stateCoveragePct === null ? "No disponible" : `${formatearNumero(dia.stateCoveragePct, 2)} %`;
+        fila.innerHTML = `<td>${escaparHtml(dia.productionDate)}</td><td>${formatearEntero(dia.goodUnits)}</td><td>${formatearNumero(dia.productiveElectricalHours, 3)}</td><td>${formatearNumero(dia.measuredEnergyKWh, 3)}</td><td>${formatearNumero(dia.reconstructedEnergyKWh, 3)}</td><td>${formatearNumero(dia.knownEnergyKWh, 3)}</td><td>${formatearNumero(dia.expectedEnergyKWh, 3)}</td><td>${formatearNumero(dia.residualKWh, 3)}</td><td>${dia.deviationPct === null ? "No disponible" : formatearNumero(dia.deviationPct, 2) + " %"}</td><td>${escaparHtml(dia.performanceClassification)}</td><td>${coberturaEnergia} / ${coberturaEstados}</td><td>${escaparHtml((dia.qualityFlags || []).join(", "))}</td>`;
+        tbody.appendChild(fila);
+    });
 }
 
 async function cargarCalidad(snapshot = rangoSnapshotActual) {
@@ -989,29 +1011,26 @@ async function mostrarGrafica(tipo, snapshot = rangoSnapshotActual) {
     }
     if (tipo === "linea_base") {
         document.getElementById("tituloGrafica").innerText =
-            "Línea base ISO 50001: Energía real vs esperada";
+            "Línea base ISO 50001: energía conocida vs esperada por jornada";
 
-        const res = await fetch(`/api/linea-base?inicio=${snapshot.inicio}&fin=${snapshot.fin}`);
+        const res = await fetch(`/api/linea-base/desempeno-diario?inicio=${snapshot.inicio}&fin=${snapshot.fin}`);
         const data = await res.json();
-
-        const energiaReal = data.energia?.real_kwh || 0;
-        const energiaEsperada = data.energia?.esperada_kwh || 0;
-        const ahorro = data.energia?.ahorro_kwh || 0;
-        const sobreconsumo = data.energia?.sobreconsumo_kwh || 0;
+        const diarios = data.daily || [];
 
         chartPrincipal = new Chart(ctx, {
             type: "bar",
             data: {
-                labels: ["Real", "Esperada", "Ahorro", "Sobreconsumo"],
-                datasets: [{
-                    label: "kWh",
-                    data: [
-                        energiaReal,
-                        energiaEsperada,
-                        ahorro,
-                        sobreconsumo
-                    ]
-                }]
+                labels: diarios.map(dia => dia.productionDate),
+                datasets: [
+                    {
+                        label: "Energía conocida kWh",
+                        data: diarios.map(dia => dia.knownEnergyKWh)
+                    },
+                    {
+                        label: "Energía esperada kWh",
+                        data: diarios.map(dia => dia.expectedEnergyKWh)
+                    }
+                ]
             }
         });
     }

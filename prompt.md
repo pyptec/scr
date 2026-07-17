@@ -2016,34 +2016,487 @@ Presentar:
 
 Detenerse al finalizar. No avanzar a la subfase 2.7 ni a la fase 4 sin autorización.
 
-## Subfase 2.7 — Actualización de módulos del dashboard
+## Subfase 2.7 — Integración final de la fase 2 en el dashboard
 
-Actualizar `Producción`, `Eficiencia operacional`, `Resumen` y `Variables eléctricas` para mostrar:
+La subfase 2.6 se considera implementada y aprobada. Esta es la siguiente subfase autorizada.
+
+Trabaja únicamente en la subfase 2.7. No avances todavía a MTBF, MTTR, disponibilidad técnica definitiva, fase 3 definitiva, reentrenamiento de la línea base, Índice Base 100 definitivo ni CUSUM definitivo.
+
+### Objetivo
+
+Integrar en el dashboard, de manera coherente y trazable, los resultados ya validados de:
+
+```text
+2.2B Reconstrucción energética
+2.3 Clasificación eléctrica preliminar
+2.4 Consolidación de horas y cobertura
+2.5 Eventos eléctricos no productivos
+2.6 Conciliación con paradas reportadas
+```
+
+La subfase 2.7 no debe crear nuevos modelos. Debe consolidar servicios, contratos, filtros, indicadores, tablas y gráficas para que todos los módulos utilicen el mismo rango efectivo.
+
+### Regla global de fechas
+
+Todos los cálculos deben respetar un único rango:
+
+```text
+[inicio, fin)
+```
+
+Zona horaria:
+
+```text
+America/Bogota
+```
+
+Jornada productiva:
+
+```text
+06:00–06:00
+```
+
+Ejemplo obligatorio de validación:
+
+```text
+inicio = 2026-05-01 06:00 America/Bogota
+fin = 2026-06-01 06:00 America/Bogota
+```
+
+El inicio se incluye y el fin se excluye.
+
+Ningún módulo debe incluir datos anteriores al inicio ni posteriores o iguales al fin.
+
+Mostrar siempre:
+
+```text
+Periodo solicitado
+Periodo efectivo evaluado
+Periodo común conciliable
+```
+
+Cuando una fuente no cubra todo el rango, mostrar cobertura parcial o `NO_DATA`; no completar silenciosamente.
+
+### Terminología obligatoria
+
+No presentar los estados eléctricos como verdad productiva definitiva.
+
+Usar:
+
+```text
+Horas en estado eléctrico PRODUCTIVE
+Horas en estado eléctrico IDLE
+Horas en estado eléctrico OFF
+Horas sin clasificación eléctrica
+Clasificación eléctrica preliminar
+```
+
+No usar en esta subfase:
 
 ```text
 Horas productivas reales
-Horas de espera
-Horas apagado
-Horas sin datos
-Horas de parada reportadas
-Horas de parada detectadas
-Eventos solo reportados
-Eventos solo detectados
-Cobertura de datos
+Parada real confirmada
+Falla confirmada
+Disponibilidad técnica
 ```
 
-La tarjeta `Horas reales de trabajo` de la fase 1 debe evolucionar a `Horas productivas detectadas eléctricamente` cuando la fase 2 esté validada.
+Agregar una nota metodológica visible:
+
+```text
+Los estados se derivan de las variables eléctricas del sistema medido. No equivalen necesariamente al estado productivo real de Aoki y deben revalidarse con datos nuevos.
+```
+
+### Módulo Resumen
+
+Actualizar el resumen para mostrar, usando servicios centrales:
+
+```text
+Energía Aoki calculada
+Energía Aoki medida
+Energía Aoki reconstruida
+Producción buena
+Producción total
+Horas PRODUCTIVE eléctricas
+Horas IDLE eléctricas
+Horas OFF eléctricas
+Horas NO_DATA
+Cobertura energética
+Cobertura de estados
+Paradas reportadas
+Eventos eléctricos detectados
+Eventos conciliados
+Eventos pendientes de revisión
+Estado preliminar frente a línea base
+```
+
+No duplicar cálculos en frontend.
+
+Cada tarjeta debe indicar su fuente:
+
+```text
+Producción reportada
+Medición eléctrica
+Reconstrucción energética
+Conciliación
+Línea base preliminar
+```
+
+### Módulo Producción
+
+Mantener:
+
+```text
+Envases buenos
+Envases malos
+Producción total
+Horas programadas
+Horas de parada reportadas
+Horas reales reportadas
+Productividad buena por hora reportada
+Productividad total por hora reportada
+Observaciones
+```
+
+Agregar una sección de paradas reportadas normalizadas con:
+
+```text
+eventId
+fecha productiva
+inicio
+fin
+duración
+causa
+estado de extracción
+rawText
+```
+
+No mezclar producción reportada con estados eléctricos.
+
+### Módulo Calidad
+
+Consolidar:
+
+```text
+Envases buenos
+Envases malos
+Producción total
+Eficiencia de calidad
+Tasa de rechazo
+Rechazos por 1.000
+```
+
+El filtro global debe aplicar exactamente al mismo rango efectivo.
+
+No promediar porcentajes diarios.
+
+### Módulo Eficiencia operacional
+
+Separar visualmente dos bloques.
+
+#### Operación reportada
+
+```text
+Horas programadas
+Horas de parada reportadas
+Horas reales reportadas
+Disponibilidad operacional reportada
+Productividad buena por hora reportada
+Productividad total por hora reportada
+```
+
+#### Clasificación eléctrica preliminar
+
+```text
+Horas PRODUCTIVE eléctricas
+Horas IDLE eléctricas
+Horas OFF eléctricas
+Horas NO_DATA
+Cobertura de estados
+Horas inconsistentes
+Transiciones de estado
+```
 
 Agregar:
 
-- gráfica temporal de corriente de `ME337_1`;
-- líneas de umbral;
-- bandas o colores por estado;
-- marcadores de paradas reportadas;
+- gráfica apilada diaria;
 - tabla diaria de horas por estado;
-- tabla de eventos conciliados.
+- indicador de balance temporal;
+- advertencia metodológica.
 
-No cambiar todavía la ecuación oficial de línea base.
+No calcular disponibilidad técnica.
+
+### Módulo Eficiencia energética
+
+Mostrar:
+
+```text
+Energía total calculada
+Energía medida directamente
+Energía reconstruida
+Porcentaje reconstruido
+Cobertura energética
+Intervalos NO_DATA
+```
+
+Mantener la jerarquía:
+
+```text
+ACCUMULATOR_DELTA
+POWER_TRAPEZOIDAL
+POWER_RECTANGULAR
+NO_DATA
+```
+
+Agregar tabla diaria con fuente y calidad.
+
+Distinguir siempre:
+
+```text
+stateCoveragePct
+energyCoveragePct
+```
+
+### Módulo Línea base ISO 50001
+
+Mantener la ecuación oficial sin modificar:
+
+```text
+E_esperada_kWh =
+514.50
++ 0.005018 × envases_buenos
++ 16.5198 × horas_productivas
+```
+
+Pero indicar:
+
+```text
+RESULTADO_PRELIMINAR
+productiveHoursSource = ELECTRICAL_CLASSIFICATION_PRELIMINARY
+```
+
+Mostrar:
+
+```text
+Energía real
+Energía esperada
+Desviación
+Ahorro o sobreconsumo
+Cobertura energética
+Cobertura de estados
+Horas NO_DATA
+Horas inconsistentes
+```
+
+Agregar advertencia:
+
+```text
+La evaluación depende de una clasificación eléctrica preliminar cuya relación con la producción todavía debe revalidarse con datos nuevos.
+```
+
+Mantener `Índice Base 100` y `CUSUM` como pendientes de fase 3 si aún no están validados.
+
+### Módulo Eventos no productivos
+
+Mostrar:
+
+```text
+Número de eventos eléctricos
+Horas IDLE en eventos
+Horas OFF en eventos
+Duración total no productiva eléctrica
+Estado dominante
+Inicio y fin
+Duración
+Corriente promedio
+Potencia promedio
+Calidad
+```
+
+No incluir:
+
+```text
+PRODUCTIVE
+NO_DATA
+eventos bajo persistencia mínima
+```
+
+Confirmar que los KPI provienen del backend y coinciden con la suma de la tabla.
+
+### Módulo Conciliación
+
+Mostrar tarjetas para:
+
+```text
+REPORTADA_Y_DETECTADA
+SOLO_REPORTADA
+SOLO_DETECTADA
+SIN_DATOS
+PENDIENTE_REVISION
+```
+
+Mostrar tabla con:
+
+```text
+reconciliationId
+electricalEventIds
+reportedEventIds
+clasificación
+confianza categórica
+inicio reportado
+fin reportado
+inicio eléctrico
+fin eléctrico
+duración reportada
+duración eléctrica
+solapamiento
+cobertura reportada
+cobertura eléctrica
+diferencia de inicio
+diferencia de fin
+diferencia de duración
+causa
+rawText
+reason
+status
+```
+
+No mostrar `matchingScore` como probabilidad.
+
+No presentar ningún matching automático como falla validada.
+
+### Módulo Variables eléctricas
+
+Agregar una visualización temporal de `ME337_1` con:
+
+```text
+unit_id 54 = corriente promedio trifásica
+unit_id 61 = potencia activa total
+unit_id 100 = energía acumulada
+```
+
+La gráfica de corriente debe incluir:
+
+```text
+umbral OFF/IDLE = 27.38 A
+umbral IDLE/PRODUCTIVE = 54.58 A
+```
+
+Agregar:
+
+- bandas o marcas por estado;
+- segmentos `NO_DATA`;
+- eventos eléctricos;
+- marcadores de paradas reportadas;
+- marcadores de conciliaciones.
+
+La potencia `unit_id 61` está en kW. No dividir por 1.000.
+
+### Módulo Estado del gateway
+
+Mantener:
+
+```text
+temperatura actual
+mínima
+máxima
+promedio
+última lectura
+RAM
+CPU
+IP
+estado de datos
+```
+
+Distinguir:
+
+```text
+DATOS_HISTORICOS_DE_PRUEBA
+DATOS_RECIENTES
+SIN_DATOS_RECIENTES
+```
+
+No presentar la base histórica como telemetría actual.
+
+### Contratos y arquitectura
+
+Centralizar el manejo del rango global.
+
+No realizar cálculos distintos en varias funciones frontend.
+
+Los módulos deben consumir endpoints o servicios centrales.
+
+Documentar cualquier alias antiguo conservado por compatibilidad.
+
+Evitar:
+
+- consultas duplicadas;
+- sumas en frontend que ya existan en backend;
+- diferencias de rango entre módulos;
+- uso de cero para datos faltantes;
+- carga innecesaria de módulos ocultos.
+
+### Pruebas mínimas
+
+Agregar o actualizar pruebas para:
+
+1. rango global `[inicio, fin)`;
+2. ejemplo mayo 1 a junio 1;
+3. jornada 06:00–06:00;
+4. recorte de segmentos en límites;
+5. producción dentro del mismo rango;
+6. energía dentro del mismo rango;
+7. estados dentro del mismo rango;
+8. eventos dentro del mismo rango;
+9. conciliación dentro del rango común;
+10. exclusión de datos posteriores al fin;
+11. diferencia entre cobertura energética y de estados;
+12. resumen sin cálculos duplicados;
+13. tabla de producción reportada;
+14. tabla diaria de estados;
+15. tabla de eventos eléctricos;
+16. tabla de conciliación;
+17. no presentación de `PRODUCTIVE` como estado productivo real;
+18. no cálculo de MTBF, MTTR ni disponibilidad técnica;
+19. no modificación de la línea base;
+20. estado histórico de la base;
+21. ausencia de escrituras hacia Raspberry;
+22. estructura y navegación de todos los módulos.
+
+### Criterios de cierre de la fase 2
+
+La fase 2 podrá considerarse cerrada cuando:
+
+1. todos los módulos respeten el mismo rango;
+2. la jornada sea 06:00–06:00;
+3. energía medida y reconstruida estén separadas;
+4. estados eléctricos y operación reportada estén separados;
+5. `NO_DATA` no se convierta en cero;
+6. eventos eléctricos estén agrupados sin duplicados;
+7. conciliaciones sean trazables;
+8. el periodo común conciliable esté visible;
+9. las limitaciones metodológicas estén visibles;
+10. las pruebas estén aprobadas;
+11. no existan cálculos de fase 4;
+12. no existan operaciones sobre la Raspberry.
+
+### Entrega de la subfase 2.7
+
+Presentar:
+
+1. archivos modificados;
+2. endpoints y contratos consolidados;
+3. módulos actualizados;
+4. ejemplo completo mayo 1 a junio 1;
+5. KPI por módulo;
+6. coberturas;
+7. eventos y conciliaciones;
+8. pruebas ejecutadas;
+9. diferencias frente a la versión anterior;
+10. limitaciones pendientes;
+11. confirmación de cierre o pendientes de la fase 2.
+
+Detenerse al finalizar. No avanzar a la fase 3 ni a la fase 4 sin autorización.
+
 
 ## Criterios de aceptación de la fase 2
 
@@ -2062,18 +2515,565 @@ No cambiar todavía la ecuación oficial de línea base.
 
 # Instrucción vigente para continuar la fase 2
 
-Las subfases 2.1, 2.2, 2.2B, 2.3, 2.3B, 2.4 y 2.5 se consideran implementadas o en cierre técnico.
+Las subfases 2.1, 2.2, 2.2B, 2.3, 2.3B, 2.4, 2.5, 2.6A y 2.6 se consideran implementadas o cerradas técnicamente.
 
 El siguiente trabajo autorizado es únicamente:
 
 ```text
-SUBFASE 2.6 — Conciliación trazable de eventos eléctricos con paradas reportadas
+SUBFASE 2.7 — Integración final de la fase 2 en el dashboard
 ```
 
-Antes de implementar, Codex debe verificar y cerrar los criterios de aceptación de la subfase 2.5. Si encuentra inconsistencias, debe corregir únicamente lo necesario y documentarlas.
+No avanzar a la fase 3 definitiva, fase 4, MTBF, MTTR, disponibilidad técnica, reentrenamiento de modelos, Índice Base 100 definitivo ni CUSUM definitivo hasta recibir autorización.
 
-No avanzar a la subfase 2.7, MTBF, MTTR, disponibilidad técnica, fase 3 definitiva, fase 4 ni reentrenamiento de modelos hasta recibir autorización.
+Antes de implementar, Codex debe auditar el uso del filtro global y presentar los archivos previstos. Debe detenerse antes de modificar código si detecta diferencias de rango, contratos incompatibles o cálculos duplicados.
 
+
+
+# FASE 3 — Eficiencia energética y línea base ISO 50001
+
+La fase 2 se considera cerrada técnicamente después de aprobar la integración de la subfase 2.7.
+
+La fase 3 debe ejecutarse por subfases. No avanzar sin autorización.
+
+## Decisión metodológica vigente
+
+La línea base oficial existente se conserva sin reentrenamiento:
+
+```text
+E_esperada_kWh =
+514.50
++ 0.005018 × envases_buenos
++ 16.5198 × horas_productivas
+```
+
+Indicadores del modelo histórico:
+
+```text
+R² = 0.9278
+R² ajustado = 0.9248
+CV(RMSE) = 3.64 %
+```
+
+Sin embargo, las horas usadas actualmente provienen de una clasificación eléctrica preliminar cuya relación con la producción diaria todavía no está demostrada de forma suficiente.
+
+Resultados de diagnóstico:
+
+```text
+R² producción total diaria vs horas PRODUCTIVE:
+- todas las jornadas: 0.0285
+- cobertura >= 98 %: 0.0245
+- cobertura 100 % y producción positiva: 0.0719
+```
+
+Por tanto:
+
+- no reentrenar la línea base con los datos actuales;
+- no modificar coeficientes;
+- no presentar ahorro como mejora permanente demostrada;
+- no usar producción para rellenar `NO_DATA`;
+- presentar los resultados como evaluación energética preliminar;
+- dejar preparada la arquitectura para reentrenamiento futuro con datos nuevos.
+
+## Subfase 3.1 — Consolidación diaria de energía real, energía esperada y calidad del resultado
+
+Esta es la siguiente subfase autorizada.
+
+Trabaja únicamente en la subfase 3.1.
+
+No implementes todavía Índice Base 100 definitivo, CUSUM definitivo, reentrenamiento, alarmas, MTBF, MTTR ni disponibilidad técnica.
+
+### Objetivo
+
+Construir un conjunto diario único y trazable que permita comparar:
+
+```text
+energía real conocida
+energía esperada según línea base oficial
+residuo diario
+desviación porcentual
+calidad de energía
+calidad de estados
+origen de horas productivas
+```
+
+La salida debe ser la única fuente para las subfases posteriores de Base 100 y CUSUM.
+
+### Rango global
+
+Usar siempre:
+
+```text
+[inicio, fin)
+```
+
+Zona:
+
+```text
+America/Bogota
+```
+
+Jornada:
+
+```text
+06:00–06:00
+```
+
+Prueba obligatoria:
+
+```text
+inicio = 2026-05-01 06:00 America/Bogota
+fin exclusivo = 2026-06-01 06:00 America/Bogota
+```
+
+Debe producir exactamente 31 jornadas y 744 horas programadas.
+
+### Energía real
+
+Usar únicamente la reconstrucción energética validada en la subfase 2.2B:
+
+```text
+energía medida por ACCUMULATOR_DELTA
++
+energía reconstruida por POWER_TRAPEZOIDAL
++
+energía reconstruida por POWER_RECTANGULAR
+```
+
+No usar `CURRENT_MODEL`.
+
+Por jornada calcular:
+
+```text
+measuredEnergyKWh
+reconstructedEnergyKWh
+knownEnergyKWh
+energyCoveragePct
+reconstructedEnergyPct
+energyNoDataIntervals
+```
+
+Regla:
+
+```text
+knownEnergyKWh =
+measuredEnergyKWh + reconstructedEnergyKWh
+```
+
+No tratar energía no recuperable como cero.
+
+### Producción
+
+Usar:
+
+```text
+envases_buenos
+envases_malos
+produccion_total
+```
+
+La ecuación oficial usa exclusivamente:
+
+```text
+envases_buenos
+```
+
+No reemplazarla por producción total.
+
+El contrato debe conservar también producción total para análisis y trazabilidad.
+
+### Horas productivas
+
+Usar el campo proveniente de la clasificación eléctrica preliminar, pero renombrar su origen de forma explícita:
+
+```text
+productiveElectricalHours
+productiveHoursSource =
+ELECTRICAL_CLASSIFICATION_PRELIMINARY
+```
+
+No presentarlo como hora productiva real demostrada.
+
+Conservar:
+
+```text
+idleElectricalHours
+offElectricalHours
+noDataHours
+stateCoveragePct
+inconsistentHours
+```
+
+### Energía esperada
+
+Calcular por jornada únicamente cuando existan:
+
+```text
+envases_buenos válido
+productiveElectricalHours válido
+```
+
+Fórmula:
+
+```text
+expectedEnergyKWh =
+514.50
++ 0.005018 × envases_buenos
++ 16.5198 × productiveElectricalHours
+```
+
+No sustituir horas faltantes por:
+
+```text
+24
+horas programadas
+horas reales reportadas
+cero
+```
+
+Si falta una variable necesaria:
+
+```text
+expectedEnergyKWh = null
+evaluationStatus = INSUFFICIENT_INPUTS
+```
+
+### Residuo y desviación
+
+Cuando existan energía real y esperada:
+
+```text
+residualKWh =
+knownEnergyKWh - expectedEnergyKWh
+```
+
+```text
+deviationPct =
+residualKWh / expectedEnergyKWh × 100
+```
+
+Interpretación:
+
+```text
+residualKWh < 0
+→ consumo menor al esperado
+
+residualKWh > 0
+→ consumo mayor al esperado
+```
+
+No llamar automáticamente al residuo negativo “ahorro demostrado”.
+
+Usar:
+
+```text
+favorableDifferenceKWh
+unfavorableDifferenceKWh
+```
+
+### Calidad del resultado diario
+
+Crear estados explícitos:
+
+```text
+VALID_PRELIMINARY
+ENERGY_PARTIALLY_RECONSTRUCTED
+LOW_STATE_COVERAGE
+LOW_ENERGY_COVERAGE
+INCONSISTENT_SIGNALS
+INSUFFICIENT_INPUTS
+EXCLUDED_FROM_EVALUATION
+```
+
+Un día puede tener varias banderas.
+
+No inventar umbrales nuevos silenciosamente.
+
+Buscar primero configuración existente. Si no existe, crear una configuración versionada con valores provisionales claramente identificados y documentados.
+
+Como referencia inicial para revisión, no para aprobación automática:
+
+```text
+minimumEnergyCoveragePct = 98
+minimumStateCoveragePct = 98
+maximumReconstructedEnergyPct = 20
+```
+
+Si se usan, deben aparecer como:
+
+```text
+PROVISIONAL_QUALITY_THRESHOLDS
+```
+
+### Clasificación del desempeño
+
+La clasificación debe ser conservadora:
+
+```text
+FAVORABLE_PRELIMINARY
+NEUTRAL_WITHIN_MODEL_VARIABILITY
+UNFAVORABLE_PRELIMINARY
+INSUFFICIENT_DATA
+```
+
+Usar el `CV(RMSE) = 3.64 %` como referencia de variabilidad del modelo.
+
+Reglas iniciales:
+
+```text
+deviationPct < -3.64 %
+→ FAVORABLE_PRELIMINARY
+
+-3.64 % <= deviationPct <= 3.64 %
+→ NEUTRAL_WITHIN_MODEL_VARIABILITY
+
+deviationPct > 3.64 %
+→ UNFAVORABLE_PRELIMINARY
+```
+
+Estas reglas no deben presentarse como verificación ISO 50001 definitiva.
+
+### Contrato diario esperado
+
+Crear una salida similar a:
+
+```typescript
+interface DailyEnergyPerformance {
+  productionDate: string;
+  rangeStartUtc: string;
+  rangeEndUtc: string;
+
+  goodUnits: number | null;
+  badUnits: number | null;
+  totalUnits: number | null;
+
+  productiveElectricalHours: number | null;
+  productiveHoursSource:
+    | "ELECTRICAL_CLASSIFICATION_PRELIMINARY";
+
+  idleElectricalHours: number;
+  offElectricalHours: number;
+  noDataHours: number;
+  stateCoveragePct: number | null;
+  inconsistentHours: number;
+
+  measuredEnergyKWh: number;
+  reconstructedEnergyKWh: number;
+  knownEnergyKWh: number | null;
+  energyCoveragePct: number | null;
+  reconstructedEnergyPct: number | null;
+
+  expectedEnergyKWh: number | null;
+  residualKWh: number | null;
+  deviationPct: number | null;
+
+  favorableDifferenceKWh: number | null;
+  unfavorableDifferenceKWh: number | null;
+
+  performanceClassification:
+    | "FAVORABLE_PRELIMINARY"
+    | "NEUTRAL_WITHIN_MODEL_VARIABILITY"
+    | "UNFAVORABLE_PRELIMINARY"
+    | "INSUFFICIENT_DATA";
+
+  qualityFlags: string[];
+  evaluationStatus:
+    | "VALID_PRELIMINARY"
+    | "INSUFFICIENT_INPUTS"
+    | "EXCLUDED_FROM_EVALUATION";
+
+  modelVersion: string;
+  energyReconstructionVersion: string;
+  stateThresholdVersion: string;
+}
+```
+
+### Consolidación del periodo
+
+Calcular para el rango seleccionado:
+
+```text
+totalKnownEnergyKWh
+totalExpectedEnergyKWh
+totalResidualKWh
+totalDeviationPct
+totalMeasuredEnergyKWh
+totalReconstructedEnergyKWh
+energyCoveragePct
+stateCoveragePct
+validDays
+excludedDays
+insufficientDays
+favorableDays
+neutralDays
+unfavorableDays
+```
+
+El total esperado debe ser la suma de días evaluables.
+
+No aplicar una sola vez el intercepto al periodo completo si el modelo fue definido por jornada.
+
+Debe verificarse la granularidad real con la que se entrenó el modelo. Si el intercepto corresponde a cada jornada, calcular:
+
+```text
+sum(expectedEnergyKWh_day)
+```
+
+No usar:
+
+```text
+514.50
++ 0.005018 × total_envases
++ 16.5198 × total_horas
+```
+
+sin confirmar que esa agregación sea matemáticamente equivalente al diseño del modelo.
+
+Documentar esta verificación de forma explícita.
+
+### Módulo Línea base ISO 50001
+
+Actualizar la vista de desempeño para mostrar:
+
+```text
+Energía real conocida
+Energía medida
+Energía reconstruida
+Energía esperada
+Diferencia favorable o desfavorable
+Desviación %
+Clasificación preliminar
+Cobertura energética
+Cobertura de estados
+Días válidos
+Días excluidos
+```
+
+Agregar una tabla diaria con:
+
+```text
+fecha
+envases buenos
+horas PRODUCTIVE eléctricas
+energía real
+energía esperada
+residuo
+desviación
+clasificación
+cobertura energética
+cobertura de estados
+banderas de calidad
+```
+
+Agregar nota visible:
+
+```text
+Resultado preliminar basado en la línea base histórica y en horas derivadas de clasificación eléctrica. Requiere revalidación con datos nuevos antes de declararse mejora energética sostenida.
+```
+
+### Endpoint
+
+Crear o ajustar un endpoint local, por ejemplo:
+
+```text
+/api/linea-base/desempeno-diario
+```
+
+Debe recibir:
+
+```text
+inicio
+fin
+```
+
+y devolver:
+
+```text
+ranges
+model
+daily
+summary
+quality
+methodology
+```
+
+No duplicar cálculos existentes en frontend.
+
+### Pruebas mínimas
+
+Agregar pruebas para:
+
+1. rango `[inicio, fin)`;
+2. mayo 1 a junio 1;
+3. 31 jornadas;
+4. energía medida + reconstruida = conocida;
+5. energía no recuperable no se vuelve cero;
+6. fórmula diaria oficial;
+7. intercepto aplicado por jornada;
+8. ausencia de envases buenos;
+9. ausencia de horas eléctricas;
+10. cobertura energética baja;
+11. cobertura de estados baja;
+12. porcentaje reconstruido alto;
+13. residuo favorable;
+14. residuo desfavorable;
+15. neutral dentro de ±3,64 %;
+16. suma diaria frente al total del periodo;
+17. exclusión del fin;
+18. calidad y versiones;
+19. no reentrenamiento;
+20. no uso de producción total en la ecuación;
+21. no sustitución de horas faltantes;
+22. no presentación de ahorro como definitivo.
+
+### Entrega de la subfase 3.1
+
+Presentar:
+
+1. archivos modificados;
+2. servicio de consolidación diaria;
+3. endpoint;
+4. contrato diario;
+5. verificación de la granularidad del intercepto;
+6. resultados para mayo 1 a junio 1;
+7. energía real, esperada y residuo;
+8. días válidos y excluidos;
+9. coberturas;
+10. banderas de calidad;
+11. pruebas ejecutadas;
+12. pruebas pendientes;
+13. limitaciones;
+14. confirmación de que no se reentrenó el modelo.
+
+Detenerse al finalizar.
+
+No avanzar a:
+
+```text
+Subfase 3.2 — Índice Base 100
+Subfase 3.3 — CUSUM
+Subfase 3.4 — Evaluación económica y ambiental
+```
+
+sin autorización.
+
+# Instrucción vigente para continuar
+
+La fase 2 se considera cerrada técnicamente.
+
+El siguiente trabajo autorizado es únicamente:
+
+```text
+SUBFASE 3.1 — Consolidación diaria de energía real, energía esperada y calidad del resultado
+```
+
+Antes de modificar código, Codex debe:
+
+1. auditar el cálculo actual de línea base;
+2. verificar si el intercepto se aplica por jornada;
+3. identificar el origen exacto de energía real y horas productivas;
+4. revisar contratos y endpoints existentes;
+5. presentar los archivos previstos;
+6. detenerse antes de implementar.
 
 ---
 
