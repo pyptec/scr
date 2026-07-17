@@ -1,0 +1,10 @@
+{
+  "version": "impact-factors-v1",
+  "currency": "COP",
+  "energyTariffCopPerKWh": null,
+  "tariffSource": null,
+  "tariffEffectiveDate": null,
+  "emissionFactorKgCo2ePerKWh": null,
+  "emissionFactorSource": null,
+  "emissionFactorEffectiveDate": null
+}

@@ -157,6 +157,20 @@ class DashboardStructureTests(unittest.TestCase):
         self.assertIn("dia.includedInCusum ? null : dia.cusumKWh", self.javascript)
         self.assertIn("function inicializarVistasLineaBase()", self.javascript)
 
+    def test_impact_view_uses_traceable_phase_3_contract(self):
+        self.assertIn('id="impactoResidual"', self.html)
+        self.assertIn('id="chartImpactoEconomico"', self.html)
+        self.assertIn('id="chartImpactoAmbiental"', self.html)
+        self.assertIn('id="tablaImpactoDiaria"', self.html)
+        self.assertIn("/api/linea-base/impacto", self.javascript)
+        self.assertIn("Tarifa no configurada", self.javascript)
+        self.assertIn("Factor de emisión no configurado", self.javascript)
+        self.assertIn("dia.economicImpactCop", self.javascript)
+        self.assertIn("dia.co2eImpactKg", self.javascript)
+        self.assertNotIn("dia.economicImpactCop || 0", self.javascript)
+        self.assertNotIn('id="costoTotalizador"', self.html)
+        self.assertNotIn('id="co2Totalizador"', self.html)
+
     def test_variable_selector_supports_gateway_variables_without_device(self):
         self.assertIn('"Variables del gateway"', self.javascript)
         self.assertIn("v.source_type", self.javascript)

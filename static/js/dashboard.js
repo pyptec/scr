@@ -10,6 +10,8 @@ let actualizacionEnCurso = false;
 let chartEstadosAoki = null;
 let chartBase100Diario = null;
 let chartCusumDiario = null;
+let chartImpactoEconomico = null;
+let chartImpactoAmbiental = null;
 let conciliacionActual = [];
 let rangoSnapshotActual = null;
 let actualizacionPendiente = false;
@@ -771,6 +773,70 @@ async function cargarCusum(snapshot = rangoSnapshotActual) {
     });
 }
 
+async function cargarImpacto(snapshot = rangoSnapshotActual) {
+    snapshot = requerirSnapshot(snapshot);
+    const res = await fetch(`/api/linea-base/impacto?inicio=${snapshot.inicio}&fin=${snapshot.fin}`);
+    const data = await res.json();
+    if (!res.ok || data.error) return;
+
+    const resumen = data.summary || {};
+    const inputs = data.inputs || {};
+    document.getElementById("impactoResidual").innerText =
+        resumen.periodResidualKWh === null ? "Datos insuficientes" : `${formatearNumero(resumen.periodResidualKWh, 3)} kWh`;
+    document.getElementById("impactoCostoEvitado").innerText =
+        resumen.periodEstimatedAvoidedCostCop === null ? "Tarifa no configurada" : `${formatearNumero(resumen.periodEstimatedAvoidedCostCop, 2)} COP`;
+    document.getElementById("impactoSobrecosto").innerText =
+        resumen.periodEstimatedAdditionalCostCop === null ? "Tarifa no configurada" : `${formatearNumero(resumen.periodEstimatedAdditionalCostCop, 2)} COP`;
+    document.getElementById("impactoEmisionesEvitadas").innerText =
+        resumen.periodEstimatedAvoidedEmissionsKgCo2e === null ? "Factor de emisión no configurado" : `${formatearNumero(resumen.periodEstimatedAvoidedEmissionsKgCo2e, 3)} kgCO2e`;
+    document.getElementById("impactoEmisionesAdicionales").innerText =
+        resumen.periodEstimatedAdditionalEmissionsKgCo2e === null ? "Factor de emisión no configurado" : `${formatearNumero(resumen.periodEstimatedAdditionalEmissionsKgCo2e, 3)} kgCO2e`;
+    document.getElementById("impactoTarifa").innerText =
+        inputs.energyTariffCopPerKWh === null ? "Tarifa no configurada" : `${formatearNumero(inputs.energyTariffCopPerKWh, 3)} COP/kWh`;
+    document.getElementById("impactoFactorEmision").innerText =
+        inputs.emissionFactorKgCo2ePerKWh === null ? "Factor de emisión no configurado" : `${formatearNumero(inputs.emissionFactorKgCo2ePerKWh, 6)} kgCO2e/kWh`;
+    document.getElementById("impactoDiasEvaluables").innerText =
+        formatearEntero(resumen.evaluableDays);
+    document.getElementById("impactoDiasExcluidos").innerText =
+        formatearEntero(resumen.excludedDays);
+
+    const diarios = data.daily || [];
+    const tbody = document.getElementById("tablaImpactoDiaria");
+    tbody.innerHTML = diarios.length ? "" : '<tr><td colspan="15">Sin datos para el periodo</td></tr>';
+    diarios.forEach(dia => {
+        const fila = document.createElement("tr");
+        fila.innerHTML = `<td>${escaparHtml(dia.productionDate)}</td><td>${dia.residualKWh === null ? "No disponible" : formatearNumero(dia.residualKWh, 3)}</td><td>${dia.base100Index === null ? "No disponible" : formatearNumero(dia.base100Index, 3)}</td><td>${dia.cusumKWh === null ? "No disponible" : formatearNumero(dia.cusumKWh, 3)}</td><td>${dia.energyTariffCopPerKWh === null ? "No configurada" : formatearNumero(dia.energyTariffCopPerKWh, 3)}</td><td>${dia.economicImpactCop === null ? "No disponible" : formatearNumero(dia.economicImpactCop, 2)}</td><td>${dia.estimatedAvoidedCostCop === null ? "No disponible" : formatearNumero(dia.estimatedAvoidedCostCop, 2)}</td><td>${dia.estimatedAdditionalCostCop === null ? "No disponible" : formatearNumero(dia.estimatedAdditionalCostCop, 2)}</td><td>${dia.emissionFactorKgCo2ePerKWh === null ? "No configurado" : formatearNumero(dia.emissionFactorKgCo2ePerKWh, 6)}</td><td>${dia.co2eImpactKg === null ? "No disponible" : formatearNumero(dia.co2eImpactKg, 3)}</td><td>${dia.estimatedAvoidedEmissionsKgCo2e === null ? "No disponible" : formatearNumero(dia.estimatedAvoidedEmissionsKgCo2e, 3)}</td><td>${dia.estimatedAdditionalEmissionsKgCo2e === null ? "No disponible" : formatearNumero(dia.estimatedAdditionalEmissionsKgCo2e, 3)}</td><td>${dia.includedInImpact ? "Incluido" : "Excluido"}</td><td>${escaparHtml((dia.qualityFlags || []).join(", "))}</td><td>${escaparHtml((dia.exclusionReasons || []).join(", "))}</td>`;
+        tbody.appendChild(fila);
+    });
+
+    if (chartImpactoEconomico) chartImpactoEconomico.destroy();
+    chartImpactoEconomico = new Chart(document.getElementById("chartImpactoEconomico"), {
+        type: "line",
+        data: {
+            labels: diarios.map(dia => dia.productionDate),
+            datasets: [
+                { label: "Impacto económico diario COP", data: diarios.map(dia => dia.economicImpactCop), borderColor: "#2563eb", spanGaps: false },
+                { label: "Costo evitado estimado", data: diarios.map(dia => dia.estimatedAvoidedCostCop), borderColor: "#16a34a", spanGaps: false },
+                { label: "Sobrecosto estimado", data: diarios.map(dia => dia.estimatedAdditionalCostCop), borderColor: "#dc2626", spanGaps: false },
+                { label: "Referencia 0", data: diarios.map(() => 0), borderColor: "#475569", borderDash: [5, 5], pointRadius: 0 }
+            ]
+        }
+    });
+    if (chartImpactoAmbiental) chartImpactoAmbiental.destroy();
+    chartImpactoAmbiental = new Chart(document.getElementById("chartImpactoAmbiental"), {
+        type: "line",
+        data: {
+            labels: diarios.map(dia => dia.productionDate),
+            datasets: [
+                { label: "Impacto diario kgCO2e", data: diarios.map(dia => dia.co2eImpactKg), borderColor: "#2563eb", spanGaps: false },
+                { label: "Emisiones evitadas estimadas", data: diarios.map(dia => dia.estimatedAvoidedEmissionsKgCo2e), borderColor: "#16a34a", spanGaps: false },
+                { label: "Emisiones adicionales estimadas", data: diarios.map(dia => dia.estimatedAdditionalEmissionsKgCo2e), borderColor: "#dc2626", spanGaps: false },
+                { label: "Referencia 0", data: diarios.map(() => 0), borderColor: "#475569", borderDash: [5, 5], pointRadius: 0 }
+            ]
+        }
+    });
+}
+
 async function cargarCalidad(snapshot = rangoSnapshotActual) {
     const data = (await obtenerFase2(snapshot)).production || {};
     document.getElementById("calidadBuenos").innerText = formatearEntero(data.envases_buenos);
@@ -811,18 +877,6 @@ async function cargarDashboard(snapshot = rangoSnapshotActual) {
 
     document.getElementById("participacionProceso").innerText =
         formatearNumero(data.proceso?.participacion_totalizador_pct, 2);
-
-    document.getElementById("costoTotalizador").innerText =
-        formatearEntero(data.impacto?.costo_totalizador_cop);
-
-    document.getElementById("costoProceso").innerText =
-        formatearEntero(data.impacto?.costo_proceso_cop);
-
-    document.getElementById("co2Totalizador").innerText =
-        formatearNumero(data.impacto?.co2_totalizador_kg, 2);
-
-    document.getElementById("co2Proceso").innerText =
-        formatearNumero(data.impacto?.co2_proceso_kg, 2);
 
     document.getElementById("horasProductivasResumen").innerText = resumenEstados.productiveHours == null ? "Datos insuficientes" : formatearNumero(resumenEstados.productiveHours, 2);
     document.getElementById("horasParadaResumen").innerText = operacion.horas_parada_reportadas === null ? "Dato pendiente" : formatearNumero(operacion.horas_parada_reportadas, 2);
@@ -1309,8 +1363,10 @@ async function actualizarTodo() {
         const snapshot = crearInstantaneaRango();
         await cargarEstado();
 
-        if (moduloActual === "resumen" || moduloActual === "impacto") {
+        if (moduloActual === "resumen") {
             await cargarDashboard(snapshot);
+        } else if (moduloActual === "impacto") {
+            await cargarImpacto(snapshot);
         } else if (moduloActual === "produccion") {
             await cargarProduccion(snapshot);
         } else if (moduloActual === "calidad") {

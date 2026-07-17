@@ -387,31 +387,27 @@
 
         <div class="panel modulo" data-module="impacto" hidden>
             <h2>Impacto económico y ambiental</h2>
+            <p class="aviso-metodologico">La evaluación económica y ambiental es preliminar. Se calcula a partir de residuos energéticos frente a la línea base histórica y depende de la tarifa y del factor de emisión seleccionados. No constituye por sí sola ahorro verificado, reducción certificada de emisiones ni demostración definitiva de mejora energética sostenida.</p>
             <div class="grid-kpi">
-            <div class="card">
-                <span>Costo totalizador</span>
-                <strong id="costoTotalizador">--</strong>
-                <small>COP</small>
+                <div class="card"><span>Diferencia energética del periodo</span><strong id="impactoResidual">--</strong><small>kWh; signo contractual</small></div>
+                <div class="card"><span>Costo evitado preliminar estimado</span><strong id="impactoCostoEvitado">--</strong><small>COP; no ahorro verificado</small></div>
+                <div class="card"><span>Sobrecosto preliminar estimado</span><strong id="impactoSobrecosto">--</strong><small>COP</small></div>
+                <div class="card"><span>Emisiones evitadas preliminares estimadas</span><strong id="impactoEmisionesEvitadas">--</strong><small>kgCO2e; no reducción certificada</small></div>
+                <div class="card"><span>Emisiones adicionales preliminares estimadas</span><strong id="impactoEmisionesAdicionales">--</strong><small>kgCO2e</small></div>
+                <div class="card"><span>Tarifa aplicada</span><strong id="impactoTarifa">--</strong><small>COP/kWh</small></div>
+                <div class="card"><span>Factor de emisión aplicado</span><strong id="impactoFactorEmision">--</strong><small>kgCO2e/kWh</small></div>
+                <div class="card"><span>Días evaluables</span><strong id="impactoDiasEvaluables">--</strong><small>misma máscara CUSUM</small></div>
+                <div class="card"><span>Días excluidos</span><strong id="impactoDiasExcluidos">--</strong><small>sin impacto calculado</small></div>
             </div>
-
-            <div class="card">
-                <span>Costo proceso</span>
-                <strong id="costoProceso">--</strong>
-                <small>COP</small>
-            </div>
-
-            <div class="card">
-                <span>CO₂ totalizador</span>
-                <strong id="co2Totalizador">--</strong>
-                <small>kg CO₂</small>
-            </div>
-
-            <div class="card">
-                <span>CO₂ proceso</span>
-                <strong id="co2Proceso">--</strong>
-                <small>kg CO₂</small>
-            </div>
-            </div>
+            <h3>Impacto económico diario estimado</h3>
+            <div class="chart-wrap"><canvas id="chartImpactoEconomico"></canvas></div>
+            <h3>Impacto ambiental diario estimado</h3>
+            <div class="chart-wrap"><canvas id="chartImpactoAmbiental"></canvas></div>
+            <h3>Detalle diario</h3>
+            <div class="tabla-wrapper"><table>
+                <thead><tr><th>Fecha</th><th>Residuo kWh</th><th>Base 100</th><th>CUSUM</th><th>Tarifa</th><th>Impacto económico</th><th>Costo evitado estimado</th><th>Sobrecosto estimado</th><th>Factor emisión</th><th>Impacto kgCO2e</th><th>Emisiones evitadas estimadas</th><th>Emisiones adicionales estimadas</th><th>Inclusión</th><th>Banderas</th><th>Motivo de exclusión</th></tr></thead>
+                <tbody id="tablaImpactoDiaria"></tbody>
+            </table></div>
         </div>
     </section>
 

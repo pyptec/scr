@@ -32,6 +32,7 @@ from db.fase2_dashboard import (
 from db.aoki_daily_performance import build_daily_performance
 from db.aoki_base100 import build_base100_contract
 from db.aoki_cusum import build_cusum_contract
+from db.aoki_impact import build_impact_contract, load_impact_factors
 
 load_dotenv("/home/pi/SAMEE200/scr/.env")
 
@@ -674,6 +675,37 @@ def api_linea_base_cusum():
         performance = build_daily_performance(conn, inicio, fin)
         base100 = build_base100_contract(performance)
         return jsonify(build_cusum_contract(performance, base100))
+    finally:
+        conn.close()
+
+
+@app.route("/api/linea-base/impacto")
+def api_linea_base_impacto():
+    inicio = request.args.get("inicio", type=int)
+    fin = request.args.get("fin", type=int)
+    if inicio is None or fin is None or fin <= inicio:
+        return jsonify({"error": "Rango de fechas inválido"}), 400
+    if fin - inicio > 90 * 86400:
+        return jsonify({"error": "El rango máximo local es de 90 días"}), 400
+    overrides = {}
+    if "tarifa_cop_kwh" in request.args:
+        overrides["energyTariffCopPerKWh"] = request.args.get("tarifa_cop_kwh")
+    if "factor_emision_kgco2e_kwh" in request.args:
+        overrides["emissionFactorKgCo2ePerKWh"] = request.args.get(
+            "factor_emision_kgco2e_kwh"
+        )
+    conn = get_conn()
+    try:
+        performance = build_daily_performance(conn, inicio, fin)
+        base100 = build_base100_contract(performance)
+        cusum = build_cusum_contract(performance, base100)
+        try:
+            result = build_impact_contract(
+                performance, base100, cusum, load_impact_factors(), overrides
+            )
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        return jsonify(result)
     finally:
         conn.close()
 

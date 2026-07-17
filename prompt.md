@@ -2999,23 +2999,668 @@ Subfase 3.4 — Evaluación económica y ambiental
 
 sin autorización.
 
+
+
+## Subfase 3.4 — Evaluación económica y ambiental
+
+La subfase 3.3 se considera implementada y aprobada. Esta es la siguiente subfase autorizada.
+
+Trabaja únicamente en la subfase 3.4.
+
+No avances todavía a reentrenamiento de la línea base, alarmas automáticas, MTBF, MTTR, disponibilidad técnica ni cierre definitivo ISO 50001.
+
+### Objetivo
+
+Convertir los resultados energéticos preliminares de las subfases 3.1, 3.2 y 3.3 en indicadores económicos y ambientales trazables, sin presentar las diferencias favorables como ahorros definitivos o verificados.
+
+La evaluación debe conservar siempre la distinción entre:
+
+```text
+diferencia favorable preliminar
+diferencia desfavorable preliminar
+impacto económico estimado
+impacto ambiental estimado
+ahorro verificado
+```
+
+En esta subfase no existe ahorro verificado.
+
+### Fuentes únicas de datos
+
+Consumir exclusivamente contratos ya validados:
+
+```text
+Subfase 3.1:
+build_daily_performance()
+
+Subfase 3.2:
+build_base100_contract()
+
+Subfase 3.3:
+build_cusum_contract()
+```
+
+No volver a consultar directamente:
+
+- producción;
+- energía;
+- estados eléctricos;
+- línea base;
+- base de datos;
+- conciliaciones;
+- eventos eléctricos.
+
+No recalcular por rutas paralelas:
+
+- energía conocida;
+- energía esperada;
+- residuo;
+- desviación;
+- Base 100;
+- CUSUM.
+
+### Datos económicos requeridos
+
+La evaluación económica debe usar parámetros explícitos y versionados.
+
+Como mínimo:
+
+```text
+energyTariffCopPerKWh
+currency = COP
+tariffSource
+tariffEffectiveDate
+tariffVersion
+```
+
+No inventar una tarifa.
+
+Si no existe una tarifa configurada o suministrada:
+
+```text
+economicEvaluationStatus = TARIFF_NOT_CONFIGURED
+economicImpactCop = null
+```
+
+No sustituir con cero.
+
+La tarifa puede provenir de:
+
+1. configuración local versionada;
+2. parámetro explícito del endpoint;
+3. fuente documental autorizada por el usuario.
+
+No consultar tarifas externas automáticamente en esta subfase.
+
+### Datos ambientales requeridos
+
+Usar un factor de emisión explícito y versionado:
+
+```text
+emissionFactorKgCo2ePerKWh
+emissionFactorSource
+emissionFactorEffectiveDate
+emissionFactorVersion
+```
+
+No inventar un factor de emisión.
+
+Si no existe un factor configurado:
+
+```text
+environmentalEvaluationStatus = EMISSION_FACTOR_NOT_CONFIGURED
+co2eImpactKg = null
+```
+
+No sustituir con cero.
+
+El factor debe corresponder claramente a:
+
+```text
+kgCO2e/kWh
+```
+
+No mezclar:
+
+- kgCO2/kWh;
+- kgCO2e/kWh;
+- tCO2e/MWh;
+- factores marginales;
+- factores promedio.
+
+### Base energética para el impacto
+
+Usar exclusivamente el residuo evaluable:
+
+```text
+residualKWh =
+knownEnergyKWh - expectedEnergyKWh
+```
+
+Convención:
+
+```text
+residualKWh < 0
+→ diferencia favorable preliminar
+
+residualKWh > 0
+→ diferencia desfavorable preliminar
+```
+
+### Impacto económico diario
+
+Cuando exista tarifa válida:
+
+```text
+economicImpactCop =
+residualKWh × energyTariffCopPerKWh
+```
+
+Interpretación:
+
+```text
+economicImpactCop < 0
+→ costo evitado preliminar estimado
+
+economicImpactCop > 0
+→ sobrecosto preliminar estimado
+```
+
+No renombrar automáticamente un valor negativo como ahorro verificado.
+
+Exponer campos separados:
+
+```text
+estimatedAvoidedCostCop
+estimatedAdditionalCostCop
+```
+
+Reglas:
+
+```text
+estimatedAvoidedCostCop =
+abs(economicImpactCop)
+si economicImpactCop < 0
+de lo contrario 0
+
+estimatedAdditionalCostCop =
+economicImpactCop
+si economicImpactCop > 0
+de lo contrario 0
+```
+
+Si el día no es evaluable:
+
+```text
+economicImpactCop = null
+estimatedAvoidedCostCop = null
+estimatedAdditionalCostCop = null
+```
+
+### Impacto ambiental diario
+
+Cuando exista factor válido:
+
+```text
+co2eImpactKg =
+residualKWh × emissionFactorKgCo2ePerKWh
+```
+
+Interpretación:
+
+```text
+co2eImpactKg < 0
+→ emisiones evitadas preliminares estimadas
+
+co2eImpactKg > 0
+→ emisiones adicionales preliminares estimadas
+```
+
+Exponer:
+
+```text
+estimatedAvoidedEmissionsKgCo2e
+estimatedAdditionalEmissionsKgCo2e
+```
+
+No presentar emisiones evitadas como reducción verificada.
+
+### Consolidación del periodo
+
+Calcular únicamente sobre jornadas evaluables:
+
+```text
+periodResidualKWh
+periodEconomicImpactCop
+periodEstimatedAvoidedCostCop
+periodEstimatedAdditionalCostCop
+periodCo2eImpactKg
+periodEstimatedAvoidedEmissionsKgCo2e
+periodEstimatedAdditionalEmissionsKgCo2e
+```
+
+El consolidado debe ser suma de resultados diarios evaluables.
+
+No multiplicar nuevamente el CUSUM final si ya se usa el residuo consolidado equivalente.
+
+Verificar:
+
+```text
+periodResidualKWh = finalCusumKWh
+```
+
+dentro de tolerancia numérica.
+
+### Escenario tarifario
+
+Permitir opcionalmente escenarios, sin alterar el resultado base:
+
+```text
+BASE_TARIFF
+LOW_TARIFF
+HIGH_TARIFF
+```
+
+Solo si el usuario proporciona explícitamente los valores.
+
+No generar escenarios arbitrarios.
+
+Cada escenario debe indicar:
+
+```text
+scenarioName
+tariffCopPerKWh
+economicImpactCop
+```
+
+La vista principal debe usar únicamente `BASE_TARIFF`.
+
+### Contrato diario esperado
+
+```typescript
+interface DailyEconomicEnvironmentalImpact {
+  productionDate: string;
+
+  residualKWh: number | null;
+  includedInImpact: boolean;
+  exclusionReasons: string[];
+
+  energyTariffCopPerKWh: number | null;
+  economicImpactCop: number | null;
+  estimatedAvoidedCostCop: number | null;
+  estimatedAdditionalCostCop: number | null;
+
+  emissionFactorKgCo2ePerKWh: number | null;
+  co2eImpactKg: number | null;
+  estimatedAvoidedEmissionsKgCo2e: number | null;
+  estimatedAdditionalEmissionsKgCo2e: number | null;
+
+  base100Index: number | null;
+  cusumKWh: number | null;
+
+  economicEvaluationStatus:
+    | "VALID_PRELIMINARY"
+    | "TARIFF_NOT_CONFIGURED"
+    | "INSUFFICIENT_DATA";
+
+  environmentalEvaluationStatus:
+    | "VALID_PRELIMINARY"
+    | "EMISSION_FACTOR_NOT_CONFIGURED"
+    | "INSUFFICIENT_DATA";
+
+  qualityFlags: string[];
+  modelVersion: string;
+  tariffVersion: string | null;
+  emissionFactorVersion: string | null;
+}
+```
+
+### Contrato consolidado esperado
+
+```typescript
+interface EconomicEnvironmentalPeriodSummary {
+  periodResidualKWh: number | null;
+
+  periodEconomicImpactCop: number | null;
+  periodEstimatedAvoidedCostCop: number | null;
+  periodEstimatedAdditionalCostCop: number | null;
+
+  periodCo2eImpactKg: number | null;
+  periodEstimatedAvoidedEmissionsKgCo2e: number | null;
+  periodEstimatedAdditionalEmissionsKgCo2e: number | null;
+
+  evaluableDays: number;
+  excludedDays: number;
+
+  energyTariffCopPerKWh: number | null;
+  emissionFactorKgCo2ePerKWh: number | null;
+
+  economicEvaluationStatus:
+    | "VALID_PRELIMINARY"
+    | "TARIFF_NOT_CONFIGURED"
+    | "INSUFFICIENT_DATA";
+
+  environmentalEvaluationStatus:
+    | "VALID_PRELIMINARY"
+    | "EMISSION_FACTOR_NOT_CONFIGURED"
+    | "INSUFFICIENT_DATA";
+
+  currency: "COP";
+  methodologyStatus: "PRELIMINARY_ESTIMATE";
+}
+```
+
+### Configuración
+
+Crear una configuración versionada solo si no existe una equivalente:
+
+```text
+device/aoki_impact_factors.json
+```
+
+Estructura mínima:
+
+```json
+{
+  "version": "impact-factors-v1",
+  "currency": "COP",
+  "energyTariffCopPerKWh": null,
+  "tariffSource": null,
+  "tariffEffectiveDate": null,
+  "emissionFactorKgCo2ePerKWh": null,
+  "emissionFactorSource": null,
+  "emissionFactorEffectiveDate": null
+}
+```
+
+No llenar valores numéricos sin autorización o fuente documentada.
+
+### Endpoint
+
+Crear o ajustar:
+
+```text
+GET /api/linea-base/impacto
+```
+
+Parámetros obligatorios:
+
+```text
+inicio
+fin
+```
+
+Parámetros opcionales:
+
+```text
+tarifa_cop_kwh
+factor_emision_kgco2e_kwh
+```
+
+Reglas:
+
+- los parámetros explícitos del endpoint pueden sobrescribir la configuración local;
+- registrar en el contrato que el origen fue `REQUEST_OVERRIDE`;
+- validar que sean numéricos y mayores o iguales a cero;
+- no persistir automáticamente los valores recibidos;
+- rango máximo local de 90 días;
+- semántica `[inicio, fin)`;
+- `America/Bogota`;
+- jornada 06:00–06:00.
+
+Respuesta:
+
+```text
+ranges
+inputs
+daily
+summary
+methodology
+quality
+```
+
+### Dashboard
+
+Activar la vista:
+
+```text
+Impacto económico y ambiental
+```
+
+Mostrar tarjetas:
+
+```text
+Diferencia energética del periodo
+Costo evitado preliminar estimado
+Sobrecosto preliminar estimado
+Emisiones evitadas preliminares estimadas
+Emisiones adicionales preliminares estimadas
+Tarifa aplicada
+Factor de emisión aplicado
+Días evaluables
+Días excluidos
+```
+
+Si falta tarifa:
+
+```text
+Tarifa no configurada
+```
+
+Si falta factor de emisión:
+
+```text
+Factor de emisión no configurado
+```
+
+No mostrar cero.
+
+### Gráficas
+
+Agregar una gráfica diaria económica con:
+
+```text
+impacto económico diario
+costo evitado estimado
+sobrecosto estimado
+línea de referencia = 0
+```
+
+Agregar una gráfica ambiental con:
+
+```text
+impacto diario kgCO2e
+emisiones evitadas estimadas
+emisiones adicionales estimadas
+línea de referencia = 0
+```
+
+Días excluidos deben aparecer como huecos.
+
+### Tabla diaria
+
+Mostrar:
+
+```text
+fecha
+residuo kWh
+Base 100
+CUSUM
+tarifa
+impacto económico
+costo evitado estimado
+sobrecosto estimado
+factor de emisión
+impacto kgCO2e
+emisiones evitadas estimadas
+emisiones adicionales estimadas
+incluido o excluido
+banderas
+motivo de exclusión
+```
+
+### Terminología obligatoria
+
+Usar:
+
+```text
+estimado
+preliminar
+diferencia favorable
+diferencia desfavorable
+costo evitado estimado
+sobrecosto estimado
+emisiones evitadas estimadas
+emisiones adicionales estimadas
+```
+
+No usar:
+
+```text
+ahorro garantizado
+ahorro verificado
+reducción certificada
+beneficio definitivo
+cumplimiento ISO 50001 demostrado
+```
+
+### Mensaje metodológico visible
+
+```text
+La evaluación económica y ambiental es preliminar. Se calcula a partir de residuos energéticos frente a la línea base histórica y depende de la tarifa y del factor de emisión seleccionados. No constituye por sí sola ahorro verificado, reducción certificada de emisiones ni demostración definitiva de mejora energética sostenida.
+```
+
+### Prueba obligatoria de mayo
+
+Usar:
+
+```text
+inicio = 2026-05-01 06:00 America/Bogota
+fin exclusivo = 2026-06-01 06:00 America/Bogota
+```
+
+Validar:
+
+- 31 jornadas solicitadas;
+- 28 jornadas evaluables;
+- 3 jornadas excluidas;
+- mismo conjunto evaluable que Base 100 y CUSUM;
+- `periodResidualKWh = 669.871255 kWh` aproximadamente;
+- `periodResidualKWh = finalCusumKWh`;
+- sin tarifa, impacto económico nulo y estado `TARIFF_NOT_CONFIGURED`;
+- sin factor, impacto ambiental nulo y estado `EMISSION_FACTOR_NOT_CONFIGURED`;
+- con una tarifa de prueba, impacto económico consistente;
+- con un factor de prueba, impacto ambiental consistente;
+- exclusión exacta del fin.
+
+### Pruebas mínimas
+
+Agregar pruebas para:
+
+1. residuo favorable con tarifa;
+2. residuo desfavorable con tarifa;
+3. residuo cero;
+4. tarifa no configurada;
+5. tarifa igual a cero;
+6. tarifa negativa rechazada;
+7. factor no configurado;
+8. factor igual a cero;
+9. factor negativo rechazado;
+10. impacto económico diario;
+11. impacto ambiental diario;
+12. costo evitado estimado;
+13. sobrecosto estimado;
+14. emisiones evitadas estimadas;
+15. emisiones adicionales estimadas;
+16. día excluido;
+17. suma diaria frente al consolidado;
+18. coherencia con CUSUM final;
+19. mismo conjunto evaluable que Base 100;
+20. override por request;
+21. configuración no persistida;
+22. rango `[inicio, fin)`;
+23. mayo 1 a junio 1;
+24. exclusión exacta del fin;
+25. null no convertido en cero;
+26. no reconsulta de base de datos;
+27. no reentrenamiento;
+28. no presentación como ahorro verificado;
+29. versiones y fuentes;
+30. moneda COP;
+31. unidades kgCO2e/kWh.
+
+### Archivos previstos
+
+Antes de implementar, auditar y proponer.
+
+Preferencia arquitectónica:
+
+Nuevos:
+
+```text
+db/aoki_impact.py
+device/aoki_impact_factors.json
+tests/test_aoki_impact.py
+tests/test_aoki_impact_integration.py
+docs/fase3_subfase3.4_impacto.md
+```
+
+A modificar:
+
+```text
+api/app.py
+templates/dashboard.html
+static/js/dashboard.js
+tests/test_dashboard_structure.py
+```
+
+### Entrega
+
+Presentar:
+
+1. archivos modificados;
+2. función pura implementada;
+3. configuración y versiones;
+4. endpoint;
+5. contrato diario;
+6. contrato consolidado;
+7. resultados de mayo sin factores configurados;
+8. resultados con tarifa y factor de prueba;
+9. días incluidos y excluidos;
+10. coherencia con CUSUM y Base 100;
+11. gráficas y tabla;
+12. pruebas ejecutadas;
+13. pruebas pendientes;
+14. limitaciones;
+15. confirmación de que no se presentó ahorro verificado.
+
+Detenerse al finalizar.
+
+No avanzar a:
+
+```text
+Fase 4 — Confiabilidad, mantenimiento y alarmas
+```
+
+sin autorización.
+
 # Instrucción vigente para continuar
 
-La subfase 3.2 se considera implementada y aprobada.
+La subfase 3.3 se considera implementada y aprobada.
 
 El siguiente trabajo autorizado es únicamente:
 
 ```text
-SUBFASE 3.3 — CUSUM diario y acumulado
+SUBFASE 3.4 — Evaluación económica y ambiental
 ```
 
 Antes de modificar código, Codex debe:
 
-1. auditar el contrato real de 3.1 y 3.2;
-2. confirmar el signo del residuo;
-3. verificar el conjunto real de jornadas evaluables;
-4. calcular manualmente el CUSUM esperado para el periodo de control;
-5. confirmar que no habrá arrastre de periodos anteriores;
+1. auditar los contratos reales de 3.1, 3.2 y 3.3;
+2. confirmar el residuo consolidado de mayo;
+3. buscar si ya existe tarifa o factor de emisión configurado;
+4. verificar unidades, fuentes y vigencia;
+5. proponer el tratamiento cuando falten factores;
 6. identificar archivos previstos;
 7. presentar el diagnóstico;
 8. detenerse antes de implementar.
