@@ -364,10 +364,24 @@
                 </table></div>
             </section>
 
-            <section class="vista-linea-base estado-pendiente" data-linea-base-view="cusum" hidden>
+            <section class="vista-linea-base" data-linea-base-view="cusum" hidden>
                 <h3>CUSUM</h3>
-                <strong>Pendiente de fase 3</strong>
-                <p>La estructura está preparada; no se realizan cálculos provisionales.</p>
+                <p class="aviso-metodologico">El CUSUM presentado es descriptivo y preliminar. Acumula residuos diarios frente a la línea base histórica usando horas derivadas de clasificación eléctrica. No constituye por sí solo una prueba estadística de mejora energética sostenida ni una alarma automática.</p>
+                <div class="grid-kpi">
+                    <div class="card"><span>CUSUM final del periodo</span><strong id="cusumFinal">--</strong><small>kWh; positivo = desfavorable preliminar</small></div>
+                    <div class="card"><span>Diferencias favorables acumuladas</span><strong id="cusumFavorables">--</strong><small>kWh, no ahorro confirmado</small></div>
+                    <div class="card"><span>Diferencias desfavorables acumuladas</span><strong id="cusumDesfavorables">--</strong><small>kWh</small></div>
+                    <div class="card"><span>Días evaluables</span><strong id="cusumDiasEvaluables">--</strong><small>misma máscara de Base 100</small></div>
+                    <div class="card"><span>Días excluidos</span><strong id="cusumDiasExcluidos">--</strong><small>sin contribución</small></div>
+                    <div class="card"><span>Desviación consolidada</span><strong id="cusumDesviacion">--</strong><small>% de jornadas evaluables</small></div>
+                    <div class="card"><span>Base 100 del periodo</span><strong id="cusumBase100">--</strong><small>razón de sumas</small></div>
+                </div>
+                <div class="chart-wrap"><canvas id="chartCusumDiario"></canvas></div>
+                <h3>Detalle diario CUSUM</h3>
+                <div class="tabla-wrapper"><table>
+                    <thead><tr><th>Fecha</th><th>Energía conocida</th><th>Energía esperada</th><th>Residuo</th><th>Contribución</th><th>CUSUM</th><th>CUSUM positivo</th><th>CUSUM negativo</th><th>Base 100</th><th>Clasificación</th><th>Inclusión</th><th>Coberturas energía/estados</th><th>Banderas</th><th>Motivo de exclusión</th></tr></thead>
+                    <tbody id="tablaCusumDiaria"></tbody>
+                </table></div>
             </section>
         </section>
 

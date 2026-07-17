@@ -9,6 +9,7 @@ let moduloActual = "resumen";
 let actualizacionEnCurso = false;
 let chartEstadosAoki = null;
 let chartBase100Diario = null;
+let chartCusumDiario = null;
 let conciliacionActual = [];
 let rangoSnapshotActual = null;
 let actualizacionPendiente = false;
@@ -719,6 +720,57 @@ async function cargarBase100(snapshot = rangoSnapshotActual) {
     });
 }
 
+async function cargarCusum(snapshot = rangoSnapshotActual) {
+    snapshot = requerirSnapshot(snapshot);
+    const res = await fetch(`/api/linea-base/cusum?inicio=${snapshot.inicio}&fin=${snapshot.fin}`);
+    const data = await res.json();
+    if (!res.ok || data.error) return;
+
+    const resumen = data.summary || {};
+    document.getElementById("cusumFinal").innerText =
+        formatearNumero(resumen.finalCusumKWh, 3);
+    document.getElementById("cusumFavorables").innerText =
+        formatearNumero(resumen.favorableAccumulatedKWh, 3);
+    document.getElementById("cusumDesfavorables").innerText =
+        formatearNumero(resumen.unfavorableAccumulatedKWh, 3);
+    document.getElementById("cusumDiasEvaluables").innerText =
+        formatearEntero(resumen.evaluableDays);
+    document.getElementById("cusumDiasExcluidos").innerText =
+        `${formatearEntero(resumen.excludedDays)} (+${formatearEntero(resumen.missingDays)} falt.)`;
+    document.getElementById("cusumDesviacion").innerText =
+        resumen.periodDeviationPct === null ? "Datos insuficientes" : `${formatearNumero(resumen.periodDeviationPct, 3)} %`;
+    document.getElementById("cusumBase100").innerText =
+        formatearNumero(resumen.periodBase100Index, 3);
+
+    const diarios = data.daily || [];
+    const tbody = document.getElementById("tablaCusumDiaria");
+    tbody.innerHTML = diarios.length ? "" : '<tr><td colspan="14">Sin datos para el periodo</td></tr>';
+    diarios.forEach(dia => {
+        const fila = document.createElement("tr");
+        const coberturaEnergia = dia.energyCoveragePct === null ? "No disponible" : `${formatearNumero(dia.energyCoveragePct, 2)} %`;
+        const coberturaEstados = dia.stateCoveragePct === null ? "No disponible" : `${formatearNumero(dia.stateCoveragePct, 2)} %`;
+        fila.innerHTML = `<td>${escaparHtml(dia.productionDate)}</td><td>${formatearNumero(dia.knownEnergyKWh, 3)}</td><td>${formatearNumero(dia.expectedEnergyKWh, 3)}</td><td>${dia.residualKWh === null ? "No disponible" : formatearNumero(dia.residualKWh, 3)}</td><td>${dia.cusumContributionKWh === null ? "No disponible" : formatearNumero(dia.cusumContributionKWh, 3)}</td><td>${formatearNumero(dia.cusumKWh, 3)}</td><td>${formatearNumero(dia.positiveCusumKWh, 3)}</td><td>${formatearNumero(dia.negativeCusumKWh, 3)}</td><td>${dia.base100Index === null ? "No disponible" : formatearNumero(dia.base100Index, 3)}</td><td>${escaparHtml(dia.performanceClassification)}</td><td>${dia.includedInCusum ? "Incluido" : "Excluido"}</td><td>${coberturaEnergia} / ${coberturaEstados}</td><td>${escaparHtml((dia.qualityFlags || []).join(", "))}</td><td>${escaparHtml((dia.exclusionReasons || []).join(", "))}</td>`;
+        tbody.appendChild(fila);
+    });
+
+    if (chartCusumDiario) chartCusumDiario.destroy();
+    chartCusumDiario = new Chart(document.getElementById("chartCusumDiario"), {
+        type: "line",
+        data: {
+            labels: diarios.map(dia => dia.productionDate),
+            datasets: [
+                { label: "Residuo diario kWh", data: diarios.map(dia => dia.cusumContributionKWh), borderColor: "#f59e0b", spanGaps: false },
+                { label: "CUSUM firmado kWh", data: diarios.map(dia => dia.cusumKWh), borderColor: "#2563eb" },
+                { label: "CUSUM positivo", data: diarios.map(dia => dia.positiveCusumKWh), borderColor: "#dc2626", borderDash: [4, 3], pointRadius: 0 },
+                { label: "CUSUM negativo", data: diarios.map(dia => dia.negativeCusumKWh), borderColor: "#16a34a", borderDash: [4, 3], pointRadius: 0 },
+                { label: "Referencia 0", data: diarios.map(() => 0), borderColor: "#475569", borderDash: [5, 5], pointRadius: 0 },
+                { label: "Jornada excluida", data: diarios.map(dia => dia.includedInCusum ? null : dia.cusumKWh), borderColor: "#7c3aed", backgroundColor: "#7c3aed", showLine: false, pointRadius: 5 }
+            ]
+        },
+        options: { scales: { y: { title: { display: true, text: "kWh" } } } }
+    });
+}
+
 async function cargarCalidad(snapshot = rangoSnapshotActual) {
     const data = (await obtenerFase2(snapshot)).production || {};
     document.getElementById("calidadBuenos").innerText = formatearEntero(data.envases_buenos);
@@ -1271,6 +1323,8 @@ async function actualizarTodo() {
             await cargarLineaBase(snapshot);
             const vistaBase100 = document.querySelector('[data-linea-base-view="indice-base-100"]');
             if (vistaBase100 && !vistaBase100.hidden) await cargarBase100(snapshot);
+            const vistaCusum = document.querySelector('[data-linea-base-view="cusum"]');
+            if (vistaCusum && !vistaCusum.hidden) await cargarCusum(snapshot);
         } else if (moduloActual === "variables") {
             if (!variablesDisponibles.length) await cargarSelectorVariables();
             await cargarUltimosValores(snapshot);
@@ -1325,6 +1379,8 @@ function inicializarVistasLineaBase() {
             });
             if (vistaSeleccionada === "indice-base-100") {
                 await cargarBase100(rangoSnapshotActual);
+            } else if (vistaSeleccionada === "cusum") {
+                await cargarCusum(rangoSnapshotActual);
             }
         });
     });

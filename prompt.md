@@ -2513,245 +2513,63 @@ Detenerse al finalizar. No avanzar a la fase 3 ni a la fase 4 sin autorización.
 11. No se calculan todavía MTBF ni MTTR definitivos.
 12. Existen pruebas unitarias e integración para cambios de estado, huecos, duplicados y conciliación.
 
-# Instrucción vigente para continuar la fase 2
-
-Las subfases 2.1, 2.2, 2.2B, 2.3, 2.3B, 2.4, 2.5, 2.6A y 2.6 se consideran implementadas o cerradas técnicamente.
-
-El siguiente trabajo autorizado es únicamente:
-
-```text
-SUBFASE 2.7 — Integración final de la fase 2 en el dashboard
-```
-
-No avanzar a la fase 3 definitiva, fase 4, MTBF, MTTR, disponibilidad técnica, reentrenamiento de modelos, Índice Base 100 definitivo ni CUSUM definitivo hasta recibir autorización.
-
-Antes de implementar, Codex debe auditar el uso del filtro global y presentar los archivos previstos. Debe detenerse antes de modificar código si detecta diferencias de rango, contratos incompatibles o cálculos duplicados.
 
 
+## Subfase 3.3 — CUSUM diario y acumulado
 
-# FASE 3 — Eficiencia energética y línea base ISO 50001
+La subfase 3.2 se considera implementada y aprobada. Esta es la siguiente subfase autorizada.
 
-La fase 2 se considera cerrada técnicamente después de aprobar la integración de la subfase 2.7.
+Trabaja únicamente en la subfase 3.3.
 
-La fase 3 debe ejecutarse por subfases. No avanzar sin autorización.
-
-## Decisión metodológica vigente
-
-La línea base oficial existente se conserva sin reentrenamiento:
-
-```text
-E_esperada_kWh =
-514.50
-+ 0.005018 × envases_buenos
-+ 16.5198 × horas_productivas
-```
-
-Indicadores del modelo histórico:
-
-```text
-R² = 0.9278
-R² ajustado = 0.9248
-CV(RMSE) = 3.64 %
-```
-
-Sin embargo, las horas usadas actualmente provienen de una clasificación eléctrica preliminar cuya relación con la producción diaria todavía no está demostrada de forma suficiente.
-
-Resultados de diagnóstico:
-
-```text
-R² producción total diaria vs horas PRODUCTIVE:
-- todas las jornadas: 0.0285
-- cobertura >= 98 %: 0.0245
-- cobertura 100 % y producción positiva: 0.0719
-```
-
-Por tanto:
-
-- no reentrenar la línea base con los datos actuales;
-- no modificar coeficientes;
-- no presentar ahorro como mejora permanente demostrada;
-- no usar producción para rellenar `NO_DATA`;
-- presentar los resultados como evaluación energética preliminar;
-- dejar preparada la arquitectura para reentrenamiento futuro con datos nuevos.
-
-## Subfase 3.1 — Consolidación diaria de energía real, energía esperada y calidad del resultado
-
-Esta es la siguiente subfase autorizada.
-
-Trabaja únicamente en la subfase 3.1.
-
-No implementes todavía Índice Base 100 definitivo, CUSUM definitivo, reentrenamiento, alarmas, MTBF, MTTR ni disponibilidad técnica.
+No avances todavía a impacto económico definitivo, CO₂ definitivo, reentrenamiento de la línea base, MTBF, MTTR, disponibilidad técnica ni alarmas automáticas.
 
 ### Objetivo
 
-Construir un conjunto diario único y trazable que permita comparar:
+Implementar un análisis CUSUM diario y acumulado a partir exclusivamente del contrato validado de la subfase 3.1 y de la clasificación Base 100 de la subfase 3.2.
+
+El CUSUM debe permitir visualizar la acumulación temporal de desviaciones energéticas frente a la línea base oficial, sin convertir el resultado en una afirmación automática de ahorro sostenido o deterioro definitivo.
+
+### Fuente única de datos
+
+Consumir exclusivamente:
 
 ```text
-energía real conocida
-energía esperada según línea base oficial
-residuo diario
-desviación porcentual
-calidad de energía
-calidad de estados
-origen de horas productivas
+build_daily_performance()
 ```
 
-La salida debe ser la única fuente para las subfases posteriores de Base 100 y CUSUM.
-
-### Rango global
-
-Usar siempre:
+y, cuando sea útil para presentación o consistencia:
 
 ```text
-[inicio, fin)
+build_base100()
 ```
 
-Zona:
+No volver a consultar directamente:
 
-```text
-America/Bogota
-```
+- producción;
+- energía;
+- estados eléctricos;
+- base de datos;
+- línea base;
+- coberturas.
 
-Jornada:
+No recalcular por rutas paralelas:
 
-```text
-06:00–06:00
-```
+- energía conocida;
+- energía esperada;
+- residuo;
+- desviación;
+- Base 100.
 
-Prueba obligatoria:
+### Variable diaria de entrada
 
-```text
-inicio = 2026-05-01 06:00 America/Bogota
-fin exclusivo = 2026-06-01 06:00 America/Bogota
-```
-
-Debe producir exactamente 31 jornadas y 744 horas programadas.
-
-### Energía real
-
-Usar únicamente la reconstrucción energética validada en la subfase 2.2B:
-
-```text
-energía medida por ACCUMULATOR_DELTA
-+
-energía reconstruida por POWER_TRAPEZOIDAL
-+
-energía reconstruida por POWER_RECTANGULAR
-```
-
-No usar `CURRENT_MODEL`.
-
-Por jornada calcular:
-
-```text
-measuredEnergyKWh
-reconstructedEnergyKWh
-knownEnergyKWh
-energyCoveragePct
-reconstructedEnergyPct
-energyNoDataIntervals
-```
-
-Regla:
-
-```text
-knownEnergyKWh =
-measuredEnergyKWh + reconstructedEnergyKWh
-```
-
-No tratar energía no recuperable como cero.
-
-### Producción
-
-Usar:
-
-```text
-envases_buenos
-envases_malos
-produccion_total
-```
-
-La ecuación oficial usa exclusivamente:
-
-```text
-envases_buenos
-```
-
-No reemplazarla por producción total.
-
-El contrato debe conservar también producción total para análisis y trazabilidad.
-
-### Horas productivas
-
-Usar el campo proveniente de la clasificación eléctrica preliminar, pero renombrar su origen de forma explícita:
-
-```text
-productiveElectricalHours
-productiveHoursSource =
-ELECTRICAL_CLASSIFICATION_PRELIMINARY
-```
-
-No presentarlo como hora productiva real demostrada.
-
-Conservar:
-
-```text
-idleElectricalHours
-offElectricalHours
-noDataHours
-stateCoveragePct
-inconsistentHours
-```
-
-### Energía esperada
-
-Calcular por jornada únicamente cuando existan:
-
-```text
-envases_buenos válido
-productiveElectricalHours válido
-```
-
-Fórmula:
-
-```text
-expectedEnergyKWh =
-514.50
-+ 0.005018 × envases_buenos
-+ 16.5198 × productiveElectricalHours
-```
-
-No sustituir horas faltantes por:
-
-```text
-24
-horas programadas
-horas reales reportadas
-cero
-```
-
-Si falta una variable necesaria:
-
-```text
-expectedEnergyKWh = null
-evaluationStatus = INSUFFICIENT_INPUTS
-```
-
-### Residuo y desviación
-
-Cuando existan energía real y esperada:
+Usar como señal principal:
 
 ```text
 residualKWh =
 knownEnergyKWh - expectedEnergyKWh
 ```
 
-```text
-deviationPct =
-residualKWh / expectedEnergyKWh × 100
-```
-
-Interpretación:
+Convención:
 
 ```text
 residualKWh < 0
@@ -2761,113 +2579,152 @@ residualKWh > 0
 → consumo mayor al esperado
 ```
 
-No llamar automáticamente al residuo negativo “ahorro demostrado”.
+No invertir signos en frontend.
 
-Usar:
+### CUSUM firmado simple
 
-```text
-favorableDifferenceKWh
-unfavorableDifferenceKWh
-```
-
-### Calidad del resultado diario
-
-Crear estados explícitos:
+Para jornadas evaluables:
 
 ```text
-VALID_PRELIMINARY
-ENERGY_PARTIALLY_RECONSTRUCTED
-LOW_STATE_COVERAGE
-LOW_ENERGY_COVERAGE
-INCONSISTENT_SIGNALS
-INSUFFICIENT_INPUTS
-EXCLUDED_FROM_EVALUATION
+cusumKWh_day =
+cusumKWh_previous + residualKWh_day
 ```
 
-Un día puede tener varias banderas.
-
-No inventar umbrales nuevos silenciosamente.
-
-Buscar primero configuración existente. Si no existe, crear una configuración versionada con valores provisionales claramente identificados y documentados.
-
-Como referencia inicial para revisión, no para aprobación automática:
+Valor inicial:
 
 ```text
-minimumEnergyCoveragePct = 98
-minimumStateCoveragePct = 98
-maximumReconstructedEnergyPct = 20
+cusumKWh_0 = 0
 ```
 
-Si se usan, deben aparecer como:
+Interpretación:
 
 ```text
-PROVISIONAL_QUALITY_THRESHOLDS
+CUSUM negativo
+→ acumulación de diferencias favorables preliminares
+
+CUSUM positivo
+→ acumulación de diferencias desfavorables preliminares
 ```
 
-### Clasificación del desempeño
+No llamar ahorro confirmado al CUSUM negativo.
 
-La clasificación debe ser conservadora:
+### Tratamiento de jornadas no evaluables
+
+Cuando una jornada no sea evaluable:
 
 ```text
-FAVORABLE_PRELIMINARY
-NEUTRAL_WITHIN_MODEL_VARIABILITY
-UNFAVORABLE_PRELIMINARY
-INSUFFICIENT_DATA
+dailyResidualKWh = null
+cusumContributionKWh = null
+includedInCusum = false
 ```
 
-Usar el `CV(RMSE) = 3.64 %` como referencia de variabilidad del modelo.
-
-Reglas iniciales:
+El CUSUM acumulado debe conservar el último valor válido:
 
 ```text
-deviationPct < -3.64 %
-→ FAVORABLE_PRELIMINARY
-
--3.64 % <= deviationPct <= 3.64 %
-→ NEUTRAL_WITHIN_MODEL_VARIABILITY
-
-deviationPct > 3.64 %
-→ UNFAVORABLE_PRELIMINARY
+cusumKWh_day = cusumKWh_previous
 ```
 
-Estas reglas no deben presentarse como verificación ISO 50001 definitiva.
+La gráfica debe mostrar:
+
+- hueco en la contribución diaria;
+- continuidad horizontal del acumulado;
+- marcador de exclusión.
+
+No convertir jornadas excluidas en residuo cero sin dejar trazabilidad. La continuidad del acumulado debe distinguirse de una contribución real igual a cero.
+
+### CUSUM normalizado opcional
+
+Puede calcularse también:
+
+```text
+cusumPct =
+sum(residualKWh_evaluable)
+/
+sum(expectedEnergyKWh_evaluable)
+× 100
+```
+
+Este valor es un indicador consolidado auxiliar.
+
+No sustituye el CUSUM en kWh.
+
+No calcular un acumulado porcentual mediante suma simple de porcentajes diarios.
+
+### CUSUM positivo y negativo separados
+
+Implementar, además del CUSUM firmado, dos series auxiliares:
+
+```text
+positiveCusumKWh =
+max(0, positiveCusumKWh_previous + residualKWh_day)
+
+negativeCusumKWh =
+min(0, negativeCusumKWh_previous + residualKWh_day)
+```
+
+Estas series son descriptivas y no constituyen todavía un detector estadístico calibrado.
+
+No agregar parámetros `k`, `h`, límites de decisión, V-mask ni alarmas automáticas en esta subfase.
+
+### Reinicio del acumulado
+
+Por defecto, para cada consulta:
+
+```text
+CUSUM inicia en 0 en el inicio solicitado
+```
+
+No arrastrar saldo de periodos anteriores sin autorización expresa.
+
+Declarar:
+
+```text
+resetPolicy = RANGE_START_ZERO
+```
+
+### Orden y continuidad temporal
+
+Ordenar siempre por:
+
+```text
+productionDate ascendente
+```
+
+Validar:
+
+- fechas únicas;
+- ausencia de duplicados;
+- continuidad esperada de jornadas;
+- identificación de días faltantes;
+- rango `[inicio, fin)`;
+- jornada 06:00–06:00;
+- zona `America/Bogota`.
+
+Si faltan jornadas en el contrato diario, no inventarlas silenciosamente. Deben aparecer como:
+
+```text
+MISSING_DAY
+includedInCusum = false
+```
 
 ### Contrato diario esperado
 
-Crear una salida similar a:
-
 ```typescript
-interface DailyEnergyPerformance {
+interface DailyCusumPerformance {
   productionDate: string;
-  rangeStartUtc: string;
-  rangeEndUtc: string;
 
-  goodUnits: number | null;
-  badUnits: number | null;
-  totalUnits: number | null;
-
-  productiveElectricalHours: number | null;
-  productiveHoursSource:
-    | "ELECTRICAL_CLASSIFICATION_PRELIMINARY";
-
-  idleElectricalHours: number;
-  offElectricalHours: number;
-  noDataHours: number;
-  stateCoveragePct: number | null;
-  inconsistentHours: number;
-
-  measuredEnergyKWh: number;
-  reconstructedEnergyKWh: number;
   knownEnergyKWh: number | null;
-  energyCoveragePct: number | null;
-  reconstructedEnergyPct: number | null;
-
   expectedEnergyKWh: number | null;
   residualKWh: number | null;
-  deviationPct: number | null;
 
-  favorableDifferenceKWh: number | null;
-  unfavorableDifferenceKWh: number | null;
+  cusumContributionKWh: number | null;
+  cusumKWh: number;
+
+  positiveCusumKWh: number;
+  negativeCusumKWh: number;
+
+  includedInCusum: boolean;
+  exclusionReasons: string[];
 
   performanceClassification:
     | "FAVORABLE_PRELIMINARY"
@@ -2875,305 +2732,14 @@ interface DailyEnergyPerformance {
     | "UNFAVORABLE_PRELIMINARY"
     | "INSUFFICIENT_DATA";
 
-  qualityFlags: string[];
-  evaluationStatus:
-    | "VALID_PRELIMINARY"
-    | "INSUFFICIENT_INPUTS"
-    | "EXCLUDED_FROM_EVALUATION";
-
-  modelVersion: string;
-  energyReconstructionVersion: string;
-  stateThresholdVersion: string;
-}
-```
-
-### Consolidación del periodo
-
-Calcular para el rango seleccionado:
-
-```text
-totalKnownEnergyKWh
-totalExpectedEnergyKWh
-totalResidualKWh
-totalDeviationPct
-totalMeasuredEnergyKWh
-totalReconstructedEnergyKWh
-energyCoveragePct
-stateCoveragePct
-validDays
-excludedDays
-insufficientDays
-favorableDays
-neutralDays
-unfavorableDays
-```
-
-El total esperado debe ser la suma de días evaluables.
-
-No aplicar una sola vez el intercepto al periodo completo si el modelo fue definido por jornada.
-
-Debe verificarse la granularidad real con la que se entrenó el modelo. Si el intercepto corresponde a cada jornada, calcular:
-
-```text
-sum(expectedEnergyKWh_day)
-```
-
-No usar:
-
-```text
-514.50
-+ 0.005018 × total_envases
-+ 16.5198 × total_horas
-```
-
-sin confirmar que esa agregación sea matemáticamente equivalente al diseño del modelo.
-
-Documentar esta verificación de forma explícita.
-
-### Módulo Línea base ISO 50001
-
-Actualizar la vista de desempeño para mostrar:
-
-```text
-Energía real conocida
-Energía medida
-Energía reconstruida
-Energía esperada
-Diferencia favorable o desfavorable
-Desviación %
-Clasificación preliminar
-Cobertura energética
-Cobertura de estados
-Días válidos
-Días excluidos
-```
-
-Agregar una tabla diaria con:
-
-```text
-fecha
-envases buenos
-horas PRODUCTIVE eléctricas
-energía real
-energía esperada
-residuo
-desviación
-clasificación
-cobertura energética
-cobertura de estados
-banderas de calidad
-```
-
-Agregar nota visible:
-
-```text
-Resultado preliminar basado en la línea base histórica y en horas derivadas de clasificación eléctrica. Requiere revalidación con datos nuevos antes de declararse mejora energética sostenida.
-```
-
-### Endpoint
-
-Crear o ajustar un endpoint local, por ejemplo:
-
-```text
-/api/linea-base/desempeno-diario
-```
-
-Debe recibir:
-
-```text
-inicio
-fin
-```
-
-y devolver:
-
-```text
-ranges
-model
-daily
-summary
-quality
-methodology
-```
-
-No duplicar cálculos existentes en frontend.
-
-### Pruebas mínimas
-
-Agregar pruebas para:
-
-1. rango `[inicio, fin)`;
-2. mayo 1 a junio 1;
-3. 31 jornadas;
-4. energía medida + reconstruida = conocida;
-5. energía no recuperable no se vuelve cero;
-6. fórmula diaria oficial;
-7. intercepto aplicado por jornada;
-8. ausencia de envases buenos;
-9. ausencia de horas eléctricas;
-10. cobertura energética baja;
-11. cobertura de estados baja;
-12. porcentaje reconstruido alto;
-13. residuo favorable;
-14. residuo desfavorable;
-15. neutral dentro de ±3,64 %;
-16. suma diaria frente al total del periodo;
-17. exclusión del fin;
-18. calidad y versiones;
-19. no reentrenamiento;
-20. no uso de producción total en la ecuación;
-21. no sustitución de horas faltantes;
-22. no presentación de ahorro como definitivo.
-
-### Entrega de la subfase 3.1
-
-Presentar:
-
-1. archivos modificados;
-2. servicio de consolidación diaria;
-3. endpoint;
-4. contrato diario;
-5. verificación de la granularidad del intercepto;
-6. resultados para mayo 1 a junio 1;
-7. energía real, esperada y residuo;
-8. días válidos y excluidos;
-9. coberturas;
-10. banderas de calidad;
-11. pruebas ejecutadas;
-12. pruebas pendientes;
-13. limitaciones;
-14. confirmación de que no se reentrenó el modelo.
-
-Detenerse al finalizar.
-
-No avanzar a:
-
-```text
-Subfase 3.2 — Índice Base 100
-Subfase 3.3 — CUSUM
-Subfase 3.4 — Evaluación económica y ambiental
-```
-
-sin autorización.
-
-
-
-## Subfase 3.2 — Índice Base 100 diario y consolidado
-
-La subfase 3.1 se considera implementada y aprobada. Esta es la siguiente subfase autorizada.
-
-Trabaja únicamente en la subfase 3.2.
-
-No avances todavía a CUSUM, reentrenamiento de la línea base, impacto económico definitivo, CO₂ definitivo, MTBF, MTTR, disponibilidad técnica ni alarmas.
-
-### Objetivo
-
-Implementar el Índice Base 100 a partir exclusivamente del contrato diario validado en la subfase 3.1.
-
-### Fuente única de datos
-
-Consumir únicamente la salida validada de la subfase 3.1. No volver a consultar ni recalcular de forma independiente producción, horas PRODUCTIVE eléctricas, energía medida, energía reconstruida, energía esperada, coberturas ni banderas de calidad.
-
-### Fórmula diaria
-
-```text
-base100Index = knownEnergyKWh / expectedEnergyKWh × 100
-```
-
-Solo calcular cuando:
-
-```text
-knownEnergyKWh != null
-expectedEnergyKWh != null
-expectedEnergyKWh > 0
-evaluationStatus = VALID_PRELIMINARY
-```
-
-Si no se cumplen estas condiciones:
-
-```text
-base100Index = null
-base100Status = INSUFFICIENT_DATA
-```
-
-### Interpretación y clasificación
-
-```text
-base100Index = 100
-→ desempeño igual a la línea base
-
-base100Index < 100
-→ consumo menor al esperado
-
-base100Index > 100
-→ consumo mayor al esperado
-```
-
-Clasificación preliminar usando `CV(RMSE) = 3.64 %`:
-
-```text
-base100Index < 96.36
-→ FAVORABLE_PRELIMINARY
-
-96.36 <= base100Index <= 103.64
-→ NEUTRAL_WITHIN_MODEL_VARIABILITY
-
-base100Index > 103.64
-→ UNFAVORABLE_PRELIMINARY
-```
-
-No llamar “ahorro demostrado” a valores menores de 100.
-
-### Índice consolidado del periodo
-
-Calcular únicamente con jornadas evaluables:
-
-```text
-periodBase100Index =
-sum(knownEnergyKWh_day)
-/
-sum(expectedEnergyKWh_day)
-× 100
-```
-
-No usar promedio simple de índices diarios.
-
-No incluir días excluidos, insuficientes, con energía conocida nula o con energía esperada nula o no positiva.
-
-### Calidad del resultado
-
-Conservar las banderas de calidad de la subfase 3.1 y agregar:
-
-```text
-BASE100_VALID_PRELIMINARY
-BASE100_INSUFFICIENT_DATA
-BASE100_LOW_ENERGY_COVERAGE
-BASE100_LOW_STATE_COVERAGE
-BASE100_HIGH_RECONSTRUCTION
-BASE100_INCONSISTENT_SIGNALS
-```
-
-Cada día excluido debe conservar `exclusionReasons`.
-
-### Contrato diario esperado
-
-```typescript
-interface DailyBase100Performance {
-  productionDate: string;
-  knownEnergyKWh: number | null;
-  expectedEnergyKWh: number | null;
   base100Index: number | null;
-  base100Classification:
-    | "FAVORABLE_PRELIMINARY"
-    | "NEUTRAL_WITHIN_MODEL_VARIABILITY"
-    | "UNFAVORABLE_PRELIMINARY"
-    | "INSUFFICIENT_DATA";
-  includedInPeriodIndex: boolean;
-  exclusionReasons: string[];
+
   energyCoveragePct: number | null;
   stateCoveragePct: number | null;
   reconstructedEnergyPct: number | null;
+
   qualityFlags: string[];
+
   modelVersion: string;
   performanceQualityVersion: string;
 }
@@ -3182,32 +2748,52 @@ interface DailyBase100Performance {
 ### Contrato consolidado esperado
 
 ```typescript
-interface Base100PeriodSummary {
-  periodKnownEnergyKWh: number | null;
-  periodExpectedEnergyKWh: number | null;
-  periodBase100Index: number | null;
-  includedDays: number;
+interface CusumPeriodSummary {
+  totalResidualKWh: number | null;
+  finalCusumKWh: number | null;
+
+  favorableAccumulatedKWh: number;
+  unfavorableAccumulatedKWh: number;
+
+  evaluableDays: number;
   excludedDays: number;
-  insufficientDays: number;
-  favorableDays: number;
-  neutralDays: number;
-  unfavorableDays: number;
-  classification:
-    | "FAVORABLE_PRELIMINARY"
-    | "NEUTRAL_WITHIN_MODEL_VARIABILITY"
-    | "UNFAVORABLE_PRELIMINARY"
-    | "INSUFFICIENT_DATA";
-  calculationMethod: "RATIO_OF_SUMS";
-  modelVariabilityPct: number;
+  missingDays: number;
+
+  periodExpectedEnergyKWh: number | null;
+  periodKnownEnergyKWh: number | null;
+  periodDeviationPct: number | null;
+  periodBase100Index: number | null;
+
+  resetPolicy: "RANGE_START_ZERO";
+  calculationMethod: "SIGNED_RESIDUAL_CUMSUM";
 }
 ```
+
+Reglas:
+
+```text
+finalCusumKWh =
+sum(residualKWh de jornadas evaluables)
+```
+
+```text
+favorableAccumulatedKWh =
+sum(abs(residualKWh)) solo donde residualKWh < 0
+```
+
+```text
+unfavorableAccumulatedKWh =
+sum(residualKWh) solo donde residualKWh > 0
+```
+
+No netear ambos valores para presentarlos como si fueran independientes.
 
 ### Endpoint
 
 Crear o ajustar:
 
 ```text
-GET /api/linea-base/base-100
+GET /api/linea-base/cusum
 ```
 
 Parámetros:
@@ -3238,39 +2824,70 @@ summary
 methodology
 ```
 
-### Actualización del dashboard
+### Dashboard
 
-Activar la vista `Índice Base 100`.
+Activar la vista:
+
+```text
+CUSUM
+```
 
 Mostrar tarjetas:
 
 ```text
-Índice Base 100 del periodo
-Energía real conocida
-Energía esperada
-Días incluidos
+CUSUM final del periodo
+Diferencias favorables acumuladas
+Diferencias desfavorables acumuladas
+Días evaluables
 Días excluidos
-Clasificación preliminar
-Variabilidad del modelo
+Desviación consolidada
+Base 100 del periodo
 ```
 
-Agregar gráfica diaria con:
+Agregar una gráfica principal con:
 
 ```text
-Base 100 diario
-línea de referencia = 100
-límite favorable = 96.36
-límite desfavorable = 103.64
+residuo diario en kWh
+CUSUM acumulado en kWh
+línea de referencia = 0
 ```
 
-Los días no evaluables deben aparecer como huecos, no como cero.
+Agregar una gráfica secundaria o bandas para:
 
-Agregar tabla diaria con fecha, energía conocida, energía esperada, índice, clasificación, inclusión, coberturas, porcentaje reconstruido, banderas y motivos de exclusión.
+```text
+positiveCusumKWh
+negativeCusumKWh
+```
+
+Los días excluidos deben estar señalados.
+
+No mostrar contribución diaria nula cuando en realidad es dato insuficiente.
+
+### Tabla diaria
+
+Mostrar:
+
+```text
+fecha
+energía conocida
+energía esperada
+residuo diario
+contribución CUSUM
+CUSUM acumulado
+CUSUM positivo
+CUSUM negativo
+Base 100
+clasificación
+incluido o excluido
+coberturas
+banderas
+motivo de exclusión
+```
 
 ### Mensaje metodológico visible
 
 ```text
-El Índice Base 100 es preliminar y se calcula con la línea base histórica y horas derivadas de clasificación eléctrica. Los valores menores de 100 indican consumo inferior al esperado, pero no constituyen por sí solos una mejora energética sostenida verificada.
+El CUSUM presentado es descriptivo y preliminar. Acumula residuos diarios frente a la línea base histórica usando horas derivadas de clasificación eléctrica. No constituye por sí solo una prueba estadística de mejora energética sostenida ni una alarma automática.
 ```
 
 ### Prueba obligatoria
@@ -3285,61 +2902,98 @@ fin exclusivo = 2026-06-01 06:00 America/Bogota
 Validar:
 
 - 31 jornadas solicitadas;
+- mismo conjunto evaluable que 3.2;
+- mismo numerador y denominador que Base 100;
+- `finalCusumKWh = sum(residualKWh evaluable)`;
+- días excluidos no modifican el CUSUM;
+- el acumulado inicia en cero;
 - exclusión exacta del fin;
-- razón de sumas;
-- días excluidos fuera del numerador y denominador;
-- no usar promedio simple;
-- no convertir días sin datos en cero.
+- orden cronológico;
+- ausencia de duplicados.
 
 ### Pruebas mínimas
 
 Agregar pruebas para:
 
-1. índice diario igual a 100;
-2. índice menor que 96.36;
-3. índice dentro de 96.36–103.64;
-4. índice mayor que 103.64;
-5. energía esperada igual a cero;
-6. energía conocida nula;
-7. día excluido;
-8. razón de sumas;
-9. diferencia frente al promedio simple;
-10. exclusión de días insuficientes;
-11. conservación de banderas;
-12. huecos en gráfica;
-13. rango `[inicio, fin)`;
-14. mayo 1 a junio 1;
-15. exclusión de timestamp igual a fin;
-16. contrato y versiones;
-17. no recálculo independiente de energía esperada;
-18. no reentrenamiento;
-19. no cálculo de CUSUM;
-20. no presentación de ahorro definitivo.
+1. primer día evaluable;
+2. residuo positivo;
+3. residuo negativo;
+4. residuo exactamente cero;
+5. día excluido;
+6. día faltante;
+7. acumulado firmado;
+8. CUSUM positivo;
+9. CUSUM negativo;
+10. reinicio en cero al inicio del rango;
+11. no arrastre entre consultas;
+12. suma final igual a suma de residuos;
+13. días excluidos sin contribución;
+14. continuidad horizontal del acumulado;
+15. huecos de contribución diaria;
+16. orden cronológico;
+17. fechas duplicadas;
+18. razón consolidada consistente con Base 100;
+19. rango `[inicio, fin)`;
+20. mayo 1 a junio 1;
+21. exclusión exacta del fin;
+22. conservación de banderas;
+23. no reconsulta de base de datos;
+24. no reentrenamiento;
+25. no alarmas automáticas;
+26. no uso de parámetros `k` o `h`;
+27. no presentación como ahorro confirmado.
+
+### Archivos previstos
+
+Antes de implementar, auditar y proponer.
+
+Preferencia arquitectónica:
+
+Nuevos:
+
+```text
+db/aoki_cusum.py
+tests/test_aoki_cusum.py
+tests/test_aoki_cusum_integration.py
+docs/fase3_subfase3.3_cusum.md
+```
+
+A modificar:
+
+```text
+api/app.py
+templates/dashboard.html
+static/js/dashboard.js
+tests/test_dashboard_structure.py
+```
+
+No crear configuración nueva salvo que sea estrictamente necesaria. En esta subfase no se autorizan umbrales estadísticos de decisión.
 
 ### Entrega
 
 Presentar:
 
 1. archivos modificados;
-2. servicio o extensión implementada;
+2. función pura implementada;
 3. endpoint;
 4. contrato diario;
 5. contrato consolidado;
-6. índice diario y consolidado para mayo;
-7. días incluidos y excluidos;
-8. clasificación preliminar;
-9. gráfica y tabla;
-10. pruebas ejecutadas;
-11. pruebas pendientes;
-12. limitaciones;
-13. confirmación de que no se implementó CUSUM.
+6. CUSUM diario de mayo;
+7. CUSUM final del periodo;
+8. diferencias favorables y desfavorables acumuladas;
+9. días incluidos y excluidos;
+10. comparación con Base 100;
+11. gráfica y tabla;
+12. pruebas ejecutadas;
+13. pruebas pendientes;
+14. limitaciones;
+15. confirmación de que no se implementaron alarmas ni umbrales estadísticos.
 
 Detenerse al finalizar.
 
 No avanzar a:
 
 ```text
-Subfase 3.3 — CUSUM
 Subfase 3.4 — Evaluación económica y ambiental
 ```
 
@@ -3347,23 +3001,24 @@ sin autorización.
 
 # Instrucción vigente para continuar
 
-La subfase 3.1 se considera implementada y aprobada.
+La subfase 3.2 se considera implementada y aprobada.
 
 El siguiente trabajo autorizado es únicamente:
 
 ```text
-SUBFASE 3.2 — Índice Base 100 diario y consolidado
+SUBFASE 3.3 — CUSUM diario y acumulado
 ```
 
 Antes de modificar código, Codex debe:
 
-1. auditar el contrato real de la subfase 3.1;
-2. verificar los campos diarios disponibles;
-3. confirmar qué días quedan evaluables;
-4. comprobar que el índice consolidado será razón de sumas;
-5. identificar archivos previstos;
-6. presentar el diagnóstico;
-7. detenerse antes de implementar.
+1. auditar el contrato real de 3.1 y 3.2;
+2. confirmar el signo del residuo;
+3. verificar el conjunto real de jornadas evaluables;
+4. calcular manualmente el CUSUM esperado para el periodo de control;
+5. confirmar que no habrá arrastre de periodos anteriores;
+6. identificar archivos previstos;
+7. presentar el diagnóstico;
+8. detenerse antes de implementar.
 
 ---
 
