@@ -344,10 +344,24 @@
             </table></div>
             </section>
 
-            <section class="vista-linea-base estado-pendiente" data-linea-base-view="indice-base-100" hidden>
+            <section class="vista-linea-base" data-linea-base-view="indice-base-100" hidden>
                 <h3>Índice Base 100</h3>
-                <strong>Pendiente de fase 3</strong>
-                <p>La estructura está preparada; no se realizan cálculos provisionales.</p>
+                <p class="aviso-metodologico">El Índice Base 100 es preliminar y se calcula con la línea base histórica y horas derivadas de clasificación eléctrica. Los valores menores de 100 indican consumo inferior al esperado, pero no constituyen por sí solos una mejora energética sostenida verificada.</p>
+                <div class="grid-kpi">
+                    <div class="card"><span>Índice Base 100 del periodo</span><strong id="base100Periodo">--</strong><small>razón de sumas</small></div>
+                    <div class="card"><span>Energía conocida evaluable</span><strong id="base100EnergiaConocida">--</strong><small>kWh</small></div>
+                    <div class="card"><span>Energía esperada evaluable</span><strong id="base100EnergiaEsperada">--</strong><small>kWh</small></div>
+                    <div class="card"><span>Días incluidos</span><strong id="base100DiasIncluidos">--</strong><small>mismas jornadas en numerador y denominador</small></div>
+                    <div class="card"><span>Días excluidos</span><strong id="base100DiasExcluidos">--</strong><small>calidad o entradas insuficientes</small></div>
+                    <div class="card"><span>Clasificación preliminar</span><strong id="base100Clasificacion">--</strong><small>no constituye mejora verificada</small></div>
+                    <div class="card"><span>Variabilidad del modelo</span><strong id="base100Variabilidad">--</strong><small>CV(RMSE)</small></div>
+                </div>
+                <div class="chart-wrap"><canvas id="chartBase100Diario"></canvas></div>
+                <h3>Detalle diario del Índice Base 100</h3>
+                <div class="tabla-wrapper"><table>
+                    <thead><tr><th>Fecha</th><th>Energía conocida</th><th>Energía esperada</th><th>Base 100</th><th>Clasificación</th><th>Inclusión</th><th>Cobertura energética</th><th>Cobertura estados</th><th>Reconstruido</th><th>Banderas</th><th>Motivos de exclusión</th></tr></thead>
+                    <tbody id="tablaBase100Diaria"></tbody>
+                </table></div>
             </section>
 
             <section class="vista-linea-base estado-pendiente" data-linea-base-view="cusum" hidden>

@@ -30,6 +30,7 @@ from db.fase2_dashboard import (
     build_phase2_dashboard,
 )
 from db.aoki_daily_performance import build_daily_performance
+from db.aoki_base100 import build_base100_contract
 
 load_dotenv("/home/pi/SAMEE200/scr/.env")
 
@@ -639,6 +640,22 @@ def api_linea_base_desempeno_diario():
     conn = get_conn()
     try:
         return jsonify(build_daily_performance(conn, inicio, fin))
+    finally:
+        conn.close()
+
+
+@app.route("/api/linea-base/base-100")
+def api_linea_base_base_100():
+    inicio = request.args.get("inicio", type=int)
+    fin = request.args.get("fin", type=int)
+    if inicio is None or fin is None or fin <= inicio:
+        return jsonify({"error": "Rango de fechas inválido"}), 400
+    if fin - inicio > 90 * 86400:
+        return jsonify({"error": "El rango máximo local es de 90 días"}), 400
+    conn = get_conn()
+    try:
+        performance = build_daily_performance(conn, inicio, fin)
+        return jsonify(build_base100_contract(performance))
     finally:
         conn.close()
 

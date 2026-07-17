@@ -139,10 +139,16 @@ class DashboardStructureTests(unittest.TestCase):
         self.assertIn('id="calidadRechazo"', self.html)
         self.assertIn('moduloActual === "calidad"', self.javascript)
 
-    def test_base_100_and_cusum_are_separate_pending_phase_3_views(self):
+    def test_base_100_is_active_and_cusum_remains_pending(self):
         self.assertIn('data-linea-base-view="indice-base-100"', self.html)
         self.assertIn('data-linea-base-view="cusum"', self.html)
-        self.assertEqual(self.html.count("Pendiente de fase 3"), 2)
+        self.assertEqual(self.html.count("Pendiente de fase 3"), 1)
+        self.assertIn('id="chartBase100Diario"', self.html)
+        self.assertIn('id="tablaBase100Diaria"', self.html)
+        self.assertIn("/api/linea-base/base-100", self.javascript)
+        self.assertIn("dia.base100Index", self.javascript)
+        self.assertIn("spanGaps: false", self.javascript)
+        self.assertNotIn("dia.base100Index || 0", self.javascript)
         self.assertIn("function inicializarVistasLineaBase()", self.javascript)
 
     def test_variable_selector_supports_gateway_variables_without_device(self):

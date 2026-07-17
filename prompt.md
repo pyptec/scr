@@ -3056,24 +3056,314 @@ Subfase 3.4 — Evaluación económica y ambiental
 
 sin autorización.
 
+
+
+## Subfase 3.2 — Índice Base 100 diario y consolidado
+
+La subfase 3.1 se considera implementada y aprobada. Esta es la siguiente subfase autorizada.
+
+Trabaja únicamente en la subfase 3.2.
+
+No avances todavía a CUSUM, reentrenamiento de la línea base, impacto económico definitivo, CO₂ definitivo, MTBF, MTTR, disponibilidad técnica ni alarmas.
+
+### Objetivo
+
+Implementar el Índice Base 100 a partir exclusivamente del contrato diario validado en la subfase 3.1.
+
+### Fuente única de datos
+
+Consumir únicamente la salida validada de la subfase 3.1. No volver a consultar ni recalcular de forma independiente producción, horas PRODUCTIVE eléctricas, energía medida, energía reconstruida, energía esperada, coberturas ni banderas de calidad.
+
+### Fórmula diaria
+
+```text
+base100Index = knownEnergyKWh / expectedEnergyKWh × 100
+```
+
+Solo calcular cuando:
+
+```text
+knownEnergyKWh != null
+expectedEnergyKWh != null
+expectedEnergyKWh > 0
+evaluationStatus = VALID_PRELIMINARY
+```
+
+Si no se cumplen estas condiciones:
+
+```text
+base100Index = null
+base100Status = INSUFFICIENT_DATA
+```
+
+### Interpretación y clasificación
+
+```text
+base100Index = 100
+→ desempeño igual a la línea base
+
+base100Index < 100
+→ consumo menor al esperado
+
+base100Index > 100
+→ consumo mayor al esperado
+```
+
+Clasificación preliminar usando `CV(RMSE) = 3.64 %`:
+
+```text
+base100Index < 96.36
+→ FAVORABLE_PRELIMINARY
+
+96.36 <= base100Index <= 103.64
+→ NEUTRAL_WITHIN_MODEL_VARIABILITY
+
+base100Index > 103.64
+→ UNFAVORABLE_PRELIMINARY
+```
+
+No llamar “ahorro demostrado” a valores menores de 100.
+
+### Índice consolidado del periodo
+
+Calcular únicamente con jornadas evaluables:
+
+```text
+periodBase100Index =
+sum(knownEnergyKWh_day)
+/
+sum(expectedEnergyKWh_day)
+× 100
+```
+
+No usar promedio simple de índices diarios.
+
+No incluir días excluidos, insuficientes, con energía conocida nula o con energía esperada nula o no positiva.
+
+### Calidad del resultado
+
+Conservar las banderas de calidad de la subfase 3.1 y agregar:
+
+```text
+BASE100_VALID_PRELIMINARY
+BASE100_INSUFFICIENT_DATA
+BASE100_LOW_ENERGY_COVERAGE
+BASE100_LOW_STATE_COVERAGE
+BASE100_HIGH_RECONSTRUCTION
+BASE100_INCONSISTENT_SIGNALS
+```
+
+Cada día excluido debe conservar `exclusionReasons`.
+
+### Contrato diario esperado
+
+```typescript
+interface DailyBase100Performance {
+  productionDate: string;
+  knownEnergyKWh: number | null;
+  expectedEnergyKWh: number | null;
+  base100Index: number | null;
+  base100Classification:
+    | "FAVORABLE_PRELIMINARY"
+    | "NEUTRAL_WITHIN_MODEL_VARIABILITY"
+    | "UNFAVORABLE_PRELIMINARY"
+    | "INSUFFICIENT_DATA";
+  includedInPeriodIndex: boolean;
+  exclusionReasons: string[];
+  energyCoveragePct: number | null;
+  stateCoveragePct: number | null;
+  reconstructedEnergyPct: number | null;
+  qualityFlags: string[];
+  modelVersion: string;
+  performanceQualityVersion: string;
+}
+```
+
+### Contrato consolidado esperado
+
+```typescript
+interface Base100PeriodSummary {
+  periodKnownEnergyKWh: number | null;
+  periodExpectedEnergyKWh: number | null;
+  periodBase100Index: number | null;
+  includedDays: number;
+  excludedDays: number;
+  insufficientDays: number;
+  favorableDays: number;
+  neutralDays: number;
+  unfavorableDays: number;
+  classification:
+    | "FAVORABLE_PRELIMINARY"
+    | "NEUTRAL_WITHIN_MODEL_VARIABILITY"
+    | "UNFAVORABLE_PRELIMINARY"
+    | "INSUFFICIENT_DATA";
+  calculationMethod: "RATIO_OF_SUMS";
+  modelVariabilityPct: number;
+}
+```
+
+### Endpoint
+
+Crear o ajustar:
+
+```text
+GET /api/linea-base/base-100
+```
+
+Parámetros:
+
+```text
+inicio
+fin
+```
+
+Validaciones:
+
+- inicio obligatorio;
+- fin obligatorio;
+- fin > inicio;
+- rango máximo local de 90 días;
+- semántica `[inicio, fin)`;
+- `America/Bogota`;
+- jornada 06:00–06:00.
+
+Respuesta:
+
+```text
+ranges
+model
+quality
+daily
+summary
+methodology
+```
+
+### Actualización del dashboard
+
+Activar la vista `Índice Base 100`.
+
+Mostrar tarjetas:
+
+```text
+Índice Base 100 del periodo
+Energía real conocida
+Energía esperada
+Días incluidos
+Días excluidos
+Clasificación preliminar
+Variabilidad del modelo
+```
+
+Agregar gráfica diaria con:
+
+```text
+Base 100 diario
+línea de referencia = 100
+límite favorable = 96.36
+límite desfavorable = 103.64
+```
+
+Los días no evaluables deben aparecer como huecos, no como cero.
+
+Agregar tabla diaria con fecha, energía conocida, energía esperada, índice, clasificación, inclusión, coberturas, porcentaje reconstruido, banderas y motivos de exclusión.
+
+### Mensaje metodológico visible
+
+```text
+El Índice Base 100 es preliminar y se calcula con la línea base histórica y horas derivadas de clasificación eléctrica. Los valores menores de 100 indican consumo inferior al esperado, pero no constituyen por sí solos una mejora energética sostenida verificada.
+```
+
+### Prueba obligatoria
+
+Usar:
+
+```text
+inicio = 2026-05-01 06:00 America/Bogota
+fin exclusivo = 2026-06-01 06:00 America/Bogota
+```
+
+Validar:
+
+- 31 jornadas solicitadas;
+- exclusión exacta del fin;
+- razón de sumas;
+- días excluidos fuera del numerador y denominador;
+- no usar promedio simple;
+- no convertir días sin datos en cero.
+
+### Pruebas mínimas
+
+Agregar pruebas para:
+
+1. índice diario igual a 100;
+2. índice menor que 96.36;
+3. índice dentro de 96.36–103.64;
+4. índice mayor que 103.64;
+5. energía esperada igual a cero;
+6. energía conocida nula;
+7. día excluido;
+8. razón de sumas;
+9. diferencia frente al promedio simple;
+10. exclusión de días insuficientes;
+11. conservación de banderas;
+12. huecos en gráfica;
+13. rango `[inicio, fin)`;
+14. mayo 1 a junio 1;
+15. exclusión de timestamp igual a fin;
+16. contrato y versiones;
+17. no recálculo independiente de energía esperada;
+18. no reentrenamiento;
+19. no cálculo de CUSUM;
+20. no presentación de ahorro definitivo.
+
+### Entrega
+
+Presentar:
+
+1. archivos modificados;
+2. servicio o extensión implementada;
+3. endpoint;
+4. contrato diario;
+5. contrato consolidado;
+6. índice diario y consolidado para mayo;
+7. días incluidos y excluidos;
+8. clasificación preliminar;
+9. gráfica y tabla;
+10. pruebas ejecutadas;
+11. pruebas pendientes;
+12. limitaciones;
+13. confirmación de que no se implementó CUSUM.
+
+Detenerse al finalizar.
+
+No avanzar a:
+
+```text
+Subfase 3.3 — CUSUM
+Subfase 3.4 — Evaluación económica y ambiental
+```
+
+sin autorización.
+
 # Instrucción vigente para continuar
 
-La fase 2 se considera cerrada técnicamente.
+La subfase 3.1 se considera implementada y aprobada.
 
 El siguiente trabajo autorizado es únicamente:
 
 ```text
-SUBFASE 3.1 — Consolidación diaria de energía real, energía esperada y calidad del resultado
+SUBFASE 3.2 — Índice Base 100 diario y consolidado
 ```
 
 Antes de modificar código, Codex debe:
 
-1. auditar el cálculo actual de línea base;
-2. verificar si el intercepto se aplica por jornada;
-3. identificar el origen exacto de energía real y horas productivas;
-4. revisar contratos y endpoints existentes;
-5. presentar los archivos previstos;
-6. detenerse antes de implementar.
+1. auditar el contrato real de la subfase 3.1;
+2. verificar los campos diarios disponibles;
+3. confirmar qué días quedan evaluables;
+4. comprobar que el índice consolidado será razón de sumas;
+5. identificar archivos previstos;
+6. presentar el diagnóstico;
+7. detenerse antes de implementar.
 
 ---
 

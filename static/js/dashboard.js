@@ -8,6 +8,7 @@ let mesesProduccion = [];
 let moduloActual = "resumen";
 let actualizacionEnCurso = false;
 let chartEstadosAoki = null;
+let chartBase100Diario = null;
 let conciliacionActual = [];
 let rangoSnapshotActual = null;
 let actualizacionPendiente = false;
@@ -668,6 +669,56 @@ async function cargarLineaBase(snapshot = rangoSnapshotActual) {
     });
 }
 
+async function cargarBase100(snapshot = rangoSnapshotActual) {
+    snapshot = requerirSnapshot(snapshot);
+    const res = await fetch(`/api/linea-base/base-100?inicio=${snapshot.inicio}&fin=${snapshot.fin}`);
+    const data = await res.json();
+    if (!res.ok || data.error) return;
+
+    const resumen = data.summary || {};
+    document.getElementById("base100Periodo").innerText =
+        resumen.periodBase100Index === null ? "Datos insuficientes" : formatearNumero(resumen.periodBase100Index, 3);
+    document.getElementById("base100EnergiaConocida").innerText =
+        formatearNumero(resumen.periodKnownEnergyKWh, 3);
+    document.getElementById("base100EnergiaEsperada").innerText =
+        formatearNumero(resumen.periodExpectedEnergyKWh, 3);
+    document.getElementById("base100DiasIncluidos").innerText =
+        formatearEntero(resumen.includedDays);
+    document.getElementById("base100DiasExcluidos").innerText =
+        `${formatearEntero(resumen.excludedDays)} (+${formatearEntero(resumen.insufficientDays)} insuf.)`;
+    document.getElementById("base100Clasificacion").innerText =
+        resumen.classification || "INSUFFICIENT_DATA";
+    document.getElementById("base100Variabilidad").innerText =
+        resumen.modelVariabilityPct === null ? "Datos insuficientes" : `±${formatearNumero(resumen.modelVariabilityPct, 2)} %`;
+
+    const diarios = data.daily || [];
+    const tbody = document.getElementById("tablaBase100Diaria");
+    tbody.innerHTML = diarios.length ? "" : '<tr><td colspan="11">Sin datos para el periodo</td></tr>';
+    diarios.forEach(dia => {
+        const fila = document.createElement("tr");
+        fila.innerHTML = `<td>${escaparHtml(dia.productionDate)}</td><td>${formatearNumero(dia.knownEnergyKWh, 3)}</td><td>${formatearNumero(dia.expectedEnergyKWh, 3)}</td><td>${dia.base100Index === null ? "No disponible" : formatearNumero(dia.base100Index, 3)}</td><td>${escaparHtml(dia.base100Classification)}</td><td>${dia.includedInPeriodIndex ? "Incluido" : "Excluido"}</td><td>${dia.energyCoveragePct === null ? "No disponible" : formatearNumero(dia.energyCoveragePct, 2) + " %"}</td><td>${dia.stateCoveragePct === null ? "No disponible" : formatearNumero(dia.stateCoveragePct, 2) + " %"}</td><td>${dia.reconstructedEnergyPct === null ? "No disponible" : formatearNumero(dia.reconstructedEnergyPct, 2) + " %"}</td><td>${escaparHtml((dia.qualityFlags || []).join(", "))}</td><td>${escaparHtml((dia.exclusionReasons || []).join(", "))}</td>`;
+        tbody.appendChild(fila);
+    });
+
+    if (chartBase100Diario) chartBase100Diario.destroy();
+    const reference = diarios.map(() => 100);
+    const lower = diarios.map(() => resumen.favorableLimit);
+    const upper = diarios.map(() => resumen.unfavorableLimit);
+    chartBase100Diario = new Chart(document.getElementById("chartBase100Diario"), {
+        type: "line",
+        data: {
+            labels: diarios.map(dia => dia.productionDate),
+            datasets: [
+                { label: "Base 100 diario", data: diarios.map(dia => dia.base100Index), borderColor: "#2563eb", spanGaps: false },
+                { label: "Referencia 100", data: reference, borderColor: "#475569", pointRadius: 0, borderDash: [5, 5] },
+                { label: `Límite favorable ${formatearNumero(resumen.favorableLimit, 2)}`, data: lower, borderColor: "#16a34a", pointRadius: 0, borderDash: [3, 3] },
+                { label: `Límite desfavorable ${formatearNumero(resumen.unfavorableLimit, 2)}`, data: upper, borderColor: "#dc2626", pointRadius: 0, borderDash: [3, 3] }
+            ]
+        },
+        options: { scales: { y: { title: { display: true, text: "Índice Base 100" } } } }
+    });
+}
+
 async function cargarCalidad(snapshot = rangoSnapshotActual) {
     const data = (await obtenerFase2(snapshot)).production || {};
     document.getElementById("calidadBuenos").innerText = formatearEntero(data.envases_buenos);
@@ -1218,6 +1269,8 @@ async function actualizarTodo() {
             await cargarEnergiaReconstruidaAoki(snapshot);
         } else if (moduloActual === "linea-base") {
             await cargarLineaBase(snapshot);
+            const vistaBase100 = document.querySelector('[data-linea-base-view="indice-base-100"]');
+            if (vistaBase100 && !vistaBase100.hidden) await cargarBase100(snapshot);
         } else if (moduloActual === "variables") {
             if (!variablesDisponibles.length) await cargarSelectorVariables();
             await cargarUltimosValores(snapshot);
@@ -1259,7 +1312,7 @@ function inicializarNavegacion() {
 
 function inicializarVistasLineaBase() {
     document.querySelectorAll("[data-linea-base-target]").forEach(boton => {
-        boton.addEventListener("click", () => {
+        boton.addEventListener("click", async () => {
             const vistaSeleccionada = boton.dataset.lineaBaseTarget;
 
             document.querySelectorAll("[data-linea-base-view]").forEach(vista => {
@@ -1270,6 +1323,9 @@ function inicializarVistasLineaBase() {
                 item.classList.toggle("activo", activo);
                 item.setAttribute("aria-current", activo ? "page" : "false");
             });
+            if (vistaSeleccionada === "indice-base-100") {
+                await cargarBase100(rangoSnapshotActual);
+            }
         });
     });
 }
