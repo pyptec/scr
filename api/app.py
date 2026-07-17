@@ -46,6 +46,12 @@ from db.aoki_maintenance_validation_store import (
 )
 from db.aoki_validated_uptime import build_validated_uptime, load_uptime_policy
 from db.aoki_reliability import build_reliability_contract
+from db.aoki_alerts import (
+    build_alert_contract,
+    filter_alert_contract,
+    find_alert,
+    load_alert_rules,
+)
 
 load_dotenv("/home/pi/SAMEE200/scr/.env")
 
@@ -344,6 +350,67 @@ def api_mantenimiento_confiabilidad():
         (phase2.get("electricalStates") or {}).get("segments", []),
     )
     return jsonify(build_reliability_contract(uptime, maintenance))
+
+
+def _alert_contract(inicio, fin):
+    conn = get_conn()
+    try:
+        phase2 = build_phase2_dashboard(conn, inicio, fin)
+        performance = build_daily_performance(conn, inicio, fin)
+    finally:
+        conn.close()
+    base100 = build_base100_contract(performance)
+    maintenance = merge_human_validations(
+        build_maintenance_events(phase2),
+        maintenance_store.list_validations(),
+    )
+    uptime = build_validated_uptime(
+        inicio, fin,
+        maintenance_store.list_windows(inicio, fin),
+        maintenance["events"],
+        (phase2.get("electricalStates") or {}).get("segments", []),
+    )
+    reliability = build_reliability_contract(uptime, maintenance)
+    return build_alert_contract(
+        phase2, performance, base100, maintenance, reliability
+    )
+
+
+@app.route("/api/alarmas/reglas")
+def api_alarmas_reglas():
+    return jsonify(load_alert_rules())
+
+
+@app.route("/api/alarmas")
+def api_alarmas():
+    inicio, fin, error = _maintenance_range()
+    if error:
+        return error
+    contract = _alert_contract(inicio, fin)
+    return jsonify(filter_alert_contract(
+        contract,
+        alarm_type=request.args.get("tipo"),
+        severity=request.args.get("severidad"),
+        status=request.args.get("estado"),
+        module=request.args.get("modulo"),
+    ))
+
+
+@app.route("/api/alarmas/<alarm_id>")
+def api_alarma(alarm_id):
+    inicio, fin, error = _maintenance_range()
+    if error:
+        return error
+    contract = _alert_contract(inicio, fin)
+    alarm = find_alert(contract, alarm_id)
+    if alarm is None:
+        return jsonify({"error": "Alarma no encontrada en el rango"}), 404
+    return jsonify({
+        "rulesVersion": contract["rulesVersion"],
+        "ranges": contract["ranges"],
+        "alarm": alarm,
+        "methodology": contract["methodology"],
+    })
 
 
 @app.route("/api/estado")

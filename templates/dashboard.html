@@ -32,6 +32,7 @@
     <button class="menu-item" data-module-target="linea-base">Línea base ISO 50001</button>
     <button class="menu-item" data-module-target="impacto">Impacto económico y ambiental</button>
     <button class="menu-item" data-module-target="confiabilidad">Confiabilidad y mantenimiento</button>
+    <button class="menu-item" data-module-target="alarmas">Alarmas</button>
     <button class="menu-item" data-module-target="variables">Variables eléctricas</button>
     <button class="menu-item" data-module-target="gateway">Estado del gateway</button>
 </nav>
@@ -694,6 +695,49 @@
             <label>Fuente<input id="mantWindowSource" type="text"></label>
             <label>Comentario<input id="mantWindowComment" type="text"></label>
             <button id="mantGuardarVentana" type="button">Guardar ventana</button>
+        </div>
+    </section>
+    <section class="panel modulo" data-module="alarmas" hidden>
+        <div class="panel-header">
+            <div>
+                <h2>Alarmas</h2>
+                <small>Generación determinista en memoria · Solo lectura · Sin notificaciones</small>
+            </div>
+        </div>
+        <p class="aviso-metodologico">Una alarma operacional o una revisión pendiente no equivale a una falla. Las filas correlacionadas se emiten una sola vez y conservan todas sus reglas fuente.</p>
+        <div class="grid-kpi">
+            <div class="card"><span>Alarmas abiertas</span><strong id="alarmasAbiertas">--</strong><small>estado derivado OPEN</small></div>
+            <div class="card"><span>Críticas</span><strong id="alarmasCriticas">--</strong><small>sin reglas críticas activas</small></div>
+            <div class="card"><span>Advertencias</span><strong id="alarmasAdvertencias">--</strong><small>WARNING</small></div>
+            <div class="card"><span>Informativas</span><strong id="alarmasInformativas">--</strong><small>INFO</small></div>
+            <div class="card"><span>Energéticas</span><strong id="alarmasEnergeticas">--</strong><small>episodios diarios deduplicados</small></div>
+            <div class="card"><span>Calidad de datos</span><strong id="alarmasCalidad">--</strong><small>cobertura y NO_DATA</small></div>
+            <div class="card"><span>Operacionales</span><strong id="alarmasOperacionales">--</strong><small>IDLE/OFF y conciliación</small></div>
+            <div class="card"><span>Mantenimiento</span><strong id="alarmasMantenimiento">--</strong><small>requieren revisión humana</small></div>
+            <div class="card"><span>Confiabilidad</span><strong id="alarmasConfiabilidad">--</strong><small>indisponibilidad metodológica</small></div>
+            <div class="card"><span>Versión de reglas</span><strong id="alarmasVersion">--</strong><small>configuración trazable</small></div>
+        </div>
+        <div class="filtros-grid">
+            <label>Tipo
+                <select id="filtroAlarmaTipo"><option value="">Todos</option></select>
+            </label>
+            <label>Severidad
+                <select id="filtroAlarmaSeveridad">
+                    <option value="">Todas</option>
+                    <option value="WARNING">WARNING</option>
+                    <option value="INFO">INFO</option>
+                    <option value="CRITICAL">CRITICAL</option>
+                </select>
+            </label>
+            <label>Módulo
+                <select id="filtroAlarmaModulo"><option value="">Todos</option></select>
+            </label>
+        </div>
+        <div class="tabla-wrapper">
+            <table>
+                <thead><tr><th>Fecha</th><th>Tipo</th><th>Correlaciones</th><th>Severidad</th><th>Estado</th><th>Descripción</th><th>Valor</th><th>Umbral</th><th>Fuente</th><th>Entidad</th><th>Regla</th><th>Revisión</th></tr></thead>
+                <tbody id="tablaAlarmas"></tbody>
+            </table>
         </div>
     </section>
 

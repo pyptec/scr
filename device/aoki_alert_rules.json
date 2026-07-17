@@ -1,0 +1,97 @@
+{
+  "version": "aoki-alert-rules-v1-2026-07",
+  "status": "READ_ONLY_IN_MEMORY",
+  "timezone": "America/Bogota",
+  "intervalSemantics": "[start, end)",
+  "activeRules": {
+    "ENERGY_OVERCONSUMPTION": {
+      "severity": "WARNING",
+      "sourceModule": "ENERGY_PERFORMANCE",
+      "condition": "performanceClassification == UNFAVORABLE_PRELIMINARY",
+      "thresholdSource": "model.cv_rmse_pct"
+    },
+    "ENERGY_FAVORABLE_DEVIATION": {
+      "severity": "INFO",
+      "sourceModule": "ENERGY_PERFORMANCE",
+      "condition": "performanceClassification == FAVORABLE_PRELIMINARY",
+      "thresholdSource": "model.cv_rmse_pct"
+    },
+    "LOW_ENERGY_COVERAGE": {
+      "severity": "WARNING",
+      "sourceModule": "DATA_QUALITY",
+      "condition": "qualityFlags contains LOW_ENERGY_COVERAGE",
+      "thresholdSource": "quality.thresholds.minimumEnergyCoveragePct"
+    },
+    "LOW_STATE_COVERAGE": {
+      "severity": "WARNING",
+      "sourceModule": "DATA_QUALITY",
+      "condition": "qualityFlags contains LOW_STATE_COVERAGE",
+      "thresholdSource": "quality.thresholds.minimumStateCoveragePct"
+    },
+    "NO_DATA_PROLONGED": {
+      "severity": "WARNING",
+      "sourceModule": "DATA_QUALITY",
+      "condition": "state == NO_DATA and durationMinutes > maximumGapMinutes",
+      "thresholdSource": "electricalStates.thresholds.maximumGapMinutes"
+    },
+    "ELECTRICAL_IDLE_EVENT": {
+      "severity": "INFO",
+      "sourceModule": "ELECTRICAL_OPERATION",
+      "condition": "dominantState == IDLE",
+      "thresholdSource": "electricalEvent.thresholdVersion"
+    },
+    "ELECTRICAL_OFF_EVENT": {
+      "severity": "WARNING",
+      "sourceModule": "ELECTRICAL_OPERATION",
+      "condition": "dominantState == OFF",
+      "thresholdSource": "electricalEvent.thresholdVersion"
+    },
+    "UNREPORTED_ELECTRICAL_EVENT": {
+      "severity": "WARNING",
+      "sourceModule": "ELECTRICAL_OPERATION",
+      "condition": "reconciliation.classification == SOLO_DETECTADA",
+      "thresholdSource": "reconciliation.reconciliationVersion"
+    },
+    "REPORTED_STOP_NOT_DETECTED": {
+      "severity": "WARNING",
+      "sourceModule": "ELECTRICAL_OPERATION",
+      "condition": "reconciliation.classification == SOLO_REPORTADA",
+      "thresholdSource": "reconciliation.reconciliationVersion"
+    },
+    "MAINTENANCE_REVIEW_REQUIRED": {
+      "severity": "INFO",
+      "sourceModule": "MAINTENANCE",
+      "condition": "validationStatus == PENDING_HUMAN_REVIEW",
+      "thresholdSource": "maintenance.taxonomyVersion"
+    },
+    "STALE_MAINTENANCE_EVIDENCE": {
+      "severity": "WARNING",
+      "sourceModule": "MAINTENANCE",
+      "condition": "evidenceStatus == STALE_SOURCE_EVIDENCE",
+      "thresholdSource": "maintenance.evidenceHashVersion"
+    },
+    "RELIABILITY_KPI_UNAVAILABLE": {
+      "severity": "INFO",
+      "sourceModule": "RELIABILITY",
+      "condition": "reliability.status != VALID",
+      "thresholdSource": "reliability.methodology.reliabilityMethodVersion"
+    }
+  },
+  "disabledRules": [
+    "CUSUM_UNFAVORABLE_ACCUMULATION",
+    "CUSUM_FAVORABLE_ACCUMULATION",
+    "LOW_TECHNICAL_AVAILABILITY",
+    "MTBF_DEGRADATION",
+    "MTTR_DEGRADATION",
+    "GATEWAY_DATA_STALE",
+    "GATEWAY_HIGH_TEMPERATURE"
+  ],
+  "deduplication": {
+    "energyDeviationWithBase100": "ONE_ENERGY_EPISODE_PER_PRODUCTION_DAY",
+    "electricalEventWithSoloDetectada": "ONE_OPERATIONAL_EPISODE_PER_ELECTRICAL_EVENT",
+    "reconciliationWithMaintenance": "ONE_MAINTENANCE_REVIEW_PER_MAINTENANCE_EVENT",
+    "noDataWithLowCoverage": "CORRELATE_BY_PRODUCTION_DAY_WITHOUT_DROPPING_DISTINCT_EVIDENCE"
+  },
+  "persistence": false,
+  "externalNotifications": false
+}

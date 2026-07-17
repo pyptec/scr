@@ -15,6 +15,7 @@ let chartImpactoAmbiental = null;
 let conciliacionActual = [];
 let mantenimientoActual = [];
 let ventanasOperacionActuales = [];
+let alarmasActuales = [];
 let rangoSnapshotActual = null;
 let actualizacionPendiente = false;
 const cacheHistorico = new Map();
@@ -682,6 +683,81 @@ function renderizarConfiabilidad(data) {
         row.innerHTML = `<td>${escaparHtml(event.maintenanceEventId)}</td><td>${escaparHtml(start)}</td><td>${escaparHtml(end)}</td><td>${event.validatedDowntimeMinutes === null ? "No disponible" : formatearNumero(event.validatedDowntimeMinutes, 3)}</td><td>${escaparHtml(event.censoringStatus)}</td><td>${event.includedInMtbf ? "Sí" : "No"}</td><td>${event.includedInMttr ? "Sí" : "No"}</td><td>${event.includedInAvailability ? "Sí" : "No"}</td><td>${escaparHtml(event.evidenceStatus || "--")}</td><td>${escaparHtml((event.exclusionReasons || []).join(", ") || "--")}</td><td>${escaparHtml(event.actorId || "--")}</td><td>${formatearEntero(event.validationVersion)}</td>`;
         tbody.appendChild(row);
     });
+}
+
+function renderizarAlarmas() {
+    const tipo = document.getElementById("filtroAlarmaTipo").value;
+    const severidad = document.getElementById("filtroAlarmaSeveridad").value;
+    const modulo = document.getElementById("filtroAlarmaModulo").value;
+    const alarms = alarmasActuales.filter(item =>
+        (!tipo || item.alarmType === tipo || (item.correlatedAlarmTypes || []).includes(tipo))
+        && (!severidad || item.severity === severidad)
+        && (!modulo || item.sourceModule === modulo)
+    );
+    const tbody = document.getElementById("tablaAlarmas");
+    tbody.innerHTML = alarms.length
+        ? ""
+        : '<tr><td colspan="12">No existen alarmas para los filtros seleccionados</td></tr>';
+    alarms.forEach(item => {
+        const row = document.createElement("tr");
+        const observed = item.observedValue === null || item.observedValue === undefined
+            ? "No disponible" : `${escaparHtml(item.observedValue)} ${escaparHtml(item.unit || "")}`;
+        const threshold = item.thresholdValue === null || item.thresholdValue === undefined
+            ? "No aplica" : `${escaparHtml(item.thresholdValue)} ${escaparHtml(item.unit || "")}`;
+        row.innerHTML = `<td>${escaparHtml(formatearIsoColombia(item.rangeStartUtc) || "--")}</td><td>${escaparHtml(item.alarmType)}</td><td>${escaparHtml((item.correlatedAlarmTypes || []).join(", ") || "--")}</td><td>${escaparHtml(item.severity)}</td><td>${escaparHtml(item.status)}</td><td>${escaparHtml(item.description)}</td><td>${observed}</td><td>${threshold}</td><td>${escaparHtml(item.sourceModule)}</td><td>${escaparHtml((item.sourceEntityIds || []).join(", "))}</td><td>${escaparHtml(item.ruleVersion)}</td><td>${item.requiresHumanReview ? "Sí" : "No"}</td>`;
+        tbody.appendChild(row);
+    });
+}
+
+function poblarFiltrosAlarmas() {
+    const populate = (id, values) => {
+        const select = document.getElementById(id);
+        const current = select.value;
+        select.innerHTML = '<option value="">Todos</option>';
+        [...new Set(values)].sort().forEach(value => {
+            const option = document.createElement("option");
+            option.value = value;
+            option.textContent = value;
+            select.appendChild(option);
+        });
+        select.value = current;
+    };
+    populate("filtroAlarmaTipo", alarmasActuales.flatMap(item =>
+        [item.alarmType, ...(item.correlatedAlarmTypes || [])]
+    ));
+    populate("filtroAlarmaModulo", alarmasActuales.map(item => item.sourceModule));
+}
+
+async function cargarAlarmas(snapshot = rangoSnapshotActual) {
+    snapshot = requerirSnapshot(snapshot);
+    const data = await fetchJsonCacheado(
+        `/api/alarmas?inicio=${snapshot.inicio}&fin=${snapshot.fin}`, snapshot
+    );
+    alarmasActuales = data.alarms || [];
+    const summary = data.summary || {};
+    const severity = summary.bySeverity || {};
+    const modules = summary.byModule || {};
+    document.getElementById("alarmasAbiertas").innerText =
+        formatearEntero(summary.openAlarmCount);
+    document.getElementById("alarmasCriticas").innerText =
+        formatearEntero(severity.CRITICAL || 0);
+    document.getElementById("alarmasAdvertencias").innerText =
+        formatearEntero(severity.WARNING || 0);
+    document.getElementById("alarmasInformativas").innerText =
+        formatearEntero(severity.INFO || 0);
+    document.getElementById("alarmasEnergeticas").innerText =
+        formatearEntero(modules.ENERGY_PERFORMANCE || 0);
+    document.getElementById("alarmasCalidad").innerText =
+        formatearEntero(modules.DATA_QUALITY || 0);
+    document.getElementById("alarmasOperacionales").innerText =
+        formatearEntero(modules.ELECTRICAL_OPERATION || 0);
+    document.getElementById("alarmasMantenimiento").innerText =
+        formatearEntero(modules.MAINTENANCE || 0);
+    document.getElementById("alarmasConfiabilidad").innerText =
+        formatearEntero(modules.RELIABILITY || 0);
+    document.getElementById("alarmasVersion").innerText = data.rulesVersion || "--";
+    poblarFiltrosAlarmas();
+    renderizarAlarmas();
 }
 
 async function cargarMantenimiento(snapshot = rangoSnapshotActual) {
@@ -1627,6 +1703,8 @@ async function actualizarTodo() {
             if (vistaCusum && !vistaCusum.hidden) await cargarCusum(snapshot);
         } else if (moduloActual === "confiabilidad") {
             await cargarMantenimiento(snapshot);
+        } else if (moduloActual === "alarmas") {
+            await cargarAlarmas(snapshot);
         } else if (moduloActual === "variables") {
             if (!variablesDisponibles.length) await cargarSelectorVariables();
             await cargarUltimosValores(snapshot);
@@ -1745,11 +1823,18 @@ function inicializarFiltrosMantenimiento() {
     );
 }
 
+function inicializarFiltrosAlarmas() {
+    ["filtroAlarmaTipo", "filtroAlarmaSeveridad", "filtroAlarmaModulo"].forEach(
+        id => document.getElementById(id)?.addEventListener("change", renderizarAlarmas)
+    );
+}
+
 async function iniciarDashboard() {
     await cargarRangosProduccion();
     inicializarFiltros();
     inicializarFiltrosConciliacion();
     inicializarFiltrosMantenimiento();
+    inicializarFiltrosAlarmas();
     inicializarVistasLineaBase();
     await inicializarNavegacion();
 

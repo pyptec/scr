@@ -29,11 +29,11 @@ class DashboardStructureTests(unittest.TestCase):
         cls.parser = DashboardHTMLParser()
         cls.parser.feed(cls.html)
 
-    def test_menu_and_modules_have_the_ten_expected_destinations(self):
+    def test_menu_and_modules_have_the_eleven_expected_destinations(self):
         expected = {
             "resumen", "produccion", "calidad", "eficiencia-operacional",
             "eficiencia-energetica", "linea-base", "impacto",
-            "confiabilidad", "variables", "gateway",
+            "confiabilidad", "alarmas", "variables", "gateway",
         }
         self.assertEqual(set(self.parser.targets), expected)
         self.assertEqual(set(self.parser.modules), expected)
@@ -217,6 +217,25 @@ class DashboardStructureTests(unittest.TestCase):
         self.assertIn("event.includedInMttr", self.javascript)
         self.assertNotIn("summary.mtbfHours || 0", self.javascript)
         self.assertNotIn("summary.mttrHours || 0", self.javascript)
+
+    def test_alert_dashboard_is_read_only_deduplicated_and_traceable(self):
+        for identifier in (
+            "alarmasAbiertas", "alarmasCriticas", "alarmasAdvertencias",
+            "alarmasInformativas", "alarmasEnergeticas", "alarmasCalidad",
+            "alarmasOperacionales", "alarmasMantenimiento",
+            "alarmasConfiabilidad", "alarmasVersion", "tablaAlarmas",
+            "filtroAlarmaTipo", "filtroAlarmaSeveridad", "filtroAlarmaModulo",
+        ):
+            self.assertIn(f'id="{identifier}"', self.html)
+        self.assertIn('data-module-target="alarmas"', self.html)
+        self.assertIn('moduloActual === "alarmas"', self.javascript)
+        self.assertIn("/api/alarmas?inicio=", self.javascript)
+        self.assertIn("correlatedAlarmTypes", self.javascript)
+        self.assertIn("no equivale a una falla", self.html)
+        alert_loader = self.javascript.split(
+            "async function cargarAlarmas", 1
+        )[1].split("async function cargarMantenimiento", 1)[0]
+        self.assertNotIn('method: "POST"', alert_loader)
 
 
 if __name__ == "__main__":

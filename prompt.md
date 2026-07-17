@@ -7049,19 +7049,447 @@ Detenerse al finalizar.
 
 No avanzar a alarmas sin autorización.
 
+
+
+## Subfase 4.3 — Alarmas operacionales, energéticas y de mantenimiento
+
+La subfase 4.2 se considera implementada y aprobada.
+
+La siguiente subfase autorizada es únicamente la auditoría previa de 4.3.
+
+### Objetivo
+
+Diseñar un sistema de alarmas trazable que use contratos ya validados, evite duplicaciones y no convierta automáticamente una anomalía en falla.
+
+La implementación deberá separar claramente:
+
+```text
+alarmas operacionales
+alarmas energéticas
+alarmas de calidad de datos
+alarmas de mantenimiento
+alarmas de confiabilidad
+```
+
+### Fuentes permitidas
+
+Auditar y reutilizar exclusivamente contratos existentes:
+
+```text
+2.4 estados y cobertura
+2.5 eventos eléctricos
+2.6 conciliación
+3.1 desempeño diario
+3.2 Base 100
+3.3 CUSUM
+3.4 impacto económico y ambiental
+4.1 taxonomía de mantenimiento
+4.1B validaciones humanas y uptime
+4.2 confiabilidad
+```
+
+No volver a calcular por rutas paralelas:
+
+- energía conocida;
+- energía esperada;
+- residuo;
+- Base 100;
+- CUSUM;
+- MTBF;
+- MTTR;
+- disponibilidad;
+- eventos eléctricos;
+- conciliaciones.
+
+### Principios obligatorios
+
+1. Una alarma no equivale automáticamente a una falla.
+2. Una sugerencia automática no equivale a validación humana.
+3. No generar alarmas con datos insuficientes.
+4. No convertir `NO_DATA` en cero.
+5. Toda alarma debe indicar fuente, regla, versión y evidencia.
+6. Evitar emitir múltiples alarmas equivalentes para el mismo evento.
+7. Las alarmas deben tener ciclo de vida explícito.
+8. No implementar notificaciones externas en esta subfase sin autorización.
+
+### Taxonomía de alarmas propuesta
+
+```text
+ENERGY_OVERCONSUMPTION
+ENERGY_FAVORABLE_DEVIATION
+BASE100_HIGH
+BASE100_LOW
+CUSUM_UNFAVORABLE_ACCUMULATION
+CUSUM_FAVORABLE_ACCUMULATION
+LOW_ENERGY_COVERAGE
+LOW_STATE_COVERAGE
+NO_DATA_PROLONGED
+ELECTRICAL_IDLE_EVENT
+ELECTRICAL_OFF_EVENT
+UNREPORTED_ELECTRICAL_EVENT
+REPORTED_STOP_NOT_DETECTED
+MAINTENANCE_REVIEW_REQUIRED
+STALE_MAINTENANCE_EVIDENCE
+RELIABILITY_KPI_UNAVAILABLE
+LOW_TECHNICAL_AVAILABILITY
+MTBF_DEGRADATION
+MTTR_DEGRADATION
+GATEWAY_DATA_STALE
+GATEWAY_HIGH_TEMPERATURE
+```
+
+La auditoría debe confirmar cuáles son viables con los datos actuales.
+
+### Severidad
+
+Proponer severidades versionadas:
+
+```text
+INFO
+WARNING
+CRITICAL
+```
+
+No asignar severidad crítica sin una regla explícita y trazable.
+
+### Estado de la alarma
+
+```text
+OPEN
+ACKNOWLEDGED
+RESOLVED
+SUPPRESSED
+EXPIRED
+```
+
+No implementar todavía escritura de reconocimiento o resolución hasta auditar seguridad y persistencia.
+
+### Reglas energéticas
+
+Auditar posibles reglas basadas en contratos ya existentes:
+
+```text
+deviationPct
+base100Index
+cusumKWh
+performanceClassification
+energyCoveragePct
+stateCoveragePct
+reconstructedEnergyPct
+```
+
+No crear nuevos umbrales silenciosamente.
+
+Preferir reutilizar:
+
+```text
+CV(RMSE) = 3.64 %
+Base 100: 96.36–103.64
+umbrales de calidad versionados de 3.1
+```
+
+Para CUSUM, no introducir `k`, `h` o límites estadísticos sin calibración.
+
+### Reglas operacionales
+
+Auditar reglas posibles sobre:
+
+```text
+eventos IDLE/OFF
+duración
+persistencia
+SOLO_DETECTADA
+SOLO_REPORTADA
+PENDIENTE_REVISION
+SIN_DATOS
+```
+
+No llamar falla a `IDLE`, `OFF` o `SOLO_DETECTADA`.
+
+### Reglas de mantenimiento
+
+Usar:
+
+```text
+suggestedClassification
+validatedClassification
+validationStatus
+evidenceStatus
+readinessStatus
+```
+
+Alarmas posibles:
+
+```text
+MAINTENANCE_REVIEW_REQUIRED
+STALE_MAINTENANCE_EVIDENCE
+RELIABILITY_KPI_UNAVAILABLE
+```
+
+No crear alarmas de falla confirmada desde sugerencias automáticas.
+
+### Reglas de confiabilidad
+
+Usar únicamente el contrato de 4.2.
+
+Si `status != VALID`, solo se permite una alarma informativa de indisponibilidad metodológica.
+
+No comparar MTBF, MTTR o disponibilidad contra metas si no existen metas configuradas y versionadas.
+
+### Reglas del gateway
+
+Auditar si existen contratos confiables para:
+
+```text
+temperatura
+última lectura
+CPU
+RAM
+conectividad
+```
+
+No mezclar estado instantáneo con KPI históricos.
+
+### Deduplicación
+
+Proponer un identificador estable:
+
+```text
+alarmId =
+alarm-{sha256(alarmType + sourceEntityIds + ruleVersion + effectiveRange)}
+```
+
+No usar índice de tabla.
+
+Definir:
+
+```text
+deduplicationKey
+correlationKey
+```
+
+para agrupar alarmas relacionadas.
+
+### Ciclo de vida y persistencia
+
+Antes de implementar escritura, auditar si puede reutilizarse la base auxiliar de mantenimiento o si se requiere una base separada.
+
+Preferencia:
+
+```text
+data/aoki_alerts.db
+```
+
+con historial append-only.
+
+No implementar todavía persistencia hasta aprobar el diagnóstico.
+
+### Contrato propuesto
+
+```typescript
+interface AokiAlert {
+  alarmId: string;
+  alarmType: string;
+  severity: "INFO" | "WARNING" | "CRITICAL";
+  status: "OPEN" | "ACKNOWLEDGED" | "RESOLVED" | "SUPPRESSED" | "EXPIRED";
+
+  title: string;
+  description: string;
+
+  detectedAtUtc: string;
+  rangeStartUtc: string | null;
+  rangeEndUtc: string | null;
+
+  sourceModule: string;
+  sourceEntityIds: string[];
+  ruleId: string;
+  ruleVersion: string;
+
+  observedValue: number | string | null;
+  thresholdValue: number | string | null;
+  unit: string | null;
+
+  evidence: object;
+  qualityFlags: string[];
+
+  deduplicationKey: string;
+  correlationKey: string | null;
+
+  requiresHumanReview: boolean;
+  maintenanceEventId: string | null;
+}
+```
+
+### Endpoint propuesto
+
+```text
+GET /api/alarmas
+GET /api/alarmas/{alarmId}
+```
+
+Filtros:
+
+```text
+inicio
+fin
+tipo
+severidad
+estado
+modulo
+```
+
+No implementar todavía:
+
+```text
+POST /api/alarmas/{alarmId}/ack
+POST /api/alarmas/{alarmId}/resolve
+```
+
+hasta auditar autenticación, persistencia y concurrencia.
+
+### Dashboard
+
+Diseñar módulo:
+
+```text
+Alarmas
+```
+
+Mostrar:
+
+```text
+Alarmas abiertas
+Críticas
+Advertencias
+Informativas
+Pendientes de revisión
+Calidad de datos
+Energéticas
+Operacionales
+Mantenimiento
+Confiabilidad
+```
+
+Tabla:
+
+```text
+fecha
+tipo
+severidad
+estado
+descripción
+valor observado
+umbral
+fuente
+evidencia
+entidad relacionada
+regla y versión
+```
+
+### Prueba obligatoria de mayo
+
+Usar:
+
+```text
+inicio = 2026-05-01 06:00 America/Bogota
+fin exclusivo = 2026-06-01 06:00 America/Bogota
+```
+
+Auditar cuántas alarmas candidatas produciría cada regla, sin implementar todavía persistencia ni notificaciones.
+
+No asumir conteos de antemano.
+
+### Pruebas mínimas futuras
+
+Preparar pruebas para:
+
+1. desviación energética desfavorable;
+2. desviación favorable;
+3. Base 100 alto;
+4. Base 100 bajo;
+5. CUSUM desfavorable;
+6. cobertura energética baja;
+7. cobertura de estados baja;
+8. NO_DATA prolongado;
+9. evento IDLE;
+10. evento OFF;
+11. SOLO_DETECTADA;
+12. SOLO_REPORTADA;
+13. mantenimiento pendiente;
+14. evidencia obsoleta;
+15. confiabilidad no disponible;
+16. KPI válido;
+17. gateway sin datos recientes;
+18. temperatura alta;
+19. severidad versionada;
+20. deduplicación;
+21. correlación;
+22. rango `[inicio, fin)`;
+23. exclusión exacta del fin;
+24. datos insuficientes;
+25. no falla automática;
+26. no umbrales k/h;
+27. no persistencia todavía;
+28. no notificaciones externas;
+29. no modificación de base histórica;
+30. no operaciones sobre Raspberry.
+
+### Archivos previstos
+
+Antes de implementar, Codex debe auditar y proponer.
+
+Preferencia:
+
+Nuevos:
+
+```text
+db/aoki_alerts.py
+device/aoki_alert_rules.json
+tests/test_aoki_alerts.py
+tests/test_aoki_alerts_integration.py
+docs/fase4_subfase4.3_alarmas.md
+```
+
+Posibles modificaciones:
+
+```text
+api/app.py
+templates/dashboard.html
+static/js/dashboard.js
+tests/test_dashboard_structure.py
+```
+
+### Entrega del diagnóstico previo
+
+Antes de modificar código, presentar:
+
+1. contratos realmente disponibles;
+2. tipos de alarma viables;
+3. reglas y umbrales existentes;
+4. reglas que requieren configuración nueva;
+5. conteos candidatos para mayo;
+6. estrategia de severidad;
+7. estrategia de deduplicación;
+8. estrategia de correlación;
+9. propuesta de persistencia;
+10. propuesta de endpoints;
+11. archivos previstos;
+12. riesgos;
+13. confirmación de que no se implementaron notificaciones ni persistencia.
+
+Detenerse antes de implementar.
+
 # Instrucción vigente para continuar
 
-La subfase 4.1B se considera implementada y aprobada.
+La subfase 4.2 se considera implementada y aprobada.
 
 El siguiente trabajo autorizado es únicamente:
 
 ```text
-IMPLEMENTAR SUBFASE 4.2 — MTBF, MTTR y disponibilidad técnica
+AUDITORÍA PREVIA DE SUBFASE 4.3 — Alarmas operacionales, energéticas y de mantenimiento
 ```
 
-La implementación debe verificar primero `READY_FOR_RELIABILITY_KPI`.
-
-Si no existe readiness válido, debe devolver KPI nulos y una explicación trazable.
+No implementar todavía persistencia, reconocimiento, resolución ni notificaciones externas.
 
 ---
 
