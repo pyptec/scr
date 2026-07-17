@@ -4250,27 +4250,1535 @@ Antes de modificar código, presentar:
 
 Detenerse antes de implementar.
 
-# Instrucción vigente para continuar
 
-La fase 3 se considera cerrada técnicamente.
 
-El siguiente trabajo autorizado es únicamente:
+# Aprobación de implementación — Subfase 4.1
+
+El diagnóstico previo de la subfase 4.1 queda aprobado.
+
+Se autoriza implementar únicamente:
 
 ```text
 SUBFASE 4.1 — Taxonomía y validación de eventos de mantenimiento
 ```
 
-Antes de modificar código, Codex debe:
+## Decisiones aprobadas
 
-1. auditar contratos 2.5, 2.6A, 2.6 y 2.7;
-2. identificar evidencia real de mantenimiento;
-3. separar fallas correctivas de paradas operacionales;
-4. proponer taxonomía y reglas heurísticas;
-5. proponer almacenamiento de validaciones sin tocar la base histórica;
-6. proponer endpoints;
-7. identificar archivos previstos;
-8. presentar el diagnóstico;
-9. detenerse antes de implementar.
+### Taxonomía inicial
+
+Usar la versión:
+
+```text
+aoki-maintenance-taxonomy-v1-2026-07
+```
+
+Clasificaciones:
+
+```text
+CORRECTIVE_FAILURE
+PREVENTIVE_MAINTENANCE
+PREDICTIVE_MAINTENANCE
+OPERATIONAL_STOP
+PLANNED_STOP
+QUALITY_ADJUSTMENT
+MATERIAL_SHORTAGE
+CLEANING
+CHANGEOVER
+DATA_QUALITY_EVENT
+OTHER
+UNDETERMINED
+```
+
+Estados de validación:
+
+```text
+PENDING_HUMAN_REVIEW
+HUMAN_VALIDATED
+HUMAN_REJECTED
+SUPERSEDED
+```
+
+### Regla de falla confirmada
+
+Solo considerar falla confirmada cuando:
+
+```text
+validatedClassification = CORRECTIVE_FAILURE
+AND validationStatus = HUMAN_VALIDATED
+```
+
+Ninguna sugerencia automática puede llenar `validatedClassification`.
+
+### Heurísticas aprobadas
+
+Aplicar conservadoramente:
+
+```text
+IDLE
+OFF
+SOLO_DETECTADA
+→ UNDETERMINED
+```
+
+```text
+NO_DATA
+→ DATA_QUALITY_EVENT
+```
+
+```text
+limpieza
+→ CLEANING
+```
+
+```text
+engrase
+lubricación
+→ PREVENTIVE_MAINTENANCE
+```
+
+solo cuando no exista evidencia de daño o reparación.
+
+```text
+falta de material
+→ MATERIAL_SHORTAGE
+```
+
+```text
+cambio de molde
+cambio de producto
+→ CHANGEOVER
+```
+
+```text
+ajuste de calidad
+→ QUALITY_ADJUSTMENT
+```
+
+```text
+programada
+→ PLANNED_STOP
+```
+
+```text
+mantenimiento
+```
+
+sin evidencia adicional:
+
+```text
+UNDETERMINED
+```
+
+Términos como:
+
+```text
+falla
+daño
+escape
+rotura
+no levanta presión
+reparación
+cambio de pieza
+```
+
+pueden sugerir:
+
+```text
+CORRECTIVE_FAILURE
+```
+
+pero siempre con:
+
+```text
+validationStatus = PENDING_HUMAN_REVIEW
+```
+
+Los conflictos, causas múltiples o evidencia incompleta deben producir:
+
+```text
+UNDETERMINED
+```
+
+### Identificador estable
+
+Crear:
+
+```text
+maintenanceEventId =
+maintenance-{sha256(sourceType + canonicalSourceIds)}
+```
+
+Usar IDs fuente canónicos ordenados:
+
+- reconciliationId;
+- reportedEventIds;
+- electricalEventIds.
+
+No incluir la versión de taxonomía en la identidad.
+
+No usar índices de posición ni el orden de la tabla.
+
+### Fuente y trazabilidad
+
+Consumir exclusivamente:
+
+- eventos eléctricos 2.5;
+- paradas normalizadas 2.6A;
+- conciliaciones 2.6;
+- contrato temporal integrado 2.7.
+
+No reconstruir ni recalcular fuentes cerradas.
+
+Conservar:
+
+```text
+reconciliationId
+reportedEventIds
+electricalEventIds
+rawText
+matchedText
+cause
+reportedStart
+reportedEnd
+electricalStart
+electricalEnd
+reportedDurationMinutes
+electricalDurationMinutes
+qualityFlags
+```
+
+### Contrato de clasificación
+
+Cada evento debe incluir como mínimo:
+
+```text
+maintenanceEventId
+productionDate
+suggestedClassification
+suggestionConfidence
+suggestionReasons
+validatedClassification
+validationStatus
+causeCategory
+causeText
+affectedSystem
+affectedComponent
+maintenanceType
+interventionDescription
+reportedStart
+reportedEnd
+electricalStart
+electricalEnd
+validatedStart
+validatedEnd
+reportedDurationMinutes
+electricalDurationMinutes
+validatedDowntimeMinutes
+rawText
+matchedText
+evidence
+qualityFlags
+reviewReason
+taxonomyVersion
+classifierVersion
+```
+
+Valores iniciales:
+
+```text
+validatedClassification = null
+validationStatus = PENDING_HUMAN_REVIEW
+validatedStart = null
+validatedEnd = null
+validatedDowntimeMinutes = null
+```
+
+### Tiempos
+
+No usar automáticamente la duración eléctrica como tiempo de reparación.
+
+No calcular `validatedDowntimeMinutes` sin una validación humana o fuente temporal aprobada.
+
+Conservar diferencias entre tiempos reportados y eléctricos.
+
+### Eventos múltiples
+
+Detectar y marcar:
+
+```text
+OVERLAPPING_MAINTENANCE_EVENTS
+DUPLICATE_CLASSIFICATION
+AMBIGUOUS_TEMPORAL_SCOPE
+MULTIPLE_CAUSES
+INSUFFICIENT_TEMPORAL_EVIDENCE
+```
+
+No duplicar un mismo evento fuente.
+
+### Persistencia humana
+
+No implementar todavía escritura de validaciones.
+
+No crear todavía:
+
+```text
+data/aoki_maintenance_validations.db
+```
+
+No implementar todavía el POST de validación.
+
+Solo documentar el diseño aprobado:
+
+- base auxiliar separada;
+- historial append-only;
+- control optimista;
+- actor;
+- timestamp UTC;
+- versión incremental;
+- hash de evidencia;
+- taxonomía aplicada;
+- protección contra sobrescritura.
+
+No modificar:
+
+```text
+samee200.db
+eventos_mantenimiento
+```
+
+### Endpoints autorizados
+
+Implementar únicamente endpoints de lectura:
+
+```text
+GET /api/mantenimiento/taxonomia
+GET /api/mantenimiento/eventos
+GET /api/mantenimiento/eventos/{maintenanceEventId}
+```
+
+Filtros:
+
+```text
+inicio
+fin
+clasificacion_sugerida
+estado_validacion
+causa
+sistema
+```
+
+Usar:
+
+```text
+[inicio, fin)
+America/Bogota
+06:00–06:00
+```
+
+No implementar todavía:
+
+```text
+POST /api/mantenimiento/eventos/{maintenanceEventId}/validacion
+```
+
+### Dashboard
+
+Activar:
+
+```text
+Confiabilidad y mantenimiento
+```
+
+Mostrar tarjetas:
+
+```text
+Eventos pendientes de revisión
+Sugerencias de falla correctiva
+Mantenimientos preventivos sugeridos
+Limpiezas
+Paradas operacionales
+Eventos de calidad de datos
+Eventos indeterminados
+Eventos validados
+```
+
+Mostrar tabla con:
+
+```text
+ID
+fecha
+clasificación sugerida
+confianza de sugerencia
+clasificación validada
+estado
+causa
+sistema
+componente
+inicio reportado
+inicio eléctrico
+duración reportada
+duración eléctrica
+duración validada
+evidencia
+motivo de revisión
+```
+
+No mostrar todavía:
+
+```text
+MTBF
+MTTR
+disponibilidad técnica
+tasa de fallas
+```
+
+### Casos de mayo para revisión
+
+Auditar y mostrar como candidatos, sin confirmar:
+
+```text
+1 de mayo:
+fallas en el Booster
+
+4 de mayo:
+compresor sin alcanzar presión, cambio de pieza y válvula
+
+13 de mayo:
+daño de empaques
+
+14 de mayo:
+temperatura de aceite
+
+24 de mayo:
+escape de agua
+```
+
+También clasificar conservadoramente:
+
+```text
+limpieza de filtros
+engrase y lubricación general
+tratamiento o aditivo del agua
+mantenimiento del compresor sin contexto suficiente
+ajuste del cilindro de molde
+cambio de resortes
+```
+
+No asumir una cantidad fija de fallas.
+
+### Archivos autorizados
+
+Nuevos:
+
+```text
+db/aoki_maintenance_events.py
+device/aoki_maintenance_taxonomy.json
+tests/test_aoki_maintenance_events.py
+tests/test_aoki_maintenance_events_integration.py
+docs/fase4_subfase4.1_taxonomia_mantenimiento.md
+```
+
+A modificar:
+
+```text
+api/app.py
+templates/dashboard.html
+static/js/dashboard.js
+tests/test_dashboard_structure.py
+```
+
+### Pruebas obligatorias
+
+Agregar pruebas para:
+
+1. sugerencia de falla correctiva;
+2. mantenimiento preventivo;
+3. limpieza;
+4. cambio de molde;
+5. falta de material;
+6. ajuste de calidad;
+7. parada programada;
+8. evento eléctrico sin reporte;
+9. reporte sin evidencia temporal;
+10. evento NO_DATA;
+11. texto ambiguo;
+12. `mantenimiento` sin contexto;
+13. no clasificación automática definitiva;
+14. `validatedClassification = null`;
+15. `PENDING_HUMAN_REVIEW`;
+16. identificador estable;
+17. identidad independiente de taxonomía;
+18. no duplicación;
+19. solapamientos;
+20. conservación de rawText;
+21. conservación de IDs fuente;
+22. rango `[inicio, fin)`;
+23. exclusión exacta del fin;
+24. no cálculo de MTBF;
+25. no cálculo de MTTR;
+26. no disponibilidad técnica;
+27. no modificación de base histórica;
+28. ausencia de escritura auxiliar;
+29. ausencia del POST de validación;
+30. versiones y trazabilidad.
+
+### Control obligatorio de mayo
+
+Usar:
+
+```text
+inicio = 2026-05-01 06:00 America/Bogota
+fin exclusivo = 2026-06-01 06:00 America/Bogota
+```
+
+Controles de entrada:
+
+```text
+31 jornadas
+13 paradas reportadas
+12 VALID
+1 PARTIAL
+103 eventos eléctricos completos
+1 evento eléctrico censurado
+101 SOLO_DETECTADA
+13 PENDIENTE_REVISION
+2 reportes con evidencia eléctrica candidata
+0 fallas confirmadas
+```
+
+El resultado automático debe conservar:
+
+```text
+0 fallas confirmadas
+```
+
+aunque existan sugerencias `CORRECTIVE_FAILURE`.
+
+### Entrega
+
+Al finalizar presentar:
+
+1. archivos modificados;
+2. taxonomía;
+3. reglas heurísticas;
+4. función de clasificación;
+5. contrato;
+6. endpoints de lectura;
+7. conteos por sugerencia;
+8. candidatos correctivos;
+9. casos ambiguos;
+10. eventos indeterminados;
+11. pruebas ejecutadas;
+12. pruebas pendientes;
+13. limitaciones;
+14. confirmación de que no existe persistencia humana;
+15. confirmación de que no se calcularon KPI de confiabilidad.
+
+Detenerse al finalizar.
+
+No avanzar a la subfase 4.2 sin autorización.
+
+
+
+## Subfase 4.2 — MTBF, MTTR y disponibilidad técnica
+
+La subfase 4.1 se considera implementada y aprobada.
+
+La siguiente subfase autorizada es únicamente la auditoría previa de 4.2.
+
+No implementar todavía cálculos definitivos hasta verificar que existan eventos de falla correctiva validados humanamente y tiempos suficientes.
+
+### Objetivo
+
+Definir y, únicamente si los datos lo permiten, implementar KPI de confiabilidad para Aoki:
+
+```text
+MTBF
+MTTR
+disponibilidad técnica
+número de fallas confirmadas
+tiempo correctivo validado
+tiempo operativo evaluable
+```
+
+Los KPI deben calcularse exclusivamente a partir de eventos confirmados bajo la taxonomía de la subfase 4.1.
+
+### Regla de entrada obligatoria
+
+Un evento solo puede ingresar al conjunto de fallas cuando:
+
+```text
+validatedClassification = CORRECTIVE_FAILURE
+AND validationStatus = HUMAN_VALIDATED
+AND validatedStart != null
+```
+
+Para aportar al MTTR también debe cumplir:
+
+```text
+validatedEnd != null
+validatedDowntimeMinutes > 0
+```
+
+No usar como fallas:
+
+```text
+suggestedClassification = CORRECTIVE_FAILURE
+AUTO_SUGGESTED
+PENDING_HUMAN_REVIEW
+IDLE
+OFF
+SOLO_DETECTADA
+REPORTADA_Y_DETECTADA
+UNDETERMINED
+```
+
+### Condición de suficiencia
+
+Antes de calcular KPI, verificar:
+
+```text
+confirmedFailureCount
+failuresWithValidatedDowntime
+failuresWithValidatedStart
+evaluableOperatingTimeHours
+```
+
+Estados posibles:
+
+```text
+VALID
+INSUFFICIENT_CONFIRMED_FAILURES
+INSUFFICIENT_REPAIR_TIME_DATA
+INSUFFICIENT_OPERATING_TIME
+NO_HUMAN_VALIDATIONS
+```
+
+Si no existen fallas confirmadas:
+
+```text
+MTBF = null
+MTTR = null
+technicalAvailability = null
+```
+
+No mostrar infinito, cero ni 100 %.
+
+### Persistencia humana
+
+La subfase 4.1 no autorizó todavía persistencia de validaciones humanas.
+
+Antes de implementar 4.2, Codex debe auditar si ya existe una capa de validación implementada después de 4.1.
+
+Si no existe, debe informar:
+
+```text
+NO_HUMAN_VALIDATIONS
+```
+
+y detenerse antes de implementar KPI definitivos.
+
+No usar sugerencias automáticas como sustituto.
+
+### Definición de tiempo operativo
+
+No asumir automáticamente que todo el rango calendario es tiempo operativo.
+
+Auditar y proponer una base temporal:
+
+```text
+SCHEDULED_OPERATING_TIME
+REPORTED_OPERATING_TIME
+ELECTRICAL_EVALUABLE_TIME
+VALIDATED_ASSET_UPTIME
+```
+
+Preferencia para KPI técnico definitivo:
+
+```text
+validatedAssetUptimeHours
+```
+
+derivado de una política documentada y consistente.
+
+No usar directamente:
+
+```text
+PRODUCTIVE eléctrico
+horas programadas
+24 h por día
+```
+
+sin justificar la definición.
+
+### Definición de MTBF
+
+Propuesta preferida:
+
+```text
+MTBF_hours =
+totalValidatedUptimeHours
+/
+confirmedFailureCount
+```
+
+Alternativa temporal entre fallas:
+
+```text
+mean(validatedFailureStart[i] - validatedRepairEnd[i-1])
+```
+
+Codex debe auditar cuál definición es viable con los datos disponibles.
+
+La metodología escogida debe quedar explícita:
+
+```text
+mtbfMethod
+```
+
+No mezclar ambas definiciones.
+
+### Definición de MTTR
+
+```text
+MTTR_hours =
+sum(validatedDowntimeMinutes) / 60
+/
+failuresWithValidatedDowntime
+```
+
+Solo usar eventos con:
+
+```text
+validatedStart
+validatedEnd
+validatedDowntimeMinutes > 0
+```
+
+No usar duración eléctrica como tiempo de reparación.
+
+No usar duración reportada sin validación.
+
+### Disponibilidad técnica
+
+Si existen MTBF y MTTR válidos:
+
+```text
+technicalAvailabilityPct =
+MTBF / (MTBF + MTTR) × 100
+```
+
+También puede calcularse por tiempo:
+
+```text
+technicalAvailabilityByTimePct =
+validatedUptimeHours
+/
+(validatedUptimeHours + validatedCorrectiveDowntimeHours)
+× 100
+```
+
+Codex debe comparar ambas y documentar si son equivalentes bajo la metodología elegida.
+
+No presentar disponibilidad operacional reportada como disponibilidad técnica.
+
+### Ventanas de rango
+
+Usar:
+
+```text
+[inicio, fin)
+America/Bogota
+06:00–06:00
+```
+
+Los eventos que crucen fronteras deben recortarse o excluirse según una política explícita.
+
+No duplicar una falla que cruce dos consultas.
+
+### Eventos censurados
+
+Distinguir:
+
+```text
+LEFT_CENSORED
+RIGHT_CENSORED
+FULLY_OBSERVED
+```
+
+Un evento sin inicio o fin completo no debe alimentar MTTR.
+
+Para MTBF, Codex debe documentar el tratamiento del primer y último intervalo censurado.
+
+### Contrato esperado
+
+```typescript
+interface ReliabilityKpiSummary {
+  requestedRange: {
+    startUtc: string;
+    endUtc: string;
+    timezone: "America/Bogota";
+    startInclusive: true;
+    endExclusive: true;
+  };
+
+  status:
+    | "VALID"
+    | "INSUFFICIENT_CONFIRMED_FAILURES"
+    | "INSUFFICIENT_REPAIR_TIME_DATA"
+    | "INSUFFICIENT_OPERATING_TIME"
+    | "NO_HUMAN_VALIDATIONS";
+
+  confirmedFailureCount: number;
+  failuresWithValidatedDowntime: number;
+
+  validatedOperatingTimeHours: number | null;
+  validatedCorrectiveDowntimeHours: number | null;
+
+  mtbfHours: number | null;
+  mttrHours: number | null;
+  technicalAvailabilityPct: number | null;
+  technicalAvailabilityByTimePct: number | null;
+
+  mtbfMethod: string | null;
+  availabilityMethod: string | null;
+
+  includedMaintenanceEventIds: string[];
+  excludedMaintenanceEvents: Array<{
+    maintenanceEventId: string;
+    reasons: string[];
+  }>;
+
+  qualityFlags: string[];
+  taxonomyVersion: string;
+  reliabilityMethodVersion: string;
+}
+```
+
+### Configuración versionada
+
+Crear solo si el diagnóstico lo justifica:
+
+```text
+device/aoki_reliability_method.json
+```
+
+Debe incluir:
+
+```text
+version
+failureDefinition
+mtbfMethod
+mttrMethod
+availabilityMethod
+operatingTimeSource
+boundaryPolicy
+censoringPolicy
+minimumConfirmedFailures
+minimumFailuresWithDowntime
+```
+
+No fijar umbrales sin documentarlos.
+
+### Endpoint propuesto
+
+```text
+GET /api/mantenimiento/confiabilidad
+```
+
+Parámetros:
+
+```text
+inicio
+fin
+```
+
+Respuesta:
+
+```text
+ranges
+status
+summary
+events
+quality
+methodology
+```
+
+Si faltan validaciones humanas, el endpoint debe responder correctamente con KPI nulos y estado explícito.
+
+### Dashboard
+
+En la vista de confiabilidad mostrar:
+
+```text
+Fallas correctivas confirmadas
+Fallas con tiempo de reparación validado
+Tiempo operativo validado
+Tiempo correctivo validado
+MTBF
+MTTR
+Disponibilidad técnica
+Estado de suficiencia
+```
+
+Si faltan datos:
+
+```text
+No disponible: faltan fallas correctivas validadas
+```
+
+No mostrar:
+
+```text
+MTBF = 0
+MTTR = 0
+Disponibilidad = 100 %
+```
+
+como sustitución.
+
+### Tabla de eventos incluidos
+
+Mostrar:
+
+```text
+maintenanceEventId
+clasificación validada
+inicio validado
+fin validado
+tiempo correctivo validado
+estado de censura
+incluido en MTBF
+incluido en MTTR
+motivo de exclusión
+```
+
+### Prueba obligatoria de mayo
+
+Usar:
+
+```text
+inicio = 2026-05-01 06:00 America/Bogota
+fin exclusivo = 2026-06-01 06:00 America/Bogota
+```
+
+Según el diagnóstico de 4.1, el control inicial esperado es:
+
+```text
+confirmedFailureCount = 0
+status = NO_HUMAN_VALIDATIONS
+mtbfHours = null
+mttrHours = null
+technicalAvailabilityPct = null
+```
+
+Si el estado real cambió por validaciones posteriores, Codex debe documentarlo con trazabilidad.
+
+### Pruebas mínimas futuras
+
+Preparar pruebas para:
+
+1. cero fallas confirmadas;
+2. una falla confirmada;
+3. varias fallas confirmadas;
+4. falla sugerida no validada;
+5. falla rechazada;
+6. falla sin inicio;
+7. falla sin fin;
+8. duración validada nula;
+9. duración validada negativa;
+10. MTBF por tiempo operativo;
+11. MTTR;
+12. disponibilidad por MTBF/MTTR;
+13. disponibilidad por tiempo;
+14. evento censurado a izquierda;
+15. evento censurado a derecha;
+16. evento cruzando frontera;
+17. rango `[inicio, fin)`;
+18. exclusión exacta del fin;
+19. no uso de duración eléctrica;
+20. no uso de duración reportada no validada;
+21. no uso de sugerencias automáticas;
+22. KPI nulos por insuficiencia;
+23. no infinito;
+24. no 100 % artificial;
+25. trazabilidad de IDs;
+26. versiones metodológicas;
+27. no modificación de base histórica;
+28. no escritura en Raspberry.
+
+### Archivos previstos
+
+Antes de implementar, Codex debe auditar y proponer.
+
+Preferencia:
+
+Nuevos:
+
+```text
+db/aoki_reliability.py
+device/aoki_reliability_method.json
+tests/test_aoki_reliability.py
+tests/test_aoki_reliability_integration.py
+docs/fase4_subfase4.2_confiabilidad.md
+```
+
+Posibles modificaciones:
+
+```text
+api/app.py
+templates/dashboard.html
+static/js/dashboard.js
+tests/test_dashboard_structure.py
+```
+
+### Entrega del diagnóstico previo
+
+Antes de modificar código, presentar:
+
+1. si existe persistencia humana;
+2. cantidad de fallas confirmadas;
+3. cantidad con inicio y fin validados;
+4. tiempo correctivo validado disponible;
+5. fuente viable de tiempo operativo;
+6. definición propuesta de MTBF;
+7. definición propuesta de MTTR;
+8. definición propuesta de disponibilidad;
+9. tratamiento de censura y fronteras;
+10. contrato;
+11. archivos previstos;
+12. riesgos;
+13. resultado esperado para mayo;
+14. confirmación de que no se calcularon KPI con sugerencias.
+
+Detenerse antes de implementar.
+
+
+
+## Subfase 4.1B — Persistencia de validaciones humanas y política de uptime validado
+
+La auditoría previa de 4.2 identificó un bloqueo metodológico:
+
+```text
+NO_HUMAN_VALIDATIONS
+```
+
+Actualmente no existe:
+
+- persistencia de validaciones humanas;
+- fallas correctivas confirmadas;
+- tiempos correctivos validados;
+- política autorizada de `VALIDATED_ASSET_UPTIME`.
+
+Por tanto, no se autoriza todavía calcular MTBF, MTTR ni disponibilidad técnica definitiva.
+
+La siguiente subfase autorizada es únicamente:
+
+```text
+SUBFASE 4.1B — Persistencia de validaciones humanas y política de uptime validado
+```
+
+### Objetivo
+
+Implementar una capa local, separada y trazable para:
+
+1. validar humanamente eventos de mantenimiento;
+2. conservar historial append-only;
+3. proteger contra sobrescritura concurrente;
+4. registrar actor, fecha, versión y evidencia;
+5. definir una política explícita de uptime validado;
+6. preparar los datos requeridos por 4.2.
+
+### Restricción principal
+
+No modificar:
+
+```text
+samee200.db
+eventos_mantenimiento
+base histórica maestra
+```
+
+No escribir ni desplegar nada hacia la Raspberry.
+
+### Persistencia auxiliar autorizada
+
+Crear una base local independiente:
+
+```text
+data/aoki_maintenance_validations.db
+```
+
+La base auxiliar debe contener como mínimo:
+
+```text
+maintenance_validation_current
+maintenance_validation_history
+validated_operating_windows
+validated_operating_window_history
+```
+
+No almacenar mediciones eléctricas ni producción histórica.
+
+### Tabla current
+
+Campos mínimos:
+
+```text
+maintenanceEventId
+validatedClassification
+validationStatus
+validatedStartUtc
+validatedEndUtc
+validatedDowntimeMinutes
+causeCategory
+affectedSystem
+affectedComponent
+interventionDescription
+reviewComment
+actor
+validatedAtUtc
+version
+taxonomyVersion
+sourceEvidenceHash
+createdAtUtc
+updatedAtUtc
+```
+
+Reglas:
+
+- una fila actual por `maintenanceEventId`;
+- `version` incremental;
+- `sourceEvidenceHash` obligatorio;
+- timestamps en UTC;
+- actor obligatorio;
+- no permitir clasificación vacía cuando el estado sea `HUMAN_VALIDATED`.
+
+### Historial append-only
+
+Cada cambio debe insertar una fila nueva con:
+
+```text
+historyId
+maintenanceEventId
+previousVersion
+newVersion
+previousPayload
+newPayload
+actor
+changedAtUtc
+sourceEvidenceHash
+taxonomyVersion
+changeReason
+```
+
+No actualizar ni borrar filas históricas.
+
+### Control de concurrencia
+
+El endpoint de escritura debe exigir:
+
+```text
+expectedVersion
+```
+
+o cabecera equivalente:
+
+```text
+If-Match
+```
+
+Si la versión no coincide:
+
+```text
+409 CONFLICT
+```
+
+No sobrescribir silenciosamente.
+
+### Validación de tiempos
+
+Para `CORRECTIVE_FAILURE` validada:
+
+```text
+validatedStartUtc != null
+```
+
+Para aportar a MTTR:
+
+```text
+validatedEndUtc != null
+validatedEndUtc > validatedStartUtc
+validatedDowntimeMinutes > 0
+```
+
+Regla:
+
+```text
+validatedDowntimeMinutes =
+(validatedEndUtc - validatedStartUtc) / 60
+```
+
+salvo que exista una duración humana explícita distinta y documentada.
+
+Si hay diferencia, conservar:
+
+```text
+durationOverrideReason
+```
+
+No copiar automáticamente duración eléctrica ni reportada.
+
+### Endpoint de lectura
+
+Implementar o ajustar:
+
+```text
+GET /api/mantenimiento/eventos
+GET /api/mantenimiento/eventos/{maintenanceEventId}
+```
+
+Deben combinar:
+
+- clasificación automática;
+- validación humana actual;
+- historial disponible;
+- hash de evidencia;
+- versión.
+
+### Endpoint de validación
+
+Implementar:
+
+```text
+POST /api/mantenimiento/eventos/{maintenanceEventId}/validacion
+```
+
+Entrada mínima:
+
+```text
+validatedClassification
+validationStatus
+validatedStart
+validatedEnd
+causeCategory
+affectedSystem
+affectedComponent
+interventionDescription
+reviewComment
+actor
+expectedVersion
+sourceEvidenceHash
+```
+
+Reglas:
+
+- validar que el evento exista;
+- validar clasificación contra taxonomía;
+- validar actor;
+- validar rango temporal;
+- validar hash de evidencia;
+- rechazar evidencia desactualizada;
+- rechazar versión concurrente;
+- insertar historial;
+- actualizar current;
+- no modificar contratos fuente.
+
+### Estados admitidos
+
+```text
+HUMAN_VALIDATED
+HUMAN_REJECTED
+SUPERSEDED
+PENDING_HUMAN_REVIEW
+```
+
+Solo:
+
+```text
+validatedClassification = CORRECTIVE_FAILURE
+AND validationStatus = HUMAN_VALIDATED
+```
+
+produce una falla confirmada.
+
+### Hash de evidencia
+
+Calcular a partir de campos estables:
+
+```text
+maintenanceEventId
+reportedEventIds
+electricalEventIds
+rawText
+matchedText
+reportedStart
+reportedEnd
+electricalStart
+electricalEnd
+taxonomyVersion
+```
+
+Usar SHA-256 canónico.
+
+Si cambia la evidencia fuente, la validación anterior debe marcarse:
+
+```text
+STALE_SOURCE_EVIDENCE
+```
+
+No eliminarla.
+
+### Política de uptime validado
+
+Crear configuración versionada:
+
+```text
+device/aoki_uptime_policy.json
+```
+
+Versión inicial sugerida:
+
+```text
+aoki-uptime-policy-v1-2026-07
+```
+
+La política debe definir explícitamente:
+
+```text
+operatingCalendarSource
+scheduledOperatingWindows
+plannedStopTreatment
+operationalStopTreatment
+correctiveDowntimeTreatment
+noDataTreatment
+boundaryPolicy
+timezone
+productiveDayStart
+```
+
+### Ventanas de operación validadas
+
+Crear endpoints:
+
+```text
+GET /api/mantenimiento/ventanas-operacion
+POST /api/mantenimiento/ventanas-operacion
+```
+
+Cada ventana debe incluir:
+
+```text
+windowId
+startUtc
+endUtc
+windowType
+source
+actor
+status
+version
+comment
+createdAtUtc
+updatedAtUtc
+```
+
+Tipos:
+
+```text
+SCHEDULED_OPERATION
+PLANNED_STOP
+EXTERNAL_STOP
+NON_OPERATING_PERIOD
+UNKNOWN
+```
+
+No asumir 24 horas por día.
+
+### Cálculo preparatorio de uptime
+
+Crear una función que construya, sin calcular todavía MTBF:
+
+```text
+validatedAssetUptimeHours
+validatedCorrectiveDowntimeHours
+excludedNoDataHours
+unresolvedHours
+```
+
+Regla conceptual:
+
+```text
+validatedAssetUptime =
+validated scheduled operating windows
+- validated corrective downtime
+- validated planned/external non-operating windows
+- unresolved/no-data intervals según política
+```
+
+No usar directamente `PRODUCTIVE eléctrico` como uptime.
+
+El resultado debe conservar intervalos y trazabilidad.
+
+### Estado de suficiencia
+
+Exponer:
+
+```text
+NO_HUMAN_VALIDATIONS
+INSUFFICIENT_OPERATING_WINDOWS
+INSUFFICIENT_CORRECTIVE_TIMES
+READY_FOR_RELIABILITY_KPI
+```
+
+Solo `READY_FOR_RELIABILITY_KPI` habilita 4.2 definitiva.
+
+### Dashboard
+
+Agregar a “Confiabilidad y mantenimiento”:
+
+```text
+Revisión y validación humana
+Historial de cambios
+Ventanas operativas validadas
+Estado de preparación para KPI
+```
+
+Mostrar:
+
+- evento;
+- sugerencia;
+- clasificación validada;
+- actor;
+- versión;
+- fecha;
+- inicio y fin validados;
+- tiempo correctivo validado;
+- hash de evidencia;
+- estado de evidencia;
+- conflictos de versión.
+
+No mostrar todavía MTBF, MTTR ni disponibilidad.
+
+### Seguridad y auditoría
+
+Antes de implementar, Codex debe auditar:
+
+- autenticación disponible;
+- identificación de actor;
+- protección CSRF si aplica;
+- permisos de escritura;
+- validación de payload;
+- logs de auditoría;
+- recuperación ante corrupción de la base auxiliar.
+
+Si no existe autenticación, debe documentar la limitación y proponer una protección local mínima.
+
+No inventar usuarios.
+
+### Pruebas mínimas
+
+Agregar pruebas para:
+
+1. crear validación;
+2. actualizar validación con versión correcta;
+3. conflicto de versión;
+4. actor obligatorio;
+5. clasificación inválida;
+6. evento inexistente;
+7. hash desactualizado;
+8. historial append-only;
+9. rechazo humano;
+10. validación correctiva;
+11. correctiva sin inicio;
+12. correctiva sin fin;
+13. duración negativa;
+14. duración calculada;
+15. override documentado;
+16. evidencia cambiante;
+17. base auxiliar separada;
+18. no modificación de samee200.db;
+19. ventana operativa válida;
+20. ventana invertida;
+21. ventanas solapadas;
+22. jornada 06:00–06:00;
+23. rango `[inicio, fin)`;
+24. estado READY;
+25. estado insuficiente;
+26. no uso de PRODUCTIVE como uptime;
+27. no cálculo de MTBF;
+28. no cálculo de MTTR;
+29. no disponibilidad técnica;
+30. no operaciones sobre Raspberry.
+
+### Archivos previstos
+
+Antes de implementar, auditar y proponer.
+
+Preferencia:
+
+Nuevos:
+
+```text
+db/aoki_maintenance_validation_store.py
+db/aoki_validated_uptime.py
+device/aoki_uptime_policy.json
+tests/test_aoki_maintenance_validation_store.py
+tests/test_aoki_validated_uptime.py
+tests/test_aoki_maintenance_validation_integration.py
+docs/fase4_subfase4.1B_validaciones_uptime.md
+```
+
+A modificar:
+
+```text
+api/app.py
+templates/dashboard.html
+static/js/dashboard.js
+tests/test_dashboard_structure.py
+```
+
+Base auxiliar autorizada:
+
+```text
+data/aoki_maintenance_validations.db
+```
+
+### Entrega del diagnóstico previo
+
+Antes de modificar código, presentar:
+
+1. mecanismos de autenticación disponibles;
+2. actor identificable;
+3. diseño exacto de tablas;
+4. política de concurrencia;
+5. política de hash de evidencia;
+6. política de ventanas operativas;
+7. fórmula de uptime validado;
+8. endpoints;
+9. archivos previstos;
+10. riesgos;
+11. migración inicial;
+12. estrategia de respaldo;
+13. confirmación de que no se calcularán KPI todavía.
+
+Detenerse antes de implementar.
+
+# Instrucción vigente para continuar
+
+La auditoría de 4.2 identificó un bloqueo metodológico.
+
+El siguiente trabajo autorizado es únicamente:
+
+```text
+AUDITORÍA PREVIA DE SUBFASE 4.1B — Persistencia de validaciones humanas y política de uptime validado
+```
+
+No implementar MTBF, MTTR ni disponibilidad técnica hasta que exista:
+
+- al menos una política de uptime aprobada;
+- persistencia humana trazable;
+- datos suficientes;
+- estado `READY_FOR_RELIABILITY_KPI`.
 
 ---
 

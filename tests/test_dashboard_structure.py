@@ -187,9 +187,24 @@ class DashboardStructureTests(unittest.TestCase):
         self.assertIn("PENDING_HUMAN_REVIEW", self.html)
         self.assertIn("Una sugerencia CORRECTIVE_FAILURE tampoco constituye", self.html)
         self.assertIn('moduloActual === "confiabilidad"', self.javascript)
-        self.assertNotIn("/validacion", self.javascript)
+        self.assertIn("/validacion", self.javascript)
         self.assertNotIn("MTBF", self.html)
         self.assertNotIn("MTTR", self.html)
+
+    def test_maintenance_validation_and_uptime_preparation_are_visible_without_kpi(self):
+        for identifier in (
+            "mantEstadoPreparacion", "mantUptimeValidado",
+            "mantTiempoNoResuelto", "mantEventoValidar",
+            "mantBearerToken", "mantGuardarValidacion",
+            "tablaVentanasOperacion", "mantGuardarVentana",
+        ):
+            self.assertIn(f'id="{identifier}"', self.html)
+        self.assertIn("/api/mantenimiento/preparacion-kpi", self.javascript)
+        self.assertIn("/api/mantenimiento/ventanas-operacion", self.javascript)
+        self.assertIn('"Authorization": `Bearer ${token}`', self.javascript)
+        self.assertIn('"Idempotency-Key": idempotencyKey()', self.javascript)
+        self.assertNotIn("localStorage", self.javascript)
+        self.assertNotIn("sessionStorage", self.javascript)
 
 
 if __name__ == "__main__":

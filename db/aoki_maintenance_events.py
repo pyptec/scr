@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 TAXONOMY_PATH = ROOT / "device" / "aoki_maintenance_taxonomy.json"
+EVIDENCE_HASH_VERSION = "aoki-maintenance-evidence-hash-v1"
 
 
 def load_maintenance_taxonomy(path=TAXONOMY_PATH):
@@ -57,6 +58,37 @@ def maintenance_event_id(event):
         raise ValueError("El evento no tiene IDs fuente canónicos")
     digest = hashlib.sha256("|".join(source_ids).encode("utf-8")).hexdigest()[:20]
     return f"maintenance-{digest}"
+
+
+def _canonical_value(value):
+    if isinstance(value, str):
+        return unicodedata.normalize("NFC", value.replace("\r\n", "\n").replace("\r", "\n"))
+    if isinstance(value, list):
+        return sorted({_canonical_value(item) for item in value})
+    return value
+
+
+def source_evidence_hash(event):
+    evidence = {
+        "maintenanceEventId": event.get("maintenanceEventId"),
+        "reportedEventIds": event.get("reportedEventIds", []),
+        "electricalEventIds": event.get("electricalEventIds", []),
+        "rawText": event.get("rawText"),
+        "matchedText": event.get("matchedText"),
+        "reportedStart": event.get("reportedStart"),
+        "reportedEnd": event.get("reportedEnd"),
+        "electricalStart": event.get("electricalStart"),
+        "electricalEnd": event.get("electricalEnd"),
+        "taxonomyVersion": event.get("taxonomyVersion"),
+    }
+    envelope = {
+        "evidenceHashVersion": EVIDENCE_HASH_VERSION,
+        "evidence": {key: _canonical_value(value) for key, value in evidence.items()},
+    }
+    payload = json.dumps(
+        envelope, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _suggest(event):
@@ -130,7 +162,7 @@ def _production_date(event):
 
 def _build_event(source, taxonomy):
     suggested, confidence, reasons = _suggest(source)
-    return {
+    event = {
         "maintenanceEventId": maintenance_event_id(source),
         "taxonomyVersion": taxonomy["version"],
         "suggestedClassification": suggested,
@@ -161,6 +193,10 @@ def _build_event(source, taxonomy):
             "reconciliationReason": source.get("reason"),
         },
     }
+    event["evidenceHashVersion"] = EVIDENCE_HASH_VERSION
+    event["sourceEvidenceHash"] = source_evidence_hash(event)
+    event["evidenceStatus"] = "CURRENT"
+    return event
 
 
 def build_maintenance_events(phase2_contract, taxonomy=None):
@@ -204,6 +240,46 @@ def build_maintenance_events(phase2_contract, taxonomy=None):
             },
         },
     }
+
+
+def merge_human_validations(contract, validations):
+    """Combina el estado humano actual sin alterar la evidencia automática."""
+    result = deepcopy(contract)
+    result["methodology"]["humanValidationPersistenceImplemented"] = True
+    by_id = {item["maintenanceEventId"]: item for item in validations}
+    validated = 0
+    confirmed = 0
+    for event in result.get("events", []):
+        current = by_id.get(event["maintenanceEventId"])
+        if current is None:
+            continue
+        event["evidenceStatus"] = (
+            "CURRENT" if current["sourceEvidenceHash"] == event["sourceEvidenceHash"]
+            else "STALE_SOURCE_EVIDENCE"
+        )
+        for key in (
+            "validatedClassification", "validationStatus", "validatedStartUtc",
+            "validatedEndUtc", "validatedDowntimeMinutes", "durationOverrideReason",
+            "causeCategory", "affectedSystem", "affectedComponent",
+            "interventionDescription", "reviewComment", "actorId",
+            "validatedAtUtc", "version", "createdAtUtc", "updatedAtUtc",
+        ):
+            event[key] = current.get(key)
+        is_validated = current["validationStatus"] == "HUMAN_VALIDATED"
+        event["confirmedFailure"] = (
+            is_validated
+            and current["validatedClassification"] == "CORRECTIVE_FAILURE"
+            and event["evidenceStatus"] == "CURRENT"
+        )
+        validated += int(is_validated)
+        confirmed += int(event["confirmedFailure"])
+    result["summary"]["humanValidated"] = validated
+    result["summary"]["confirmedFailures"] = confirmed
+    result["summary"]["pendingHumanReview"] = sum(
+        event["validationStatus"] == "PENDING_HUMAN_REVIEW"
+        for event in result.get("events", [])
+    )
+    return result
 
 
 def find_maintenance_event(contract, maintenance_id):

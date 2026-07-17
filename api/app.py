@@ -37,7 +37,14 @@ from db.aoki_maintenance_events import (
     build_maintenance_events,
     find_maintenance_event,
     load_maintenance_taxonomy,
+    merge_human_validations,
 )
+from db.aoki_maintenance_auth import authenticate_bearer, writes_are_allowed
+from db.aoki_maintenance_validation_store import (
+    MaintenanceValidationStore,
+    StoreError,
+)
+from db.aoki_validated_uptime import build_validated_uptime, load_uptime_policy
 
 load_dotenv("/home/pi/SAMEE200/scr/.env")
 
@@ -51,6 +58,8 @@ app = Flask(
 
 init_db()
 cargar_catalogos_desde_env()
+maintenance_store = MaintenanceValidationStore()
+maintenance_store.initialize()
 
 
 def convertir_utc_a_colombia(timestamp_utc):
@@ -133,9 +142,50 @@ def _maintenance_contract(inicio, fin):
     conn = get_conn()
     try:
         phase2 = build_phase2_dashboard(conn, inicio, fin)
-        return build_maintenance_events(phase2)
+        automatic = build_maintenance_events(phase2)
+        return merge_human_validations(
+            automatic, maintenance_store.list_validations()
+        )
     finally:
         conn.close()
+
+
+def _maintenance_sources(inicio, fin):
+    conn = get_conn()
+    try:
+        phase2 = build_phase2_dashboard(conn, inicio, fin)
+        automatic = build_maintenance_events(phase2)
+        merged = merge_human_validations(
+            automatic, maintenance_store.list_validations()
+        )
+        return phase2, merged
+    finally:
+        conn.close()
+
+
+def _store_error(error):
+    return jsonify({"error": str(error), "code": error.code}), error.status_code
+
+
+def _authenticated_writer(required_role=None):
+    allowed, reason = writes_are_allowed(
+        app.debug, request.remote_addr, request.headers
+    )
+    if not allowed:
+        return None, (jsonify({"error": reason, "code": reason}), 403)
+    actor = authenticate_bearer(
+        maintenance_store, request.headers.get("Authorization")
+    )
+    if actor is None:
+        return None, (
+            jsonify({"error": "Credencial de mantenimiento inválida", "code": "UNAUTHENTICATED"}),
+            401,
+        )
+    if required_role and actor["role"] != required_role:
+        return None, (
+            jsonify({"error": "Rol insuficiente", "code": "FORBIDDEN"}), 403
+        )
+    return actor, None
 
 
 @app.route("/api/mantenimiento/taxonomia")
@@ -166,6 +216,118 @@ def api_mantenimiento_evento(maintenance_event_id):
         "event": event,
         "methodology": contract["methodology"],
     })
+
+
+@app.route(
+    "/api/mantenimiento/eventos/<maintenance_event_id>/historial"
+)
+def api_mantenimiento_evento_historial(maintenance_event_id):
+    return jsonify({
+        "maintenanceEventId": maintenance_event_id,
+        "history": maintenance_store.validation_history(maintenance_event_id),
+    })
+
+
+@app.route(
+    "/api/mantenimiento/eventos/<maintenance_event_id>/validacion",
+    methods=["POST"],
+)
+def api_mantenimiento_validacion(maintenance_event_id):
+    actor, error = _authenticated_writer()
+    if error:
+        return error
+    inicio, fin, range_error = _maintenance_range()
+    if range_error:
+        return range_error
+    contract = _maintenance_contract(inicio, fin)
+    event = find_maintenance_event(contract, maintenance_event_id)
+    if event is None:
+        return jsonify({"error": "Evento no encontrado", "code": "NOT_FOUND"}), 404
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"error": "JSON inválido", "code": "INVALID_JSON"}), 400
+    payload = dict(payload)
+    if "validatedStart" in payload:
+        payload["validatedStartUtc"] = payload.pop("validatedStart")
+    if "validatedEnd" in payload:
+        payload["validatedEndUtc"] = payload.pop("validatedEnd")
+    try:
+        result = maintenance_store.save_validation(
+            event, payload, actor, payload.get("expectedVersion"),
+            request.headers.get("Idempotency-Key"),
+        )
+        return jsonify(result)
+    except (StoreError, TypeError, ValueError) as exc:
+        if isinstance(exc, StoreError):
+            return _store_error(exc)
+        return jsonify({"error": str(exc), "code": "INVALID_VALIDATION"}), 422
+
+
+@app.route("/api/mantenimiento/ventanas-operacion")
+def api_mantenimiento_ventanas():
+    inicio = request.args.get("inicio", type=int)
+    fin = request.args.get("fin", type=int)
+    if (inicio is None) != (fin is None) or (
+        inicio is not None and fin <= inicio
+    ):
+        return jsonify({"error": "Rango de fechas inválido"}), 400
+    return jsonify({
+        "policy": load_uptime_policy(),
+        "windows": maintenance_store.list_windows(inicio, fin),
+    })
+
+
+@app.route("/api/mantenimiento/ventanas-operacion", methods=["POST"])
+@app.route(
+    "/api/mantenimiento/ventanas-operacion/<window_id>", methods=["POST"]
+)
+def api_mantenimiento_guardar_ventana(window_id=None):
+    actor, error = _authenticated_writer("MAINTENANCE_ADMIN")
+    if error:
+        return error
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"error": "JSON inválido", "code": "INVALID_JSON"}), 400
+    payload = dict(payload)
+    if window_id:
+        if payload.get("windowId") not in (None, window_id):
+            return jsonify({"error": "windowId inconsistente"}), 422
+        payload["windowId"] = window_id
+    payload["policyVersion"] = load_uptime_policy()["version"]
+    try:
+        result = maintenance_store.save_window(
+            payload, actor, payload.get("expectedVersion"),
+            request.headers.get("Idempotency-Key"),
+        )
+        return jsonify(result)
+    except (StoreError, KeyError, TypeError, ValueError) as exc:
+        if isinstance(exc, StoreError):
+            return _store_error(exc)
+        return jsonify({"error": str(exc), "code": "INVALID_WINDOW"}), 422
+
+
+@app.route("/api/mantenimiento/ventanas-operacion/<window_id>/historial")
+def api_mantenimiento_ventana_historial(window_id):
+    return jsonify({
+        "windowId": window_id,
+        "history": maintenance_store.window_history(window_id),
+    })
+
+
+@app.route("/api/mantenimiento/uptime-validado")
+@app.route("/api/mantenimiento/preparacion-kpi")
+def api_mantenimiento_uptime_validado():
+    inicio, fin, error = _maintenance_range()
+    if error:
+        return error
+    phase2, maintenance = _maintenance_sources(inicio, fin)
+    result = build_validated_uptime(
+        inicio, fin,
+        maintenance_store.list_windows(inicio, fin),
+        maintenance["events"],
+        (phase2.get("electricalStates") or {}).get("segments", []),
+    )
+    return jsonify(result)
 
 
 @app.route("/api/estado")

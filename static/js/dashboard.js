@@ -14,6 +14,7 @@ let chartImpactoEconomico = null;
 let chartImpactoAmbiental = null;
 let conciliacionActual = [];
 let mantenimientoActual = [];
+let ventanasOperacionActuales = [];
 let rangoSnapshotActual = null;
 let actualizacionPendiente = false;
 const cacheHistorico = new Map();
@@ -604,12 +605,54 @@ function renderizarMantenimiento() {
     });
 }
 
+function idempotencyKey() {
+    return globalThis.crypto?.randomUUID?.()
+        || `maintenance-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function poblarEventosValidacion() {
+    const selector = document.getElementById("mantEventoValidar");
+    const seleccionado = selector.value;
+    selector.innerHTML = '<option value="">Seleccione</option>';
+    mantenimientoActual.forEach(evento => {
+        const option = document.createElement("option");
+        option.value = evento.maintenanceEventId;
+        option.textContent = `${evento.productionDate || "--"} · ${evento.maintenanceEventId} · ${evento.suggestedClassification}`;
+        selector.appendChild(option);
+    });
+    if (mantenimientoActual.some(e => e.maintenanceEventId === seleccionado)) {
+        selector.value = seleccionado;
+    }
+}
+
+function renderizarVentanasOperacion() {
+    const tbody = document.getElementById("tablaVentanasOperacion");
+    tbody.innerHTML = ventanasOperacionActuales.length
+        ? ""
+        : '<tr><td colspan="8">No existen ventanas operativas validadas</td></tr>';
+    ventanasOperacionActuales.forEach(ventana => {
+        const fila = document.createElement("tr");
+        fila.innerHTML = `<td>${escaparHtml(ventana.windowId)}</td><td>${escaparHtml(formatearIsoColombia(new Date(ventana.startUtc * 1000).toISOString()))}</td><td>${escaparHtml(formatearIsoColombia(new Date(ventana.endUtc * 1000).toISOString()))}</td><td>${escaparHtml(ventana.windowType)}</td><td>${escaparHtml(ventana.source)}</td><td>${escaparHtml(ventana.actorId)}</td><td>${formatearEntero(ventana.version)}</td><td>${escaparHtml(ventana.status)}</td>`;
+        tbody.appendChild(fila);
+    });
+}
+
 async function cargarMantenimiento(snapshot = rangoSnapshotActual) {
     snapshot = requerirSnapshot(snapshot);
-    const data = await fetchJsonCacheado(
-        `/api/mantenimiento/eventos?inicio=${snapshot.inicio}&fin=${snapshot.fin}`,
-        snapshot
-    );
+    const [data, uptime, ventanas] = await Promise.all([
+        fetchJsonCacheado(
+            `/api/mantenimiento/eventos?inicio=${snapshot.inicio}&fin=${snapshot.fin}`,
+            snapshot
+        ),
+        fetchJsonCacheado(
+            `/api/mantenimiento/preparacion-kpi?inicio=${snapshot.inicio}&fin=${snapshot.fin}`,
+            snapshot
+        ),
+        fetchJsonCacheado(
+            `/api/mantenimiento/ventanas-operacion?inicio=${snapshot.inicio}&fin=${snapshot.fin}`,
+            snapshot
+        )
+    ]);
     const resumen = data.summary || {};
     const sugerencias = resumen.suggestionsByClassification || {};
     document.getElementById("mantPendientes").innerText = formatearEntero(resumen.pendingHumanReview);
@@ -619,14 +662,107 @@ async function cargarMantenimiento(snapshot = rangoSnapshotActual) {
     document.getElementById("mantSinDatos").innerText = formatearEntero(sugerencias.DATA_QUALITY_EVENT || 0);
     document.getElementById("mantValidados").innerText = formatearEntero(resumen.humanValidated);
     document.getElementById("mantFallasConfirmadas").innerText = formatearEntero(resumen.confirmedFailures);
+    document.getElementById("mantEstadoPreparacion").innerText = uptime.status || "--";
+    document.getElementById("mantUptimeValidado").innerText =
+        uptime.summary?.validatedAssetUptimeHours === null
+            ? "No disponible"
+            : formatearNumero(uptime.summary?.validatedAssetUptimeHours, 3);
+    document.getElementById("mantTiempoNoResuelto").innerText =
+        uptime.summary?.unresolvedHours === null
+            ? "No disponible"
+            : formatearNumero(uptime.summary?.unresolvedHours, 3);
     document.getElementById("mantTaxonomia").innerText =
-        `Taxonomía: ${data.taxonomyVersion || "--"} · sugerencias automáticas, sin persistencia humana`;
+        `Taxonomía: ${data.taxonomyVersion || "--"} · validaciones humanas separadas y trazables`;
     mantenimientoActual = data.events || [];
+    ventanasOperacionActuales = ventanas.windows || [];
     poblarFiltroConciliacion(
         "filtroMantSugerencia",
         mantenimientoActual.map(evento => evento.suggestedClassification)
     );
+    poblarEventosValidacion();
+    renderizarVentanasOperacion();
     renderizarMantenimiento();
+}
+
+async function guardarValidacionMantenimiento() {
+    const snapshot = requerirSnapshot(rangoSnapshotActual);
+    const id = document.getElementById("mantEventoValidar").value;
+    const event = mantenimientoActual.find(item => item.maintenanceEventId === id);
+    const token = document.getElementById("mantBearerToken").value;
+    const output = document.getElementById("mantResultadoEscritura");
+    if (!event || !token) {
+        output.textContent = "Seleccione un evento e ingrese el token individual.";
+        return;
+    }
+    const startValue = document.getElementById("mantInicioValidado").value;
+    const endValue = document.getElementById("mantFinValidado").value;
+    const payload = {
+        validatedClassification: document.getElementById("mantClasificacionValidada").value || null,
+        validationStatus: document.getElementById("mantEstadoValidacion").value,
+        validatedStartUtc: startValue ? datetimeLocalAUnix(startValue) : null,
+        validatedEndUtc: endValue ? datetimeLocalAUnix(endValue) : null,
+        reviewComment: document.getElementById("mantComentarioValidacion").value || null,
+        expectedVersion: event.version || 0,
+        sourceEvidenceHash: event.sourceEvidenceHash
+    };
+    const response = await fetch(
+        `/api/mantenimiento/eventos/${encodeURIComponent(id)}/validacion?inicio=${snapshot.inicio}&fin=${snapshot.fin}`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`,
+                "Idempotency-Key": idempotencyKey()
+            },
+            body: JSON.stringify(payload)
+        }
+    );
+    const result = await response.json();
+    output.textContent = response.ok
+        ? `Validación guardada. Versión ${result.version}.`
+        : `${result.code || "ERROR"}: ${result.error || "No fue posible guardar"}`;
+    if (response.ok) {
+        cacheHistorico.clear();
+        await cargarMantenimiento(snapshot);
+    }
+}
+
+async function guardarVentanaOperacion() {
+    const snapshot = requerirSnapshot(rangoSnapshotActual);
+    const id = document.getElementById("mantWindowId").value.trim();
+    const token = document.getElementById("mantBearerToken").value;
+    const current = ventanasOperacionActuales.find(item => item.windowId === id);
+    const output = document.getElementById("mantResultadoEscritura");
+    if (!id || !token) {
+        output.textContent = "Ingrese ID de ventana y token de administrador.";
+        return;
+    }
+    const payload = {
+        windowId: id,
+        startUtc: datetimeLocalAUnix(document.getElementById("mantWindowStart").value),
+        endUtc: datetimeLocalAUnix(document.getElementById("mantWindowEnd").value),
+        windowType: document.getElementById("mantWindowType").value,
+        source: document.getElementById("mantWindowSource").value,
+        comment: document.getElementById("mantWindowComment").value || null,
+        expectedVersion: current?.version || 0
+    };
+    const response = await fetch("/api/mantenimiento/ventanas-operacion", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+            "Idempotency-Key": idempotencyKey()
+        },
+        body: JSON.stringify(payload)
+    });
+    const result = await response.json();
+    output.textContent = response.ok
+        ? `Ventana guardada. Versión ${result.version}.`
+        : `${result.code || "ERROR"}: ${result.error || "No fue posible guardar"}`;
+    if (response.ok) {
+        cacheHistorico.clear();
+        await cargarMantenimiento(snapshot);
+    }
 }
 
 async function cargarEnergiaReconstruidaAoki(snapshot = rangoSnapshotActual) {
@@ -1548,6 +1684,12 @@ function inicializarFiltrosConciliacion() {
 function inicializarFiltrosMantenimiento() {
     ["filtroMantSugerencia", "filtroMantValidacion"].forEach(
         id => document.getElementById(id)?.addEventListener("change", renderizarMantenimiento)
+    );
+    document.getElementById("mantGuardarValidacion")?.addEventListener(
+        "click", guardarValidacionMantenimiento
+    );
+    document.getElementById("mantGuardarVentana")?.addEventListener(
+        "click", guardarVentanaOperacion
     );
 }
 

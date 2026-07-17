@@ -4,6 +4,8 @@ import unittest
 from db.aoki_maintenance_events import (
     build_maintenance_events,
     maintenance_event_id,
+    merge_human_validations,
+    source_evidence_hash,
 )
 
 
@@ -163,6 +165,32 @@ class AokiMaintenanceEventsTests(unittest.TestCase):
         self.assertFalse(
             result["methodology"]["humanValidationPersistenceImplemented"]
         )
+
+    def test_evidence_hash_is_canonical_and_stale_validation_never_confirms_failure(self):
+        event = self.build_one(reconciliation_event(
+            text="Falla en Booster", reported_ids=["reported-b", "reported-a"]
+        ))
+        reordered = copy.deepcopy(event)
+        reordered["reportedEventIds"].reverse()
+        self.assertEqual(source_evidence_hash(event), source_evidence_hash(reordered))
+        base = build_maintenance_events(contract([reconciliation_event(
+            text="Falla en Booster", reported_ids=["reported-b", "reported-a"]
+        )]))
+        current = {
+            "maintenanceEventId": event["maintenanceEventId"],
+            "validatedClassification": "CORRECTIVE_FAILURE",
+            "validationStatus": "HUMAN_VALIDATED",
+            "validatedStartUtc": 100,
+            "validatedEndUtc": 200,
+            "validatedDowntimeMinutes": 100 / 60,
+            "sourceEvidenceHash": "0" * 64,
+            "actorId": "actor-1",
+            "version": 1,
+        }
+        merged = merge_human_validations(base, [current])
+        item = merged["events"][0]
+        self.assertEqual(item["evidenceStatus"], "STALE_SOURCE_EVIDENCE")
+        self.assertFalse(item["confirmedFailure"])
 
 
 if __name__ == "__main__":

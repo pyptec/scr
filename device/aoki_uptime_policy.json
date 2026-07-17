@@ -1,0 +1,15 @@
+{
+  "version": "aoki-uptime-policy-v1-2026-07",
+  "operatingCalendarSource": "HUMAN_VALIDATED_WINDOWS",
+  "timezone": "America/Bogota",
+  "productiveDayStart": "06:00",
+  "intervalSemantics": "[start, end)",
+  "plannedStopTreatment": "EXCLUDE_FROM_REQUIRED_OPERATING_TIME",
+  "externalStopTreatment": "EXCLUDE_FROM_REQUIRED_OPERATING_TIME",
+  "nonOperatingPeriodTreatment": "EXCLUDE",
+  "correctiveDowntimeTreatment": "SUBTRACT_FROM_VALIDATED_UPTIME",
+  "noDataTreatment": "EXCLUDE_AS_UNRESOLVED",
+  "boundaryPolicy": "CLIP_TO_QUERY_RANGE",
+  "overlapPolicy": "UNION_WITH_CONFLICT_DETECTION",
+  "electricalProductiveUse": "EVIDENCE_ONLY"
+}

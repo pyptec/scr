@@ -596,8 +596,11 @@
             <div class="card"><span>Preventivos sugeridos</span><strong id="mantPreventivos">--</strong><small>incluye mantenimiento preventivo</small></div>
             <div class="card"><span>Paradas operacionales</span><strong id="mantOperacionales">--</strong><small>sin atribuir falla</small></div>
             <div class="card"><span>Eventos de calidad de datos</span><strong id="mantSinDatos">--</strong><small>NO_DATA</small></div>
-            <div class="card"><span>Eventos validados</span><strong id="mantValidados">--</strong><small>persistencia humana no implementada</small></div>
+            <div class="card"><span>Eventos validados</span><strong id="mantValidados">--</strong><small>persistencia humana trazable</small></div>
             <div class="card"><span>Fallas confirmadas</span><strong id="mantFallasConfirmadas">--</strong><small>requiere CORRECTIVE_FAILURE + HUMAN_VALIDATED</small></div>
+            <div class="card"><span>Estado para KPI</span><strong id="mantEstadoPreparacion">--</strong><small>4.2 permanece bloqueada salvo READY</small></div>
+            <div class="card"><span>Uptime validado</span><strong id="mantUptimeValidado">--</strong><small>horas desde ventanas humanas</small></div>
+            <div class="card"><span>Tiempo no resuelto</span><strong id="mantTiempoNoResuelto">--</strong><small>NO_DATA, UNKNOWN o conflictos</small></div>
         </div>
         <p id="mantTaxonomia" class="periodo-efectivo">Taxonomía: --</p>
         <div class="filtros-grid">
@@ -618,6 +621,63 @@
                 <thead><tr><th>ID</th><th>Jornada</th><th>Sugerencia</th><th>Clasificación validada</th><th>Estado</th><th>Causa</th><th>Inicio reportado</th><th>Inicio eléctrico</th><th>Duración reportada</th><th>Duración eléctrica</th><th>Evidencia</th><th>Motivo de revisión</th></tr></thead>
                 <tbody id="tablaMantenimiento"></tbody>
             </table>
+        </div>
+        <h3>Revisión y validación humana</h3>
+        <p class="aviso-metodologico">El token individual se usa únicamente para esta solicitud y no se almacena en el navegador. Las escrituras requieren modo seguro y acceso local o proxy TLS confiable.</p>
+        <div class="filtros-grid">
+            <label>Evento
+                <select id="mantEventoValidar"><option value="">Seleccione</option></select>
+            </label>
+            <label>Clasificación validada
+                <select id="mantClasificacionValidada">
+                    <option value="">Sin clasificación</option>
+                    <option value="CORRECTIVE_FAILURE">CORRECTIVE_FAILURE</option>
+                    <option value="PREVENTIVE_MAINTENANCE">PREVENTIVE_MAINTENANCE</option>
+                    <option value="OPERATIONAL_STOP">OPERATIONAL_STOP</option>
+                    <option value="PLANNED_STOP">PLANNED_STOP</option>
+                    <option value="CLEANING">CLEANING</option>
+                    <option value="OTHER">OTHER</option>
+                    <option value="UNDETERMINED">UNDETERMINED</option>
+                </select>
+            </label>
+            <label>Estado
+                <select id="mantEstadoValidacion">
+                    <option value="HUMAN_VALIDATED">HUMAN_VALIDATED</option>
+                    <option value="HUMAN_REJECTED">HUMAN_REJECTED</option>
+                    <option value="PENDING_HUMAN_REVIEW">PENDING_HUMAN_REVIEW</option>
+                    <option value="SUPERSEDED">SUPERSEDED</option>
+                </select>
+            </label>
+            <label>Inicio validado<input id="mantInicioValidado" type="datetime-local"></label>
+            <label>Fin validado<input id="mantFinValidado" type="datetime-local"></label>
+            <label>Comentario<input id="mantComentarioValidacion" type="text"></label>
+            <label>Bearer token<input id="mantBearerToken" type="password" autocomplete="off"></label>
+            <button id="mantGuardarValidacion" type="button">Guardar validación</button>
+        </div>
+        <p id="mantResultadoEscritura" class="periodo-efectivo">Sin operaciones pendientes.</p>
+        <h3>Ventanas operativas validadas</h3>
+        <div class="tabla-wrapper">
+            <table>
+                <thead><tr><th>ID</th><th>Inicio</th><th>Fin</th><th>Tipo</th><th>Fuente</th><th>Actor</th><th>Versión</th><th>Estado</th></tr></thead>
+                <tbody id="tablaVentanasOperacion"></tbody>
+            </table>
+        </div>
+        <div class="filtros-grid">
+            <label>ID ventana<input id="mantWindowId" type="text"></label>
+            <label>Inicio<input id="mantWindowStart" type="datetime-local"></label>
+            <label>Fin<input id="mantWindowEnd" type="datetime-local"></label>
+            <label>Tipo
+                <select id="mantWindowType">
+                    <option value="SCHEDULED_OPERATION">SCHEDULED_OPERATION</option>
+                    <option value="PLANNED_STOP">PLANNED_STOP</option>
+                    <option value="EXTERNAL_STOP">EXTERNAL_STOP</option>
+                    <option value="NON_OPERATING_PERIOD">NON_OPERATING_PERIOD</option>
+                    <option value="UNKNOWN">UNKNOWN</option>
+                </select>
+            </label>
+            <label>Fuente<input id="mantWindowSource" type="text"></label>
+            <label>Comentario<input id="mantWindowComment" type="text"></label>
+            <button id="mantGuardarVentana" type="button">Guardar ventana</button>
         </div>
     </section>
 
