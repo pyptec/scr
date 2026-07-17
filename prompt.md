@@ -5763,22 +5763,1305 @@ Antes de modificar código, presentar:
 
 Detenerse antes de implementar.
 
+
+
+# Aprobación de implementación — Subfase 4.1B
+
+El diagnóstico previo de la subfase 4.1B queda aprobado.
+
+Se autoriza implementar únicamente:
+
+```text
+SUBFASE 4.1B — Persistencia de validaciones humanas y política de uptime validado
+```
+
+No calcular todavía MTBF, MTTR ni disponibilidad técnica.
+
+## Decisiones aprobadas
+
+### Seguridad mínima obligatoria
+
+La escritura solo podrá habilitarse cuando se cumpla simultáneamente:
+
+```text
+MAINTENANCE_WRITES_ENABLED=true
+debug=false
+acceso local o proxy TLS confiable
+```
+
+No implementar escritura si estas condiciones no se cumplen.
+
+No usar como identidad:
+
+- actor libre en JSON;
+- dirección IP;
+- X-Forwarded-User sin proxy autenticado;
+- nombre guardado en navegador;
+- credencial compartida.
+
+### Actores
+
+Crear actores explícitos sin precargar usuarios.
+
+Roles permitidos:
+
+```text
+MAINTENANCE_VALIDATOR
+MAINTENANCE_ADMIN
+```
+
+Autenticación:
+
+```text
+Authorization: Bearer <token-individual>
+```
+
+Guardar únicamente:
+
+```text
+SHA-256(token)
+```
+
+No almacenar tokens en texto plano.
+
+La provisión y revocación de actores debe hacerse con utilidad local offline, no mediante endpoint público.
+
+### Base auxiliar
+
+Crear exclusivamente:
+
+```text
+data/aoki_maintenance_validations.db
+```
+
+No usar `ATTACH`, triggers ni claves foráneas hacia `samee200.db`.
+
+No modificar:
+
+```text
+samee200.db
+eventos_mantenimiento
+```
+
+### Esquema autorizado
+
+Crear:
+
+```text
+schema_metadata
+validation_actors
+maintenance_validation_current
+maintenance_validation_history
+validated_operating_windows
+validated_operating_window_history
+```
+
+Aplicar:
+
+```text
+schemaVersion = 1
+```
+
+Activar:
+
+```text
+foreign_keys = ON
+busy_timeout
+WAL
+```
+
+Ejecutar después de migrar:
+
+```text
+PRAGMA integrity_check
+```
+
+Registrar:
+
+```text
+migrationHash
+applicationVersion
+appliedAtUtc
+```
+
+### Historial append-only
+
+Proteger tablas históricas con triggers:
+
+```text
+BEFORE UPDATE → RAISE(ABORT)
+BEFORE DELETE → RAISE(ABORT)
+```
+
+Cada mutación debe ejecutarse en una única transacción:
+
+1. autenticar actor;
+2. validar payload;
+3. comprobar evidencia;
+4. comprobar versión;
+5. insertar snapshot histórico;
+6. actualizar tabla current;
+7. confirmar transacción.
+
+### Concurrencia e idempotencia
+
+Crear:
+
+```text
+expectedVersion = 0
+```
+
+Actualizar:
+
+```text
+expectedVersion = versión actual
+```
+
+Usar:
+
+```text
+BEGIN IMMEDIATE
+```
+
+y actualización condicionada por versión.
+
+Respuestas:
+
+```text
+409 VERSION_CONFLICT
+409 SOURCE_EVIDENCE_CHANGED
+404 EVENT_NOT_FOUND
+401 UNAUTHENTICATED
+403 FORBIDDEN
+422 INVALID_VALIDATION
+```
+
+Exigir:
+
+```text
+Idempotency-Key
+```
+
+o `requestId` único para evitar escrituras duplicadas por reintento.
+
+### Hash de evidencia
+
+Usar versión:
+
+```text
+aoki-maintenance-evidence-hash-v1
+```
+
+Canonización:
+
+- UTF-8;
+- Unicode NFC;
+- saltos de línea `\n`;
+- claves ordenadas;
+- arrays ordenados y sin duplicados;
+- `null` explícito;
+- JSON sin espacios;
+- SHA-256 hexadecimal minúsculo.
+
+Campos:
+
+```text
+maintenanceEventId
+reportedEventIds
+electricalEventIds
+rawText
+matchedText
+reportedStart
+reportedEnd
+electricalStart
+electricalEnd
+taxonomyVersion
+evidenceHashVersion
+```
+
+Si cambia la evidencia:
+
+```text
+evidenceStatus = STALE_SOURCE_EVIDENCE
+```
+
+No eliminar la validación anterior.
+
+### Validaciones humanas
+
+Crear:
+
+```text
+POST /api/mantenimiento/eventos/{maintenanceEventId}/validacion
+```
+
+Entrada mínima:
+
+```text
+validatedClassification
+validationStatus
+validatedStart
+validatedEnd
+causeCategory
+affectedSystem
+affectedComponent
+interventionDescription
+reviewComment
+expectedVersion
+sourceEvidenceHash
+```
+
+El actor debe derivarse del token.
+
+Si el payload incluye actor y no coincide con el autenticado:
+
+```text
+403 FORBIDDEN
+```
+
+Para:
+
+```text
+CORRECTIVE_FAILURE + HUMAN_VALIDATED
+```
+
+exigir:
+
+```text
+validatedStartUtc != null
+```
+
+Para futura inclusión en MTTR exigir además:
+
+```text
+validatedEndUtc != null
+validatedEndUtc > validatedStartUtc
+validatedDowntimeMinutes > 0
+```
+
+Calcular por defecto:
+
+```text
+validatedDowntimeMinutes =
+(validatedEndUtc - validatedStartUtc) / 60
+```
+
+Si existe override humano:
+
+```text
+durationOverrideReason
+```
+
+debe ser obligatorio.
+
+No copiar automáticamente duración eléctrica ni reportada.
+
+### Ventanas de operación
+
+Crear:
+
+```text
+GET /api/mantenimiento/ventanas-operacion
+GET /api/mantenimiento/ventanas-operacion/{windowId}/historial
+POST /api/mantenimiento/ventanas-operacion
+POST /api/mantenimiento/ventanas-operacion/{windowId}
+```
+
+Tipos:
+
+```text
+SCHEDULED_OPERATION
+PLANNED_STOP
+EXTERNAL_STOP
+NON_OPERATING_PERIOD
+UNKNOWN
+```
+
+No crear automáticamente ventanas de 24 horas.
+
+Cada ventana debe registrar:
+
+```text
+windowId
+startUtc
+endUtc
+windowType
+source
+actorId
+status
+version
+policyVersion
+comment
+createdAtUtc
+updatedAtUtc
+```
+
+Semántica:
+
+```text
+[startUtc, endUtc)
+```
+
+Ventanas del mismo tipo no deben solaparse.
+
+Solapamientos contradictorios:
+
+```text
+UNRESOLVED
+```
+
+No resolver silenciosamente.
+
+### Política de uptime
+
+Crear:
+
+```text
+device/aoki_uptime_policy.json
+```
+
+Versión:
+
+```text
+aoki-uptime-policy-v1-2026-07
+```
+
+Configuración:
+
+```text
+operatingCalendarSource = HUMAN_VALIDATED_WINDOWS
+timezone = America/Bogota
+productiveDayStart = 06:00
+intervalSemantics = [start, end)
+plannedStopTreatment = EXCLUDE_FROM_REQUIRED_OPERATING_TIME
+externalStopTreatment = EXCLUDE_FROM_REQUIRED_OPERATING_TIME
+nonOperatingPeriodTreatment = EXCLUDE
+correctiveDowntimeTreatment = SUBTRACT_FROM_VALIDATED_UPTIME
+noDataTreatment = EXCLUDE_AS_UNRESOLVED
+boundaryPolicy = CLIP_TO_QUERY_RANGE
+overlapPolicy = UNION_WITH_CONFLICT_DETECTION
+electricalProductiveUse = EVIDENCE_ONLY
+```
+
+### Uptime validado
+
+Crear en:
+
+```text
+db/aoki_validated_uptime.py
+```
+
+la lógica:
+
+```text
+S = unión de SCHEDULED_OPERATION
+P = unión de PLANNED_STOP, EXTERNAL_STOP y NON_OPERATING_PERIOD
+C = unión de downtime correctivo humano validado
+N = unión de NO_DATA dentro de S
+U = UNKNOWN + conflictos
+```
+
+Todo recortado a `[inicio, fin)`.
+
+Calcular:
+
+```text
+validatedAssetUptimeHours =
+duración(union(S) - union(P ∪ C ∪ N ∪ U))
+```
+
+También:
+
+```text
+validatedCorrectiveDowntimeHours
+excludedNoDataHours
+unresolvedHours
+```
+
+Reglas:
+
+- usar unión de intervalos;
+- una parada fuera de S no reduce uptime;
+- solapamiento correctivo con parada planificada → UNRESOLVED;
+- PRODUCTIVE eléctrico = evidencia visual únicamente;
+- NO_DATA no demuestra uptime;
+- respetar exclusión exacta del fin.
+
+### Estado de preparación
+
+Exponer:
+
+```text
+NO_HUMAN_VALIDATIONS
+INSUFFICIENT_OPERATING_WINDOWS
+INSUFFICIENT_CORRECTIVE_TIMES
+READY_FOR_RELIABILITY_KPI
+```
+
+`READY_FOR_RELIABILITY_KPI` exige:
+
+- política activa;
+- al menos una ventana SCHEDULED_OPERATION validada;
+- sin conflictos relevantes;
+- al menos una falla CORRECTIVE_FAILURE + HUMAN_VALIDATED;
+- inicio y fin validados;
+- downtime positivo;
+- evidencia vigente;
+- unresolvedHours = 0.
+
+Esta subfase no calcula KPI.
+
+### Endpoints de lectura
+
+Implementar:
+
+```text
+GET /api/mantenimiento/eventos
+GET /api/mantenimiento/eventos/{maintenanceEventId}
+GET /api/mantenimiento/eventos/{maintenanceEventId}/historial
+GET /api/mantenimiento/ventanas-operacion
+GET /api/mantenimiento/ventanas-operacion/{windowId}/historial
+GET /api/mantenimiento/uptime-validado
+GET /api/mantenimiento/preparacion-kpi
+```
+
+### Utilidad offline de actores
+
+Crear una utilidad local segura para:
+
+```text
+crear actor
+rotar token
+revocar actor
+listar actores sin exponer tokens
+```
+
+La utilidad debe mostrar el token solo una vez al crearlo o rotarlo.
+
+No exponer endpoints públicos de administración de actores.
+
+### Respaldo
+
+Usar SQLite Backup API.
+
+No copiar únicamente el archivo `.db` con WAL activo.
+
+Destino:
+
+```text
+backup/maintenance-validations/
+```
+
+Nombre con:
+
+```text
+UTC
+schemaVersion
+SHA-256
+```
+
+Crear manifiesto con:
+
+```text
+tamaño
+hash
+integrity_check
+```
+
+Retención inicial:
+
+```text
+eliminación manual
+```
+
+No copiar la base auxiliar a la Raspberry.
+
+### Dashboard
+
+Agregar:
+
+```text
+Revisión y validación humana
+Historial de cambios
+Ventanas operativas validadas
+Estado de preparación para KPI
+```
+
+Mostrar:
+
+- clasificación sugerida;
+- clasificación validada;
+- actor;
+- versión;
+- fecha;
+- inicio y fin validados;
+- tiempo correctivo;
+- hash;
+- estado de evidencia;
+- conflictos;
+- readiness.
+
+No mostrar todavía:
+
+```text
+MTBF
+MTTR
+disponibilidad técnica
+```
+
+### Archivos autorizados
+
+Nuevos:
+
+```text
+db/aoki_maintenance_auth.py
+db/aoki_maintenance_validation_store.py
+db/aoki_validated_uptime.py
+device/aoki_uptime_policy.json
+tests/test_aoki_maintenance_auth.py
+tests/test_aoki_maintenance_validation_store.py
+tests/test_aoki_validated_uptime.py
+tests/test_aoki_maintenance_validation_integration.py
+docs/fase4_subfase4.1B_validaciones_uptime.md
+```
+
+A modificar:
+
+```text
+api/app.py
+db/aoki_maintenance_events.py
+templates/dashboard.html
+static/js/dashboard.js
+tests/test_dashboard_structure.py
+```
+
+Artefacto local no versionado:
+
+```text
+data/aoki_maintenance_validations.db
+```
+
+### Pruebas obligatorias
+
+Agregar pruebas para:
+
+1. crear actor offline;
+2. token almacenado como hash;
+3. token inválido;
+4. actor revocado;
+5. rol insuficiente;
+6. feature flag desactivado;
+7. debug activo bloquea escritura;
+8. crear validación;
+9. actualizar con versión correcta;
+10. conflicto de versión;
+11. idempotencia;
+12. actor obligatorio derivado del token;
+13. clasificación inválida;
+14. evento inexistente;
+15. hash desactualizado;
+16. historial append-only;
+17. protección UPDATE/DELETE;
+18. rechazo humano;
+19. correctiva validada;
+20. correctiva sin inicio;
+21. duración calculada;
+22. override documentado;
+23. base auxiliar separada;
+24. integridad de samee200.db intacta;
+25. ventana válida;
+26. ventana invertida;
+27. solapamiento mismo tipo;
+28. conflicto entre tipos;
+29. rango `[inicio, fin)`;
+30. jornada 06:00–06:00;
+31. cálculo de uptime por unión de intervalos;
+32. NO_DATA excluido;
+33. PRODUCTIVE no usado como uptime;
+34. estado READY;
+35. estados insuficientes;
+36. respaldo mediante Backup API;
+37. no cálculo de MTBF;
+38. no cálculo de MTTR;
+39. no disponibilidad técnica;
+40. no operaciones sobre Raspberry.
+
+### Restricciones
+
+No implementar:
+
+```text
+MTBF
+MTTR
+disponibilidad técnica
+alarmas
+```
+
+No modificar:
+
+```text
+samee200.db
+eventos_mantenimiento
+```
+
+No desplegar a Raspberry.
+
+### Entrega
+
+Al finalizar presentar:
+
+1. archivos modificados;
+2. esquema de la base auxiliar;
+3. utilidad de actores;
+4. autenticación;
+5. endpoints;
+6. historial;
+7. concurrencia;
+8. hash de evidencia;
+9. ventanas operativas;
+10. uptime validado;
+11. readiness;
+12. respaldo;
+13. pruebas ejecutadas;
+14. pruebas pendientes;
+15. riesgos;
+16. confirmación de que no se calcularon KPI.
+
+Detenerse al finalizar.
+
+
+
+## Subfase 4.2 — MTBF, MTTR y disponibilidad técnica
+
+La subfase 4.1B se considera implementada y aprobada.
+
+La siguiente subfase autorizada es:
+
+```text
+SUBFASE 4.2 — MTBF, MTTR y disponibilidad técnica
+```
+
+### Objetivo
+
+Calcular KPI de confiabilidad únicamente cuando la capa de validaciones humanas y la política de uptime produzcan:
+
+```text
+READY_FOR_RELIABILITY_KPI
+```
+
+Si el sistema no está listo, el endpoint debe devolver KPI nulos y explicar exactamente qué información falta.
+
+### Auditoría previa obligatoria dentro de la implementación
+
+Antes de calcular cualquier KPI, verificar:
+
+```text
+maintenanceValidationStoreAvailable
+activeUptimePolicy
+confirmedFailureCount
+failuresWithValidatedStart
+failuresWithValidatedDowntime
+validatedAssetUptimeHours
+validatedCorrectiveDowntimeHours
+unresolvedHours
+staleEvidenceCount
+readinessStatus
+```
+
+No continuar con cálculos válidos si:
+
+```text
+readinessStatus != READY_FOR_RELIABILITY_KPI
+```
+
+### Definición de falla confirmada
+
+Incluir únicamente eventos que cumplan:
+
+```text
+validatedClassification = CORRECTIVE_FAILURE
+AND validationStatus = HUMAN_VALIDATED
+AND evidenceStatus = CURRENT
+AND validatedStartUtc != null
+```
+
+Excluir:
+
+```text
+AUTO_SUGGESTED
+PENDING_HUMAN_REVIEW
+HUMAN_REJECTED
+SUPERSEDED
+STALE_SOURCE_EVIDENCE
+```
+
+### Población para MTTR
+
+Para aportar al MTTR, además debe existir:
+
+```text
+validatedEndUtc != null
+validatedEndUtc > validatedStartUtc
+validatedDowntimeMinutes > 0
+```
+
+No usar:
+
+- duración eléctrica;
+- duración reportada no validada;
+- duración inferida desde IDLE/OFF;
+- eventos censurados sin ambos límites.
+
+### Fuente de tiempo operativo
+
+Usar exclusivamente:
+
+```text
+validatedAssetUptimeHours
+```
+
+producido por `db/aoki_validated_uptime.py`.
+
+No usar directamente:
+
+```text
+horas calendario
+24 h por día
+PRODUCTIVE eléctrico
+horas programadas reportadas
+tiempo eléctrico conocido
+```
+
+### MTBF
+
+Método aprobado:
+
+```text
+mtbfMethod =
+TOTAL_VALIDATED_UPTIME_PER_CONFIRMED_FAILURE
+```
+
+Fórmula:
+
+```text
+mtbfHours =
+validatedAssetUptimeHours
+/
+confirmedFailureCount
+```
+
+Condiciones:
+
+```text
+confirmedFailureCount > 0
+validatedAssetUptimeHours > 0
+```
+
+Si existe una sola falla, calcular el valor pero agregar:
+
+```text
+SINGLE_FAILURE_ESTIMATE
+```
+
+No presentarlo como estimación robusta.
+
+### MTTR
+
+Método aprobado:
+
+```text
+mttrMethod =
+MEAN_VALIDATED_CORRECTIVE_DOWNTIME
+```
+
+Fórmula:
+
+```text
+mttrHours =
+validatedCorrectiveDowntimeHours
+/
+failuresWithValidatedDowntime
+```
+
+donde:
+
+```text
+validatedCorrectiveDowntimeHours =
+sum(validatedDowntimeMinutes incluidos) / 60
+```
+
+### Disponibilidad técnica por tiempo
+
+Método principal para el periodo:
+
+```text
+availabilityMethod =
+VALIDATED_TIME_RATIO
+```
+
+Fórmula:
+
+```text
+technicalAvailabilityByTimePct =
+validatedAssetUptimeHours
+/
+(
+  validatedAssetUptimeHours
+  + validatedCorrectiveDowntimeHours
+)
+× 100
+```
+
+Solo calcular cuando ambos componentes sean válidos.
+
+### Disponibilidad por MTBF y MTTR
+
+Indicador secundario:
+
+```text
+technicalAvailabilityPct =
+mtbfHours
+/
+(mtbfHours + mttrHours)
+× 100
+```
+
+No presentar ambas disponibilidades como equivalentes si sus poblaciones difieren.
+
+Calcular y documentar:
+
+```text
+availabilityDifferencePctPoints =
+technicalAvailabilityPct
+- technicalAvailabilityByTimePct
+```
+
+Si la diferencia supera una tolerancia versionada, agregar:
+
+```text
+AVAILABILITY_METHOD_MISMATCH
+```
+
+### Configuración metodológica
+
+Crear:
+
+```text
+device/aoki_reliability_method.json
+```
+
+Versión inicial:
+
+```text
+aoki-reliability-method-v1-2026-07
+```
+
+Contenido mínimo:
+
+```json
+{
+  "version": "aoki-reliability-method-v1-2026-07",
+  "failureDefinition": "HUMAN_VALIDATED_CORRECTIVE_FAILURE_CURRENT_EVIDENCE",
+  "mtbfMethod": "TOTAL_VALIDATED_UPTIME_PER_CONFIRMED_FAILURE",
+  "mttrMethod": "MEAN_VALIDATED_CORRECTIVE_DOWNTIME",
+  "availabilityMethod": "VALIDATED_TIME_RATIO",
+  "secondaryAvailabilityMethod": "MTBF_MTTR_RATIO",
+  "operatingTimeSource": "VALIDATED_ASSET_UPTIME",
+  "boundaryPolicy": "START_IN_RANGE_FOR_FAILURE_COUNT",
+  "downtimeBoundaryPolicy": "CLIP_TO_QUERY_RANGE",
+  "censoringPolicy": "EXCLUDE_INCOMPLETE_FROM_MTTR",
+  "minimumConfirmedFailures": 1,
+  "minimumFailuresWithDowntime": 1,
+  "availabilityDifferenceTolerancePctPoints": 0.1
+}
+```
+
+Los umbrales deben documentarse como metodológicos y versionados.
+
+### Fronteras y censura
+
+Usar:
+
+```text
+[inicio, fin)
+America/Bogota
+06:00–06:00
+```
+
+Clasificación:
+
+```text
+FULLY_OBSERVED
+LEFT_CENSORED
+RIGHT_CENSORED
+OUTSIDE_RANGE
+```
+
+Reglas:
+
+- `validatedStartUtc == fin` → excluido;
+- inicio antes de `inicio` → LEFT_CENSORED, no incrementa fallas del periodo;
+- inicio dentro y fin ausente → RIGHT_CENSORED, cuenta para MTBF pero no MTTR;
+- inicio y fin dentro → FULLY_OBSERVED;
+- fin después de `fin` → RIGHT_CENSORED, cuenta para MTBF, no MTTR;
+- el downtime para disponibilidad por tiempo se recorta al rango;
+- conservar el mismo `maintenanceEventId` entre consultas.
+
+### Estados de suficiencia
+
+Usar prioridad:
+
+```text
+NO_HUMAN_VALIDATIONS
+INSUFFICIENT_CONFIRMED_FAILURES
+INSUFFICIENT_OPERATING_TIME
+INSUFFICIENT_REPAIR_TIME_DATA
+UNRESOLVED_OPERATING_TIME
+STALE_VALIDATIONS
+VALID
+```
+
+Reglas:
+
+- sin validaciones humanas → `NO_HUMAN_VALIDATIONS`;
+- validaciones pero cero fallas confirmadas → `INSUFFICIENT_CONFIRMED_FAILURES`;
+- uptime nulo o no positivo → `INSUFFICIENT_OPERATING_TIME`;
+- fallas confirmadas sin reparaciones completas → `INSUFFICIENT_REPAIR_TIME_DATA`;
+- `unresolvedHours > 0` → `UNRESOLVED_OPERATING_TIME`;
+- evidencia obsoleta → `STALE_VALIDATIONS`;
+- todo válido → `VALID`.
+
+Con estado distinto de `VALID`, no inventar KPI.
+
+### Contrato esperado
+
+```typescript
+interface ReliabilityKpiContract {
+  ranges: {
+    requestedRange: object;
+    effectiveRange: object;
+    timezone: "America/Bogota";
+    startInclusive: true;
+    endExclusive: true;
+  };
+
+  status: string;
+
+  summary: {
+    confirmedFailureCount: number;
+    failuresWithValidatedStart: number;
+    failuresWithValidatedDowntime: number;
+
+    validatedAssetUptimeHours: number | null;
+    validatedCorrectiveDowntimeHours: number | null;
+    unresolvedHours: number | null;
+
+    mtbfHours: number | null;
+    mttrHours: number | null;
+
+    technicalAvailabilityPct: number | null;
+    technicalAvailabilityByTimePct: number | null;
+    availabilityDifferencePctPoints: number | null;
+
+    failureRatePer1000Hours: number | null;
+  };
+
+  events: Array<{
+    maintenanceEventId: string;
+    validatedClassification: string | null;
+    validationStatus: string;
+    evidenceStatus: string;
+    validatedStartUtc: number | null;
+    validatedEndUtc: number | null;
+    validatedDowntimeMinutes: number | null;
+    censoringStatus: string;
+    includedInMtbf: boolean;
+    includedInMttr: boolean;
+    includedInAvailability: boolean;
+    exclusionReasons: string[];
+  }>;
+
+  quality: {
+    flags: string[];
+    singleFailureEstimate: boolean;
+    staleEvidenceCount: number;
+    unresolvedHours: number | null;
+  };
+
+  methodology: {
+    reliabilityMethodVersion: string;
+    taxonomyVersion: string;
+    uptimePolicyVersion: string;
+    mtbfMethod: string;
+    mttrMethod: string;
+    availabilityMethod: string;
+    secondaryAvailabilityMethod: string;
+  };
+}
+```
+
+### Tasa de fallas auxiliar
+
+Solo si MTBF es válido:
+
+```text
+failureRatePer1000Hours =
+1000 / mtbfHours
+```
+
+Etiquetar:
+
+```text
+INDICADOR_AUXILIAR
+```
+
+No presentarlo como tasa estadística estable cuando exista una sola falla.
+
+### Endpoint
+
+Implementar:
+
+```text
+GET /api/mantenimiento/confiabilidad
+```
+
+Parámetros:
+
+```text
+inicio
+fin
+```
+
+Validaciones:
+
+- inicio obligatorio;
+- fin obligatorio;
+- fin > inicio;
+- semántica `[inicio, fin)`;
+- máximo local de 90 días;
+- `America/Bogota`;
+- jornada 06:00–06:00.
+
+Respuesta:
+
+```text
+ranges
+status
+summary
+events
+quality
+methodology
+```
+
+El endpoint es de lectura.
+
+### Dashboard
+
+Activar KPI en “Confiabilidad y mantenimiento” únicamente cuando:
+
+```text
+status = VALID
+```
+
+Mostrar:
+
+```text
+Fallas correctivas confirmadas
+Fallas con reparación completa
+Uptime validado
+Downtime correctivo validado
+MTBF
+MTTR
+Disponibilidad técnica por tiempo
+Disponibilidad por MTBF/MTTR
+Tasa auxiliar por 1.000 h
+Estado metodológico
+```
+
+Cuando no sea válido:
+
+```text
+KPI no disponibles
+```
+
+y mostrar la causa exacta.
+
+No mostrar cero, infinito o 100 % por ausencia de datos.
+
+### Tabla de trazabilidad
+
+Mostrar:
+
+```text
+maintenanceEventId
+inicio validado
+fin validado
+downtime validado
+estado de censura
+incluido en MTBF
+incluido en MTTR
+incluido en disponibilidad
+evidencia vigente
+motivo de exclusión
+actor de validación
+versión de validación
+```
+
+### Prueba obligatoria de mayo
+
+Usar:
+
+```text
+inicio = 2026-05-01 06:00 America/Bogota
+fin exclusivo = 2026-06-01 06:00 America/Bogota
+```
+
+Primero consultar:
+
+```text
+GET /api/mantenimiento/preparacion-kpi
+```
+
+Si devuelve:
+
+```text
+READY_FOR_RELIABILITY_KPI
+```
+
+calcular y documentar KPI reales.
+
+Si devuelve otro estado:
+
+```text
+mtbfHours = null
+mttrHours = null
+technicalAvailabilityPct = null
+technicalAvailabilityByTimePct = null
+```
+
+y explicar qué falta.
+
+No forzar un resultado numérico.
+
+### Pruebas mínimas
+
+Agregar pruebas para:
+
+1. NO_HUMAN_VALIDATIONS;
+2. cero fallas confirmadas;
+3. una falla confirmada;
+4. varias fallas;
+5. SINGLE_FAILURE_ESTIMATE;
+6. falla sugerida no validada;
+7. falla rechazada;
+8. evidencia obsoleta;
+9. falla sin inicio;
+10. falla sin fin;
+11. downtime inválido;
+12. MTBF;
+13. MTTR;
+14. disponibilidad por tiempo;
+15. disponibilidad MTBF/MTTR;
+16. diferencia entre métodos;
+17. tasa por 1.000 h;
+18. LEFT_CENSORED;
+19. RIGHT_CENSORED;
+20. FULLY_OBSERVED;
+21. inicio igual a fin del rango;
+22. clipping de downtime;
+23. rango `[inicio, fin)`;
+24. exclusión exacta del fin;
+25. no uso de PRODUCTIVE;
+26. no uso de 24 h/día;
+27. no uso de duración eléctrica;
+28. no uso de duración reportada no validada;
+29. KPI nulos por insuficiencia;
+30. no infinito;
+31. no 100 % artificial;
+32. trazabilidad de IDs;
+33. versiones metodológicas;
+34. base histórica sin cambios;
+35. base auxiliar solo lectura desde este servicio;
+36. no operaciones sobre Raspberry.
+
+### Archivos previstos
+
+Nuevos:
+
+```text
+db/aoki_reliability.py
+device/aoki_reliability_method.json
+tests/test_aoki_reliability.py
+tests/test_aoki_reliability_integration.py
+docs/fase4_subfase4.2_confiabilidad.md
+```
+
+A modificar:
+
+```text
+api/app.py
+templates/dashboard.html
+static/js/dashboard.js
+tests/test_dashboard_structure.py
+```
+
+### Restricciones
+
+No modificar validaciones humanas desde este endpoint.
+
+No implementar:
+
+```text
+alarmas automáticas
+modelos predictivos
+reentrenamiento
+```
+
+No modificar:
+
+```text
+samee200.db
+eventos_mantenimiento
+```
+
+No desplegar hacia Raspberry.
+
+### Entrega
+
+Al finalizar presentar:
+
+1. readiness real del periodo;
+2. eventos incluidos y excluidos;
+3. definición y versión metodológica;
+4. MTBF;
+5. MTTR;
+6. ambas disponibilidades;
+7. tasa auxiliar;
+8. estados de censura;
+9. endpoint;
+10. dashboard;
+11. pruebas ejecutadas;
+12. pruebas pendientes;
+13. limitaciones;
+14. confirmación de que no se forzaron KPI cuando faltaban datos.
+
+Detenerse al finalizar.
+
+No avanzar a alarmas sin autorización.
+
 # Instrucción vigente para continuar
 
-La auditoría de 4.2 identificó un bloqueo metodológico.
+La subfase 4.1B se considera implementada y aprobada.
 
 El siguiente trabajo autorizado es únicamente:
 
 ```text
-AUDITORÍA PREVIA DE SUBFASE 4.1B — Persistencia de validaciones humanas y política de uptime validado
+IMPLEMENTAR SUBFASE 4.2 — MTBF, MTTR y disponibilidad técnica
 ```
 
-No implementar MTBF, MTTR ni disponibilidad técnica hasta que exista:
+La implementación debe verificar primero `READY_FOR_RELIABILITY_KPI`.
 
-- al menos una política de uptime aprobada;
-- persistencia humana trazable;
-- datos suficientes;
-- estado `READY_FOR_RELIABILITY_KPI`.
+Si no existe readiness válido, debe devolver KPI nulos y una explicación trazable.
 
 ---
 

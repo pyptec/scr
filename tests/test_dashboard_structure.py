@@ -82,7 +82,7 @@ class DashboardStructureTests(unittest.TestCase):
         self.assertIn("No son fallas confirmadas", self.html)
         self.assertIn("const resumenEventos = eventosData.summary || {}", self.javascript)
 
-    def test_dashboard_exposes_traceable_reconciliation_without_failures(self):
+    def test_dashboard_exposes_traceable_reconciliation_without_treating_events_as_failures(self):
         for identifier in (
             "conciliacionReportadas", "conciliacionDetectadas", "conciliacionAmbas",
             "conciliacionSoloReportadas", "conciliacionSoloDetectadas",
@@ -97,8 +97,6 @@ class DashboardStructureTests(unittest.TestCase):
         self.assertIn("item.reportedDurationMinutes", self.javascript)
         self.assertIn("item.electricalDurationMinutes", self.javascript)
         self.assertIn("item.overlapMinutes", self.javascript)
-        self.assertNotIn("MTBF", self.html)
-        self.assertNotIn("MTTR", self.html)
 
     def test_dashboard_labels_historical_dataset_and_preliminary_baseline(self):
         self.assertIn("DATOS_HISTORICOS_DE_PRUEBA", self.html)
@@ -175,7 +173,7 @@ class DashboardStructureTests(unittest.TestCase):
         self.assertIn('"Variables del gateway"', self.javascript)
         self.assertIn("v.source_type", self.javascript)
 
-    def test_maintenance_view_exposes_suggestions_without_human_writes_or_kpi(self):
+    def test_maintenance_view_exposes_suggestions_without_treating_them_as_confirmed_failures(self):
         for identifier in (
             "mantPendientes", "mantCorrectivas", "mantPreventivos",
             "mantOperacionales", "mantSinDatos", "mantValidados",
@@ -188,8 +186,6 @@ class DashboardStructureTests(unittest.TestCase):
         self.assertIn("Una sugerencia CORRECTIVE_FAILURE tampoco constituye", self.html)
         self.assertIn('moduloActual === "confiabilidad"', self.javascript)
         self.assertIn("/validacion", self.javascript)
-        self.assertNotIn("MTBF", self.html)
-        self.assertNotIn("MTTR", self.html)
 
     def test_maintenance_validation_and_uptime_preparation_are_visible_without_kpi(self):
         for identifier in (
@@ -205,6 +201,22 @@ class DashboardStructureTests(unittest.TestCase):
         self.assertIn('"Idempotency-Key": idempotencyKey()', self.javascript)
         self.assertNotIn("localStorage", self.javascript)
         self.assertNotIn("sessionStorage", self.javascript)
+
+    def test_reliability_kpi_are_gated_and_traceable(self):
+        for identifier in (
+            "relReparacionesCompletas", "relDowntimeValidado", "relMtbf",
+            "relMttr", "relDisponibilidadTiempo", "relDisponibilidadMtbf",
+            "relTasaFallas", "relEstado", "relEstadoDetalle",
+            "tablaConfiabilidad",
+        ):
+            self.assertIn(f'id="{identifier}"', self.html)
+        self.assertIn("/api/mantenimiento/confiabilidad", self.javascript)
+        self.assertIn('data.status === "VALID"', self.javascript)
+        self.assertIn("KPI no disponibles", self.javascript)
+        self.assertIn("event.includedInMtbf", self.javascript)
+        self.assertIn("event.includedInMttr", self.javascript)
+        self.assertNotIn("summary.mtbfHours || 0", self.javascript)
+        self.assertNotIn("summary.mttrHours || 0", self.javascript)
 
 
 if __name__ == "__main__":

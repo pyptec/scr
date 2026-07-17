@@ -45,6 +45,7 @@ from db.aoki_maintenance_validation_store import (
     StoreError,
 )
 from db.aoki_validated_uptime import build_validated_uptime, load_uptime_policy
+from db.aoki_reliability import build_reliability_contract
 
 load_dotenv("/home/pi/SAMEE200/scr/.env")
 
@@ -328,6 +329,21 @@ def api_mantenimiento_uptime_validado():
         (phase2.get("electricalStates") or {}).get("segments", []),
     )
     return jsonify(result)
+
+
+@app.route("/api/mantenimiento/confiabilidad")
+def api_mantenimiento_confiabilidad():
+    inicio, fin, error = _maintenance_range()
+    if error:
+        return error
+    phase2, maintenance = _maintenance_sources(inicio, fin)
+    uptime = build_validated_uptime(
+        inicio, fin,
+        maintenance_store.list_windows(inicio, fin),
+        maintenance["events"],
+        (phase2.get("electricalStates") or {}).get("segments", []),
+    )
+    return jsonify(build_reliability_contract(uptime, maintenance))
 
 
 @app.route("/api/estado")

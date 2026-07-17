@@ -1,0 +1,15 @@
+{
+  "version": "aoki-reliability-method-v1-2026-07",
+  "failureDefinition": "HUMAN_VALIDATED_CORRECTIVE_FAILURE_CURRENT_EVIDENCE",
+  "mtbfMethod": "TOTAL_VALIDATED_UPTIME_PER_CONFIRMED_FAILURE",
+  "mttrMethod": "MEAN_VALIDATED_CORRECTIVE_DOWNTIME",
+  "availabilityMethod": "VALIDATED_TIME_RATIO",
+  "secondaryAvailabilityMethod": "MTBF_MTTR_RATIO",
+  "operatingTimeSource": "VALIDATED_ASSET_UPTIME",
+  "boundaryPolicy": "START_IN_RANGE_FOR_FAILURE_COUNT",
+  "downtimeBoundaryPolicy": "CLIP_TO_QUERY_RANGE",
+  "censoringPolicy": "EXCLUDE_INCOMPLETE_FROM_MTTR",
+  "minimumConfirmedFailures": 1,
+  "minimumFailuresWithDowntime": 1,
+  "availabilityDifferenceTolerancePctPoints": 0.1
+}

@@ -637,9 +637,56 @@ function renderizarVentanasOperacion() {
     });
 }
 
+function valorKpiConUnidad(value, unit, decimals = 3) {
+    return value === null || value === undefined
+        ? "KPI no disponibles"
+        : `${formatearNumero(value, decimals)} ${unit}`;
+}
+
+function renderizarConfiabilidad(data) {
+    const summary = data.summary || {};
+    const valid = data.status === "VALID";
+    document.getElementById("relReparacionesCompletas").innerText =
+        formatearEntero(summary.failuresWithValidatedDowntime);
+    document.getElementById("relDowntimeValidado").innerText =
+        summary.validatedCorrectiveDowntimeHours === null
+            ? "No disponible"
+            : `${formatearNumero(summary.validatedCorrectiveDowntimeHours, 3)} h`;
+    document.getElementById("relMtbf").innerText =
+        valorKpiConUnidad(summary.mtbfHours, "h");
+    document.getElementById("relMttr").innerText =
+        valorKpiConUnidad(summary.mttrHours, "h");
+    document.getElementById("relDisponibilidadTiempo").innerText =
+        valorKpiConUnidad(summary.technicalAvailabilityByTimePct, "%");
+    document.getElementById("relDisponibilidadMtbf").innerText =
+        valorKpiConUnidad(summary.technicalAvailabilityPct, "%");
+    document.getElementById("relTasaFallas").innerText =
+        valorKpiConUnidad(summary.failureRatePer1000Hours, "fallas/1.000 h");
+    document.getElementById("relEstado").innerText = data.status || "--";
+    document.getElementById("relEstadoDetalle").innerText = valid
+        ? `Método ${data.methodology?.reliabilityMethodVersion || "--"}`
+        : `KPI no disponibles · readiness ${data.readinessStatus || "--"}`;
+    const tbody = document.getElementById("tablaConfiabilidad");
+    const events = data.events || [];
+    tbody.innerHTML = events.length
+        ? ""
+        : '<tr><td colspan="12">No existen eventos de mantenimiento en el rango</td></tr>';
+    events.forEach(event => {
+        const row = document.createElement("tr");
+        const start = event.validatedStartUtc === null
+            ? "--"
+            : formatearIsoColombia(new Date(event.validatedStartUtc * 1000).toISOString());
+        const end = event.validatedEndUtc === null
+            ? "--"
+            : formatearIsoColombia(new Date(event.validatedEndUtc * 1000).toISOString());
+        row.innerHTML = `<td>${escaparHtml(event.maintenanceEventId)}</td><td>${escaparHtml(start)}</td><td>${escaparHtml(end)}</td><td>${event.validatedDowntimeMinutes === null ? "No disponible" : formatearNumero(event.validatedDowntimeMinutes, 3)}</td><td>${escaparHtml(event.censoringStatus)}</td><td>${event.includedInMtbf ? "Sí" : "No"}</td><td>${event.includedInMttr ? "Sí" : "No"}</td><td>${event.includedInAvailability ? "Sí" : "No"}</td><td>${escaparHtml(event.evidenceStatus || "--")}</td><td>${escaparHtml((event.exclusionReasons || []).join(", ") || "--")}</td><td>${escaparHtml(event.actorId || "--")}</td><td>${formatearEntero(event.validationVersion)}</td>`;
+        tbody.appendChild(row);
+    });
+}
+
 async function cargarMantenimiento(snapshot = rangoSnapshotActual) {
     snapshot = requerirSnapshot(snapshot);
-    const [data, uptime, ventanas] = await Promise.all([
+    const [data, uptime, ventanas, confiabilidad] = await Promise.all([
         fetchJsonCacheado(
             `/api/mantenimiento/eventos?inicio=${snapshot.inicio}&fin=${snapshot.fin}`,
             snapshot
@@ -650,6 +697,10 @@ async function cargarMantenimiento(snapshot = rangoSnapshotActual) {
         ),
         fetchJsonCacheado(
             `/api/mantenimiento/ventanas-operacion?inicio=${snapshot.inicio}&fin=${snapshot.fin}`,
+            snapshot
+        ),
+        fetchJsonCacheado(
+            `/api/mantenimiento/confiabilidad?inicio=${snapshot.inicio}&fin=${snapshot.fin}`,
             snapshot
         )
     ]);
@@ -681,6 +732,7 @@ async function cargarMantenimiento(snapshot = rangoSnapshotActual) {
     );
     poblarEventosValidacion();
     renderizarVentanasOperacion();
+    renderizarConfiabilidad(confiabilidad);
     renderizarMantenimiento();
 }
 

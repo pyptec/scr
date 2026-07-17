@@ -601,6 +601,14 @@
             <div class="card"><span>Estado para KPI</span><strong id="mantEstadoPreparacion">--</strong><small>4.2 permanece bloqueada salvo READY</small></div>
             <div class="card"><span>Uptime validado</span><strong id="mantUptimeValidado">--</strong><small>horas desde ventanas humanas</small></div>
             <div class="card"><span>Tiempo no resuelto</span><strong id="mantTiempoNoResuelto">--</strong><small>NO_DATA, UNKNOWN o conflictos</small></div>
+            <div class="card"><span>Reparaciones completas</span><strong id="relReparacionesCompletas">--</strong><small>downtime humano validado</small></div>
+            <div class="card"><span>Downtime correctivo validado</span><strong id="relDowntimeValidado">--</strong><small>horas humanas dentro del periodo</small></div>
+            <div class="card"><span>MTBF</span><strong id="relMtbf">--</strong><small>uptime validado / fallas confirmadas</small></div>
+            <div class="card"><span>MTTR</span><strong id="relMttr">--</strong><small>downtime validado / reparaciones completas</small></div>
+            <div class="card"><span>Disponibilidad por tiempo</span><strong id="relDisponibilidadTiempo">--</strong><small>método principal</small></div>
+            <div class="card"><span>Disponibilidad MTBF/MTTR</span><strong id="relDisponibilidadMtbf">--</strong><small>indicador secundario</small></div>
+            <div class="card"><span>Tasa auxiliar por 1.000 h</span><strong id="relTasaFallas">--</strong><small>INDICADOR_AUXILIAR</small></div>
+            <div class="card"><span>Estado metodológico</span><strong id="relEstado">--</strong><small id="relEstadoDetalle">KPI no disponibles</small></div>
         </div>
         <p id="mantTaxonomia" class="periodo-efectivo">Taxonomía: --</p>
         <div class="filtros-grid">
@@ -620,6 +628,14 @@
             <table>
                 <thead><tr><th>ID</th><th>Jornada</th><th>Sugerencia</th><th>Clasificación validada</th><th>Estado</th><th>Causa</th><th>Inicio reportado</th><th>Inicio eléctrico</th><th>Duración reportada</th><th>Duración eléctrica</th><th>Evidencia</th><th>Motivo de revisión</th></tr></thead>
                 <tbody id="tablaMantenimiento"></tbody>
+            </table>
+        </div>
+        <h3>Trazabilidad de confiabilidad</h3>
+        <p class="aviso-metodologico">Los KPI solo se activan con readiness READY_FOR_RELIABILITY_KPI y estado metodológico VALID. No se usan sugerencias, duración eléctrica ni duración reportada sin validación.</p>
+        <div class="tabla-wrapper">
+            <table>
+                <thead><tr><th>ID</th><th>Inicio validado</th><th>Fin validado</th><th>Downtime min</th><th>Censura</th><th>MTBF</th><th>MTTR</th><th>Disponibilidad</th><th>Evidencia</th><th>Exclusión</th><th>Actor</th><th>Versión</th></tr></thead>
+                <tbody id="tablaConfiabilidad"></tbody>
             </table>
         </div>
         <h3>Revisión y validación humana</h3>
