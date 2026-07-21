@@ -92,6 +92,13 @@ class Phase4DashboardIntegrationTests(unittest.TestCase):
         self.assertFalse(result["quality"]["kpiVisible"])
         for field in KPI_FIELDS:
             self.assertIsNone(result["reliability"]["summary"][field])
+        reported = result["reportedReliability"]
+        self.assertFalse(reported["methodology"]["isTechnicalKpi"])
+        self.assertTrue(reported["methodology"]["isPreliminary"])
+        self.assertEqual(reported["summary"]["reportedStopCount"], 13)
+        self.assertEqual(reported["summary"]["suggestedCorrectiveFailureCount"], 5)
+        self.assertEqual(reported["summary"]["reportedStopDurationHours"], 14.5)
+        self.assertEqual(reported["summary"]["reportedPreliminaryMttrHours"], 1.604167)
 
         alert_summary = result["alerts"]["summary"]
         self.assertEqual(alert_summary["deduplicatedAlarmCount"], 236)

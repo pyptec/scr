@@ -53,6 +53,10 @@ from db.aoki_alerts import (
     load_alert_rules,
 )
 from db.fase4_dashboard import build_phase4_dashboard
+from db.aoki_reported_reliability import (
+    build_reported_reliability_contract,
+    reported_events_from_phase2,
+)
 
 load_dotenv("/home/pi/SAMEE200/scr/.env")
 
@@ -386,6 +390,27 @@ def api_fase4_dashboard():
     try:
         return jsonify(build_phase4_dashboard(
             conn, inicio, fin, maintenance_store
+        ))
+    finally:
+        conn.close()
+
+
+@app.route("/api/mantenimiento/confiabilidad-reportada")
+def api_mantenimiento_confiabilidad_reportada():
+    inicio, fin, error = _maintenance_range()
+    if error:
+        return error
+    conn = get_conn()
+    try:
+        phase2 = build_phase2_dashboard(conn, inicio, fin)
+        production = phase2.get("production") or {}
+        return jsonify(build_reported_reliability_contract(
+            reported_events_from_phase2(phase2),
+            (phase2.get("ranges") or {}),
+            actual_reported_operating_hours=production.get(
+                "actualReportedOperatingHours"
+            ),
+            scheduled_reported_hours=production.get("horas_programadas"),
         ))
     finally:
         conn.close()

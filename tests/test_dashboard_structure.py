@@ -216,6 +216,20 @@ class DashboardStructureTests(unittest.TestCase):
         self.assertIn('/api/fase4/dashboard?inicio=', self.javascript)
         app_source = (ROOT / "api" / "app.py").read_text(encoding="utf-8")
         self.assertIn('@app.route("/api/fase4/dashboard")', app_source)
+        self.assertIn(
+            '@app.route("/api/mantenimiento/confiabilidad-reportada")',
+            app_source,
+        )
+        self.assertIn("integrado.reportedReliability", self.javascript)
+        for identifier in (
+            "repRelHorasTotales", "repRelParadas", "repRelCorrectivas",
+            "repRelHorasCorrectivas", "repRelMttr", "repRelMtbf",
+            "repRelDisponibilidad", "repRelCobertura", "repRelNoClasificadas",
+            "repRelEstado", "repRelFuente", "tablaConfiabilidadReportada",
+        ):
+            self.assertIn(f'id="{identifier}"', self.html)
+        self.assertIn("PRELIMINAR_REPORTADO", self.html)
+        self.assertIn("No sustituye KPI técnico", self.html)
         self.assertIn('data.status === "VALID"', self.javascript)
         self.assertIn("KPI no disponibles", self.javascript)
         self.assertIn("event.includedInMtbf", self.javascript)

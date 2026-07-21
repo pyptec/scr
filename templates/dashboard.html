@@ -612,6 +612,26 @@
             <div class="card"><span>Estado metodológico</span><strong id="relEstado">--</strong><small id="relEstadoDetalle">KPI no disponibles</small></div>
         </div>
         <p id="mantTaxonomia" class="periodo-efectivo">Taxonomía: --</p>
+        <h3>Confiabilidad reportada preliminar</h3>
+        <p class="aviso-metodologico">PRELIMINAR_REPORTADO · Basado en texto reportado · Requiere validación humana · No sustituye KPI técnico.</p>
+        <div class="grid-kpi">
+            <div class="card"><span>Horas totales de parada reportada</span><strong id="repRelHorasTotales">--</strong><small>solo duraciones 2.6A válidas</small></div>
+            <div class="card"><span>Paradas reportadas</span><strong id="repRelParadas">--</strong><small>eventos normalizados 2.6A</small></div>
+            <div class="card"><span>Posibles fallas correctivas</span><strong id="repRelCorrectivas">--</strong><small>sugerencias, no fallas confirmadas</small></div>
+            <div class="card"><span>Horas correctivas sugeridas</span><strong id="repRelHorasCorrectivas">--</strong><small>duración reportada válida</small></div>
+            <div class="card"><span>MTTR reportado preliminar</span><strong id="repRelMttr">--</strong><small>no alimenta confiabilidad técnica</small></div>
+            <div class="card"><span>MTBF reportado preliminar</span><strong id="repRelMtbf">--</strong><small>fuente operativa reportada</small></div>
+            <div class="card"><span>Disponibilidad reportada preliminar</span><strong id="repRelDisponibilidad">--</strong><small>método reportado visible</small></div>
+            <div class="card"><span>Cobertura de clasificación</span><strong id="repRelCobertura">--</strong><small>eventos distintos de UNDETERMINED</small></div>
+            <div class="card"><span>Horas no clasificadas</span><strong id="repRelNoClasificadas">--</strong><small>UNDETERMINED</small></div>
+            <div class="card"><span>Estado preliminar</span><strong id="repRelEstado">--</strong><small id="repRelFuente">Fuente: --</small></div>
+        </div>
+        <div class="tabla-wrapper">
+            <table>
+                <thead><tr><th>ID reportado</th><th>Jornada</th><th>Clasificación sugerida</th><th>Duración min</th><th>Incluida</th><th>Estado temporal</th><th>Fragmento 2.6A</th><th>Motivo</th></tr></thead>
+                <tbody id="tablaConfiabilidadReportada"></tbody>
+            </table>
+        </div>
         <div class="filtros-grid">
             <label>Clasificación sugerida
                 <select id="filtroMantSugerencia"><option value="">Todas</option></select>

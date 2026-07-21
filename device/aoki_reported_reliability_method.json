@@ -1,0 +1,15 @@
+{
+  "version": "aoki-reported-reliability-v1-2026-07",
+  "timezone": "America/Bogota",
+  "intervalSemantics": "[start, end)",
+  "classificationCoverageMinimumPct": 80,
+  "validDurationStatuses": ["VALID", "PARTIAL"],
+  "mttrMethod": "MEAN_REPORTED_SUGGESTED_CORRECTIVE_DOWNTIME",
+  "operatingTimePriority": [
+    "ACTUAL_REPORTED_OPERATING_HOURS",
+    "SCHEDULED_REPORTED_MINUS_SUGGESTED_CORRECTIVE"
+  ],
+  "isTechnicalKpi": false,
+  "isPreliminary": true,
+  "requiresHumanValidation": true
+}

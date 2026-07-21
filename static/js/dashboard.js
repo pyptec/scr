@@ -686,6 +686,34 @@ function renderizarConfiabilidad(data) {
     });
 }
 
+function renderizarConfiabilidadReportada(data) {
+    const summary = data.summary || {};
+    const hours = (value, decimals = 3) => value === null || value === undefined
+        ? "No disponible" : `${formatearNumero(value, decimals)} h`;
+    const pct = value => value === null || value === undefined
+        ? "No disponible" : `${formatearNumero(value, 3)} %`;
+    document.getElementById("repRelHorasTotales").innerText = hours(summary.reportedStopDurationHours);
+    document.getElementById("repRelParadas").innerText = formatearEntero(summary.reportedStopCount);
+    document.getElementById("repRelCorrectivas").innerText = formatearEntero(summary.suggestedCorrectiveFailureCount);
+    document.getElementById("repRelHorasCorrectivas").innerText = hours(summary.suggestedCorrectiveDowntimeHours);
+    document.getElementById("repRelMttr").innerText = hours(summary.reportedPreliminaryMttrHours);
+    document.getElementById("repRelMtbf").innerText = hours(summary.reportedPreliminaryMtbfHours);
+    document.getElementById("repRelDisponibilidad").innerText = pct(summary.reportedPreliminaryAvailabilityPct);
+    document.getElementById("repRelCobertura").innerText = pct(summary.classificationCoveragePct);
+    document.getElementById("repRelNoClasificadas").innerText = hours(summary.undeterminedStopHours);
+    document.getElementById("repRelEstado").innerText = data.status || "--";
+    document.getElementById("repRelFuente").innerText =
+        `Fuente: ${data.methodology?.operatingTimeSource || "NO_DISPONIBLE"}`;
+    const tbody = document.getElementById("tablaConfiabilidadReportada");
+    const events = data.events || [];
+    tbody.innerHTML = events.length ? "" : '<tr><td colspan="8">No existen paradas reportadas en el rango</td></tr>';
+    events.forEach(event => {
+        const row = document.createElement("tr");
+        row.innerHTML = `<td>${escaparHtml(event.reportedEventId)}</td><td>${escaparHtml(event.productionDate || "--")}</td><td>${escaparHtml(event.reportedStopSuggestedClassification)}</td><td>${event.reportedDurationMinutes === null ? "No disponible" : formatearNumero(event.reportedDurationMinutes, 3)}</td><td>${event.durationIncluded ? "Sí" : "No"}</td><td>${escaparHtml(event.status || "--")}</td><td>${escaparHtml(event.matchedText || "--")}</td><td>${escaparHtml((event.classificationReasons || []).join(" "))}</td>`;
+        tbody.appendChild(row);
+    });
+}
+
 function renderizarAlarmas() {
     const tipo = document.getElementById("filtroAlarmaTipo").value;
     const severidad = document.getElementById("filtroAlarmaSeveridad").value;
@@ -771,6 +799,7 @@ async function cargarMantenimiento(snapshot = rangoSnapshotActual) {
     const uptime = integrado.uptime || {};
     const ventanas = integrado.validations || {};
     const confiabilidad = integrado.reliability || {};
+    const confiabilidadReportada = integrado.reportedReliability || {};
     const resumen = data.summary || {};
     const sugerencias = resumen.suggestionsByClassification || {};
     document.getElementById("mantPendientes").innerText = formatearEntero(resumen.pendingHumanReview);
@@ -800,6 +829,7 @@ async function cargarMantenimiento(snapshot = rangoSnapshotActual) {
     poblarEventosValidacion();
     renderizarVentanasOperacion();
     renderizarConfiabilidad(confiabilidad);
+    renderizarConfiabilidadReportada(confiabilidadReportada);
     renderizarMantenimiento();
 }
 

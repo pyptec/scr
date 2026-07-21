@@ -8221,17 +8221,680 @@ Presentar:
 
 Detenerse antes de implementar.
 
-# Instrucción vigente para continuar
 
-La subfase 4.3 se considera implementada y aprobada.
 
-El siguiente trabajo autorizado es únicamente:
+# Aprobación de implementación — Subfase 4.4
+
+El diagnóstico previo queda aprobado.
+
+Se autoriza implementar únicamente:
 
 ```text
-AUDITORÍA PREVIA DE SUBFASE 4.4 — Integración final de mantenimiento, confiabilidad y alarmas
+SUBFASE 4.4 — Integración final de mantenimiento, confiabilidad y alarmas
 ```
 
-No crear nuevos modelos ni modificar la base histórica.
+## Alcance
+
+La subfase 4.4 será una capa de composición. No debe crear modelos nuevos ni recalcular MTBF, MTTR, disponibilidad, uptime, alarmas o `maintenanceEventId`.
+
+Ejecutar una sola canalización por solicitud:
+
+```text
+fase 2
+→ mantenimiento 4.1
+→ validaciones 4.1B
+→ uptime 4.1B
+→ confiabilidad 4.2
+→ alarmas 4.3
+→ DTO integrado 4.4
+```
+
+## Reglas obligatorias
+
+- Usar `[inicio, fin)`, `America/Bogota` y jornada 06:00–06:00.
+- Copiar `maintenanceEventId`; no regenerarlo.
+- Solo `CORRECTIVE_FAILURE + HUMAN_VALIDATED + CURRENT` confirma una falla.
+- Si `reliability.status != VALID`, forzar a `null`:
+  - `mtbfHours`
+  - `mttrHours`
+  - `technicalAvailabilityPct`
+  - `technicalAvailabilityByTimePct`
+  - `failureRatePer1000Hours`
+- Exponer `kpiVisible = false` y explicación.
+- No duplicar alarmas de Base 100 ni `SOLO_DETECTADA`.
+- No modificar `samee200.db`, `eventos_mantenimiento` ni la base auxiliar.
+- No desplegar hacia Raspberry.
+
+## Control de mayo
+
+Para:
+
+```text
+2026-05-01 06:00
+a
+2026-06-01 06:00
+```
+
+validar:
+
+```text
+eventos de mantenimiento = 114
+readiness = NO_HUMAN_VALIDATIONS
+fallas confirmadas = 0
+KPI visibles = false
+alarmas deduplicadas = 236
+alarmas abiertas = 236
+fallas derivadas de alarmas = 0
+```
+
+Correlaciones:
+
+```text
+energía + Base 100 = 11
+evento eléctrico + SOLO_DETECTADA = 101
+mantenimiento + conciliación = 114
+NO_DATA + baja cobertura = 3
+```
+
+## Contrato integrado
+
+Exponer:
+
+```text
+ranges
+maintenance
+validations
+uptime
+reliability
+alerts
+methodology
+quality
+```
+
+Normalizar:
+
+```text
+requestedRange
+effectiveRange
+reconciliableRange
+timezone = America/Bogota
+startInclusive = true
+endExclusive = true
+```
+
+## Endpoint
+
+Crear:
+
+```text
+GET /api/fase4/dashboard
+```
+
+Parámetros:
+
+```text
+inicio
+fin
+```
+
+## Adaptador
+
+Crear:
+
+```text
+db/fase4_dashboard.py
+```
+
+Debe:
+
+- ejecutar cada servicio fuente una sola vez;
+- normalizar nombres sin romper contratos previos;
+- aplicar reglas defensivas de visibilidad;
+- validar referencias;
+- exponer versiones metodológicas.
+
+## Dashboard
+
+Consolidar:
+
+```text
+Mantenimiento, confiabilidad y alarmas
+```
+
+Mostrar:
+
+- resumen ejecutivo;
+- eventos pendientes;
+- fallas confirmadas;
+- readiness;
+- uptime;
+- downtime;
+- MTBF;
+- MTTR;
+- disponibilidad;
+- alarmas;
+- advertencias metodológicas.
+
+Para mayo mostrar:
+
+```text
+KPI no disponibles: no existen validaciones humanas
+```
+
+## Calidad
+
+Agregar banderas:
+
+```text
+ORPHAN_REFERENCE
+RANGE_MISMATCH
+VERSION_MISMATCH
+DUPLICATE_EVENT
+KPI_HIDDEN_BY_STATUS
+ALERT_COUNT_MISMATCH
+STALE_VALIDATION
+```
+
+Estados:
+
+```text
+VALID
+DEGRADED
+```
+
+## Archivos autorizados
+
+Nuevos:
+
+```text
+db/fase4_dashboard.py
+tests/test_phase4_dashboard_integration.py
+docs/fase4_subfase4.4_integracion_final.md
+```
+
+A modificar:
+
+```text
+api/app.py
+templates/dashboard.html
+static/js/dashboard.js
+tests/test_dashboard_structure.py
+```
+
+## Pruebas obligatorias
+
+Validar:
+
+1. contrato integrado;
+2. una sola ejecución por servicio;
+3. rango `[inicio, fin)`;
+4. exclusión exacta del fin;
+5. normalización de ranges;
+6. ID estable;
+7. referencia huérfana;
+8. readiness no válido;
+9. KPI forzados a null;
+10. no duplicación Base 100;
+11. no duplicación SOLO_DETECTADA;
+12. 236 alarmas en mayo;
+13. 114 eventos de mantenimiento;
+14. 0 fallas confirmadas;
+15. versiones metodológicas;
+16. hashes de bases iguales antes y después;
+17. `PRAGMA integrity_check = ok`;
+18. no escrituras;
+19. no persistencia de alarmas;
+20. no operaciones sobre Raspberry.
+
+## Entrega
+
+Presentar:
+
+- archivos modificados;
+- canalización;
+- endpoint;
+- contrato;
+- readiness;
+- KPI;
+- alarmas;
+- correlaciones;
+- IDs;
+- versiones;
+- pruebas;
+- tiempos de respuesta;
+- limitaciones;
+- confirmación de cierre o pendientes de fase 4.
+
+Detenerse al finalizar.
+
+
+# Extensión controlada — Variables reportadas de paradas y KPI preliminares
+
+La fase 4 y sus subfases implementadas deben conservarse sin regresiones.
+
+Se autoriza únicamente incorporar al dashboard variables derivadas de las paradas reportadas en texto, manteniendo separación estricta entre:
+
+```text
+dato reportado
+clasificación automática sugerida
+validación humana
+KPI reportado preliminar
+KPI técnico validado
+```
+
+Esta extensión no reemplaza la metodología de confiabilidad técnica ya implementada.
+
+## Objetivo
+
+Aprovechar la información disponible en los reportes de producción y paradas para mostrar:
+
+```text
+horas totales de parada reportada
+horas de parada correctiva sugerida
+horas de mantenimiento preventivo sugerido
+horas de limpieza
+horas de cambio de molde
+horas por falta de material
+horas por calidad
+horas operacionales
+horas no clasificadas
+cantidad de paradas reportadas
+cantidad de posibles fallas correctivas
+MTTR reportado preliminar
+MTBF reportado preliminar
+disponibilidad reportada preliminar
+cobertura de clasificación de paradas
+```
+
+Los indicadores deben quedar claramente etiquetados como `PRELIMINAR_REPORTADO` y no presentarse como KPI técnicos validados.
+
+## Restricciones principales
+
+No modificar:
+
+```text
+samee200.db
+eventos_mantenimiento
+aoki_maintenance_validations.db
+```
+
+No reescribir contratos cerrados de 2.5, 2.6A, 2.6, 2.7, 4.1, 4.1B, 4.2, 4.3 o 4.4.
+
+No desplegar ni escribir nada en la Raspberry.
+
+No reclasificar automáticamente una sugerencia como `HUMAN_VALIDATED`.
+
+No alimentar los KPI técnicos de 4.2 con estas sugerencias.
+
+## Fuente permitida
+
+Consumir exclusivamente el contrato normalizado de paradas reportadas de 2.6A y, cuando exista, su conciliación de 2.6.
+
+Campos permitidos:
+
+```text
+reportedEventId
+productionDate
+rawText
+matchedText
+cause
+reportedStart
+reportedEnd
+reportedDurationMinutes
+temporalSource
+status
+qualityFlags
+reconciliationId
+electricalEventIds
+```
+
+No leer ni interpretar nuevamente el Excel por una ruta paralela si 2.6A ya lo normalizó.
+
+## Clasificación automática conservadora
+
+Crear `reportedStopSuggestedClassification` con valores:
+
+```text
+CORRECTIVE_FAILURE
+PREVENTIVE_MAINTENANCE
+PREDICTIVE_MAINTENANCE
+CLEANING
+CHANGEOVER
+MATERIAL_SHORTAGE
+QUALITY_ADJUSTMENT
+PLANNED_STOP
+OPERATIONAL_STOP
+DATA_QUALITY_EVENT
+OTHER
+UNDETERMINED
+```
+
+La clasificación es solo sugerida. Siempre conservar:
+
+```text
+validatedClassification = null
+validationStatus = PENDING_HUMAN_REVIEW
+```
+
+salvo que ya exista una validación humana real en 4.1B.
+
+## Heurísticas autorizadas
+
+Sugerir `CORRECTIVE_FAILURE` cuando exista evidencia explícita: falla, daño, avería, rotura, escape, no levanta presión, no alcanza presión, cambio de pieza dañada, reparación, booster, empaque dañado o válvula dañada. Siempre `requiresHumanReview = true`.
+
+Sugerir `PREVENTIVE_MAINTENANCE` para engrase, lubricación, mantenimiento preventivo, inspección o ajuste preventivo, solo sin evidencia de daño.
+
+Sugerir `CLEANING` para limpieza, lavado o limpieza de filtros.
+
+Sugerir `CHANGEOVER` para cambio de molde, producto o formato.
+
+Sugerir `MATERIAL_SHORTAGE` para falta de material, sin material o espera de materia prima.
+
+Sugerir `QUALITY_ADJUSTMENT` para ajuste de calidad, rechazo, calibración de producto o ajuste de molde por calidad.
+
+Sugerir `PLANNED_STOP` para programada o parada programada.
+
+Sugerir `OPERATIONAL_STOP` para paradas operacionales sin evidencia de falla.
+
+Los textos mantenimiento, temperatura de aceite, ajuste, cambio de resortes, tratamiento de agua o aditivo de agua, sin evidencia adicional, deben quedar `UNDETERMINED`. También conflictos, causas múltiples o texto insuficiente.
+
+## Duraciones
+
+Usar únicamente `reportedDurationMinutes` cuando sea mayor que cero y el evento tenga estado temporal suficiente `VALID` o `PARTIAL`.
+
+No inventar inicio o fin. No copiar duración eléctrica como duración reportada.
+
+Separar siempre:
+
+```text
+reportedDurationMinutes
+electricalDurationMinutes
+validatedDowntimeMinutes
+```
+
+## Variables agregadas
+
+Crear por rango:
+
+```text
+reportedStopCount
+reportedStopDurationHours
+classifiedReportedStopCount
+unclassifiedReportedStopCount
+classificationCoveragePct
+durationHoursBySuggestedClassification
+countBySuggestedClassification
+suggestedCorrectiveFailureCount
+suggestedCorrectiveDowntimeHours
+preventiveMaintenanceHours
+cleaningHours
+changeoverHours
+materialShortageHours
+qualityAdjustmentHours
+plannedStopHours
+operationalStopHours
+undeterminedStopHours
+```
+
+## MTTR reportado preliminar
+
+Calcular solo cuando existan fallas correctivas sugeridas con duración válida:
+
+```text
+reportedPreliminaryMttrHours =
+suggestedCorrectiveDowntimeHours /
+suggestedCorrectiveFailuresWithDuration
+```
+
+Método:
+
+```text
+MEAN_REPORTED_SUGGESTED_CORRECTIVE_DOWNTIME
+```
+
+No usar en 4.2. Sin duración válida, devolver `null`.
+
+## MTBF reportado preliminar
+
+Solo calcular si existe una fuente reportada explícita de tiempo operativo. No usar automáticamente 744 horas, PRODUCTIVE eléctrico, 24 horas por día o tiempo eléctrico conocido.
+
+Prioridad:
+
+```text
+actualReportedOperatingHours
+```
+
+Alternativa documentada:
+
+```text
+scheduledReportedHours - suggestedCorrectiveDowntimeHours
+```
+
+marcando:
+
+```text
+operatingTimeSource = SCHEDULED_REPORTED_MINUS_SUGGESTED_CORRECTIVE
+qualityFlag = ESTIMATED_REPORTED_OPERATING_TIME
+```
+
+Fórmula:
+
+```text
+reportedPreliminaryMtbfHours =
+reportedOperatingHours /
+suggestedCorrectiveFailureCount
+```
+
+Sin tiempo operativo válido:
+
+```text
+reportedPreliminaryMtbfHours = null
+status = INSUFFICIENT_REPORTED_OPERATING_TIME
+```
+
+## Disponibilidad reportada preliminar
+
+Calcular solo con tiempo operativo reportado y downtime correctivo sugerido:
+
+```text
+reportedPreliminaryAvailabilityPct =
+reportedOperatingHours /
+(reportedOperatingHours + suggestedCorrectiveDowntimeHours)
+* 100
+```
+
+Como alternativa, si existe tiempo programado reportado:
+
+```text
+(scheduledReportedHours - suggestedCorrectiveDowntimeHours) /
+scheduledReportedHours * 100
+```
+
+No mezclar metodologías. Exponer `availabilityMethod` y `operatingTimeSource`.
+
+## Estado metodológico
+
+Estados:
+
+```text
+VALID_PRELIMINARY_REPORTED
+INSUFFICIENT_REPORTED_DURATIONS
+INSUFFICIENT_REPORTED_OPERATING_TIME
+NO_SUGGESTED_CORRECTIVE_FAILURES
+LOW_CLASSIFICATION_COVERAGE
+NO_REPORTED_STOPS
+```
+
+Mantener siempre:
+
+```text
+isTechnicalKpi = false
+isPreliminary = true
+requiresHumanValidation = true
+```
+
+## Configuración y servicio
+
+Crear:
+
+```text
+device/aoki_reported_reliability_method.json
+db/aoki_reported_reliability.py
+```
+
+Versión:
+
+```text
+aoki-reported-reliability-v1-2026-07
+```
+
+Funciones sugeridas:
+
+```text
+classify_reported_stop(...)
+aggregate_reported_stops(...)
+build_reported_reliability_contract(...)
+```
+
+Debe consumir contratos existentes, no tablas paralelas.
+
+## Endpoint
+
+Crear:
+
+```text
+GET /api/mantenimiento/confiabilidad-reportada
+```
+
+Parámetros `inicio` y `fin`.
+
+Respuesta:
+
+```text
+ranges
+status
+summary
+byClassification
+events
+methodology
+quality
+```
+
+## Integración con fase 4
+
+Agregar a `GET /api/fase4/dashboard` un bloque:
+
+```text
+reportedReliability
+```
+
+Conservar separado:
+
+```text
+reliability          -> técnico validado
+reportedReliability  -> preliminar reportado
+```
+
+## Dashboard
+
+Agregar sección:
+
+```text
+Confiabilidad reportada preliminar
+```
+
+Mostrar:
+
+```text
+Horas totales de parada reportada
+Paradas reportadas
+Posibles fallas correctivas
+Horas correctivas sugeridas
+MTTR reportado preliminar
+MTBF reportado preliminar
+Disponibilidad reportada preliminar
+Cobertura de clasificación
+Horas no clasificadas
+```
+
+Etiquetas visibles:
+
+```text
+Preliminar
+Basado en texto reportado
+Requiere validación humana
+No sustituye KPI técnico
+```
+
+Mantener aparte la sección `Confiabilidad técnica validada`.
+
+## Casos de mayo
+
+Auditar especialmente:
+
+```text
+1 de mayo: fallas en el Booster
+4 de mayo: compresor sin alcanzar presión, cambio de pieza y válvula
+13 de mayo: daño de empaques
+14 de mayo: temperatura de aceite
+24 de mayo: escape de agua
+```
+
+No asumir que todos son fallas confirmadas. Verificar duración disponible en 2.6A.
+
+## Pruebas obligatorias
+
+Agregar pruebas para clasificación correctiva, preventiva, limpieza, cambio de molde, material, calidad, parada programada, operacional, texto ambiguo, causas múltiples, duración válida/nula/negativa, MTTR preliminar, MTBF con horas reales y estimadas, MTBF sin tiempo operativo, disponibilidad, cobertura, separación del KPI técnico, `isTechnicalKpi=false`, rango `[inicio, fin)`, exclusión del fin, no uso de duración eléctrica, no uso de PRODUCTIVE, no uso de 24 h/día, no modificación de bases, integración en fase 4, no regresión 4.1–4.4, hashes sin cambios y no operaciones sobre Raspberry.
+
+## Archivos autorizados
+
+Nuevos:
+
+```text
+db/aoki_reported_reliability.py
+device/aoki_reported_reliability_method.json
+tests/test_aoki_reported_reliability.py
+tests/test_aoki_reported_reliability_integration.py
+docs/fase4_extension_confiabilidad_reportada.md
+```
+
+A modificar:
+
+```text
+db/fase4_dashboard.py
+api/app.py
+templates/dashboard.html
+static/js/dashboard.js
+tests/test_dashboard_structure.py
+tests/test_phase4_dashboard_integration.py
+```
+
+## Seguridad e integridad
+
+Antes y después:
+
+- SHA-256 de `samee200.db`;
+- SHA-256 de `aoki_maintenance_validations.db`;
+- `PRAGMA integrity_check = ok`;
+- hashes idénticos.
+
+No crear filas nuevas en bases.
+
+## Entrega
+
+Presentar archivos modificados, reglas, conteos y horas por categoría, paradas correctivas sugeridas, MTTR preliminar, fuente de tiempo operativo, MTBF preliminar, disponibilidad preliminar, cobertura, eventos excluidos, endpoint, integración en fase 4, dashboard, pruebas, hashes y confirmación de que los KPI técnicos no fueron alterados.
+
+Detenerse al finalizar.
+
+# Instrucción vigente para continuar
+
+Implementar únicamente:
+
+```text
+EXTENSIÓN CONTROLADA — Confiabilidad reportada preliminar basada en paradas de texto
+```
+
+No alterar los KPI técnicos validados de 4.2 ni los contratos cerrados existentes.
 
 ---
 

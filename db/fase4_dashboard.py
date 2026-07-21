@@ -9,6 +9,10 @@ from db.aoki_maintenance_events import (
     merge_human_validations,
 )
 from db.aoki_reliability import build_reliability_contract
+from db.aoki_reported_reliability import (
+    build_reported_reliability_contract,
+    reported_events_from_phase2,
+)
 from db.aoki_validated_uptime import build_validated_uptime
 from db.fase2_dashboard import build_phase2_dashboard
 
@@ -89,6 +93,15 @@ def build_phase4_dashboard(conn, start_utc, end_utc, validation_store):
     )
     reliability = _gated_reliability(reliability_source)
     ranges = _normalized_ranges(phase2, start, end)
+    production = phase2.get("production") or {}
+    reported_reliability = build_reported_reliability_contract(
+        reported_events_from_phase2(phase2),
+        ranges,
+        actual_reported_operating_hours=production.get(
+            "actualReportedOperatingHours"
+        ),
+        scheduled_reported_hours=production.get("horas_programadas"),
+    )
     kpi_visible = reliability["kpiVisible"]
 
     return {
@@ -106,6 +119,7 @@ def build_phase4_dashboard(conn, start_utc, end_utc, validation_store):
         },
         "uptime": uptime,
         "reliability": reliability,
+        "reportedReliability": reported_reliability,
         "alerts": alerts,
         "methodology": {
             "pipeline": [
@@ -122,6 +136,9 @@ def build_phase4_dashboard(conn, start_utc, end_utc, validation_store):
                 reliability.get("methodology") or {}
             ).get("reliabilityMethodVersion"),
             "alertRulesVersion": alerts.get("rulesVersion"),
+            "reportedReliabilityMethodVersion": (
+                reported_reliability.get("methodology") or {}
+            ).get("version"),
             "maintenanceEventIdSource": "MAINTENANCE_4_1_UNCHANGED",
             "recalculatesApprovedKpi": False,
             "recalculatesApprovedAlerts": False,
