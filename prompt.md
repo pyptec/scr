@@ -7479,17 +7479,759 @@ Antes de modificar código, presentar:
 
 Detenerse antes de implementar.
 
+
+
+# Aprobación de implementación — Subfase 4.3
+
+El diagnóstico previo de la subfase 4.3 queda aprobado.
+
+Se autoriza implementar únicamente:
+
+```text
+SUBFASE 4.3 — Alarmas operacionales, energéticas y de mantenimiento
+```
+
+La primera implementación será de lectura y generación determinista en memoria. No se autoriza todavía persistencia, reconocimiento, resolución, supresión ni notificaciones externas.
+
+## Reglas autorizadas
+
+### Energía
+
+```text
+ENERGY_OVERCONSUMPTION
+```
+
+Regla:
+
+```text
+día evaluable
+AND deviationPct > 3.64
+```
+
+Severidad:
+
+```text
+WARNING
+```
+
+Correlacionar con `BASE100_HIGH` del mismo día. Debe existir un solo episodio energético, no dos alarmas independientes.
+
+```text
+ENERGY_FAVORABLE_DEVIATION
+```
+
+Regla:
+
+```text
+día evaluable
+AND deviationPct < -3.64
+```
+
+Severidad:
+
+```text
+INFO
+```
+
+Correlacionar con `BASE100_LOW` del mismo día.
+
+### Calidad de datos
+
+```text
+LOW_ENERGY_COVERAGE
+```
+
+Regla:
+
+```text
+energyCoveragePct < 98
+```
+
+Severidad:
+
+```text
+WARNING
+```
+
+```text
+LOW_STATE_COVERAGE
+```
+
+Regla:
+
+```text
+stateCoveragePct < 98
+```
+
+Severidad:
+
+```text
+WARNING
+```
+
+```text
+NO_DATA_PROLONGED
+```
+
+Regla:
+
+```text
+segmento NO_DATA > 20 minutos
+```
+
+Severidad:
+
+```text
+WARNING
+```
+
+Correlacionar con baja cobertura diaria cuando pertenezcan al mismo episodio.
+
+### Operación
+
+```text
+ELECTRICAL_IDLE_EVENT
+```
+
+Regla:
+
+```text
+evento eléctrico validado por persistencia
+AND dominantState = IDLE
+```
+
+Severidad:
+
+```text
+INFO
+```
+
+No llamar falla.
+
+```text
+ELECTRICAL_OFF_EVENT
+```
+
+Regla:
+
+```text
+dominantState = OFF
+```
+
+Severidad:
+
+```text
+WARNING
+```
+
+No llamar falla.
+
+```text
+UNREPORTED_ELECTRICAL_EVENT
+```
+
+Regla:
+
+```text
+reconciliation.classification = SOLO_DETECTADA
+```
+
+Severidad:
+
+```text
+WARNING
+```
+
+Debe correlacionarse con el evento eléctrico correspondiente para evitar doble conteo.
+
+```text
+REPORTED_STOP_NOT_DETECTED
+```
+
+Regla:
+
+```text
+reconciliation.classification = SOLO_REPORTADA
+```
+
+Severidad:
+
+```text
+WARNING
+```
+
+### Mantenimiento
+
+```text
+MAINTENANCE_REVIEW_REQUIRED
+```
+
+Regla:
+
+```text
+validationStatus = PENDING_HUMAN_REVIEW
+```
+
+Severidad:
+
+```text
+INFO
+```
+
+Correlacionar con conciliación pendiente cuando compartan IDs fuente.
+
+```text
+STALE_MAINTENANCE_EVIDENCE
+```
+
+Regla:
+
+```text
+evidenceStatus = STALE_SOURCE_EVIDENCE
+```
+
+Severidad:
+
+```text
+WARNING
+```
+
+### Confiabilidad
+
+```text
+RELIABILITY_KPI_UNAVAILABLE
+```
+
+Regla:
+
+```text
+reliability.status != VALID
+```
+
+Severidad:
+
+```text
+INFO
+```
+
+Emitir una sola por consulta y correlacionar con evidencia obsoleta o falta de validaciones cuando aplique.
+
+## Reglas no autorizadas
+
+No implementar todavía:
+
+```text
+CUSUM_UNFAVORABLE_ACCUMULATION
+CUSUM_FAVORABLE_ACCUMULATION
+LOW_TECHNICAL_AVAILABILITY
+MTBF_DEGRADATION
+MTTR_DEGRADATION
+GATEWAY_DATA_STALE
+GATEWAY_HIGH_TEMPERATURE
+```
+
+Motivo:
+
+- no existen parámetros CUSUM calibrados;
+- no existen metas versionadas de confiabilidad;
+- no existen umbrales versionados del gateway.
+
+## Configuración versionada
+
+Crear:
+
+```text
+device/aoki_alert_rules.json
+```
+
+Versión inicial:
+
+```text
+aoki-alert-rules-v1-2026-07
+```
+
+Debe contener:
+
+```text
+enabled
+severity
+ruleVersion
+deduplicationWindow
+expirationPolicy
+correlationPolicy
+sourceModule
+requiresHumanReview
+```
+
+No incluir reglas deshabilitadas como activas.
+
+## Identidad estable
+
+Crear:
+
+```text
+alarmId =
+alarm-{sha256(
+  alarmType
+  + canonicalSourceEntityIds
+  + ruleVersion
+  + naturalRange
+)}
+```
+
+Usar rango natural del día o evento.
+
+No usar el rango completo arbitrario de la consulta.
+
+Crear:
+
+```text
+deduplicationKey
+correlationKey
+```
+
+Deduplicaciones obligatorias:
+
+1. `ENERGY_OVERCONSUMPTION` + `BASE100_HIGH` del mismo día → un episodio.
+2. `ENERGY_FAVORABLE_DEVIATION` + `BASE100_LOW` del mismo día → un episodio.
+3. `ELECTRICAL_IDLE_EVENT`/`ELECTRICAL_OFF_EVENT` + `SOLO_DETECTADA` del mismo evento → un episodio operacional.
+4. `PENDIENTE_REVISION` + `MAINTENANCE_REVIEW_REQUIRED` con mismos IDs → una cadena de revisión.
+5. `NO_DATA_PROLONGED` + `LOW_STATE_COVERAGE` del mismo día → correlación de calidad, sin fusionar evidencia.
+
+## Ciclo de vida
+
+En esta implementación todas las alarmas derivadas deben tener:
+
+```text
+status = OPEN
+```
+
+No implementar:
+
+```text
+ACKNOWLEDGED
+RESOLVED
+SUPPRESSED
+EXPIRED
+```
+
+como cambios persistentes.
+
+No crear todavía:
+
+```text
+data/aoki_alerts.db
+```
+
+## Servicio
+
+Crear:
+
+```text
+db/aoki_alerts.py
+```
+
+Debe consumir contratos existentes y no recalcular indicadores cerrados.
+
+No acceder directamente a SQLite salvo a través de servicios ya validados.
+
+Preferir funciones puras por fuente:
+
+```text
+build_energy_alerts(...)
+build_quality_alerts(...)
+build_operational_alerts(...)
+build_maintenance_alerts(...)
+build_reliability_alerts(...)
+build_alert_contract(...)
+```
+
+## Contrato
+
+Cada alarma debe incluir:
+
+```text
+alarmId
+alarmType
+severity
+status
+title
+description
+detectedAtUtc
+rangeStartUtc
+rangeEndUtc
+sourceModule
+sourceEntityIds
+ruleId
+ruleVersion
+observedValue
+thresholdValue
+unit
+evidence
+qualityFlags
+deduplicationKey
+correlationKey
+requiresHumanReview
+maintenanceEventId
+```
+
+## Endpoints autorizados
+
+Implementar:
+
+```text
+GET /api/alarmas
+GET /api/alarmas/{alarmId}
+GET /api/alarmas/reglas
+```
+
+Filtros:
+
+```text
+inicio
+fin
+tipo
+severidad
+estado
+modulo
+correlationKey
+```
+
+No implementar endpoints de escritura.
+
+## Dashboard
+
+Activar módulo:
+
+```text
+Alarmas
+```
+
+Mostrar tarjetas:
+
+```text
+Alarmas abiertas
+Advertencias
+Informativas
+Calidad de datos
+Energéticas
+Operacionales
+Mantenimiento
+Confiabilidad
+Pendientes de revisión
+```
+
+No mostrar críticas si no existen reglas críticas activas.
+
+Tabla:
+
+```text
+fecha
+tipo
+severidad
+estado
+descripción
+valor observado
+umbral
+fuente
+evidencia
+entidad relacionada
+regla y versión
+correlationKey
+```
+
+## Control de mayo
+
+Usar:
+
+```text
+inicio = 2026-05-01 06:00 America/Bogota
+fin exclusivo = 2026-06-01 06:00 America/Bogota
+```
+
+Controles candidatos:
+
+```text
+9 días desfavorables
+2 días favorables
+3 días con LOW_STATE_COVERAGE
+4 segmentos NO_DATA > 20 minutos
+103 eventos IDLE
+0 eventos OFF
+101 SOLO_DETECTADA
+0 SOLO_REPORTADA
+114 revisiones humanas pendientes
+0 evidencias obsoletas
+1 alarma informativa de confiabilidad no disponible
+```
+
+El total deduplicado de 236 es un control provisional, no una aceptación rígida. La implementación debe documentar el conteo real por regla y por episodio correlacionado.
+
+## Pruebas obligatorias
+
+Agregar pruebas para:
+
+1. desviación desfavorable;
+2. desviación favorable;
+3. Base 100 correlacionado;
+4. cobertura energética baja;
+5. cobertura de estados baja;
+6. NO_DATA prolongado;
+7. IDLE;
+8. OFF;
+9. SOLO_DETECTADA;
+10. SOLO_REPORTADA;
+11. revisión de mantenimiento;
+12. evidencia obsoleta;
+13. confiabilidad no disponible;
+14. severidades versionadas;
+15. identidad estable;
+16. rango natural;
+17. deduplicación energética;
+18. deduplicación operacional;
+19. correlación de mantenimiento;
+20. correlación de calidad;
+21. rango `[inicio, fin)`;
+22. exclusión exacta del fin;
+23. datos insuficientes;
+24. no conversión a falla;
+25. no CUSUM calibrado;
+26. no metas de confiabilidad;
+27. no gateway sin umbrales;
+28. no persistencia;
+29. no endpoints POST;
+30. no notificaciones externas;
+31. no modificación de base histórica;
+32. no operaciones sobre Raspberry.
+
+## Archivos autorizados
+
+Nuevos:
+
+```text
+db/aoki_alerts.py
+device/aoki_alert_rules.json
+tests/test_aoki_alerts.py
+tests/test_aoki_alerts_integration.py
+docs/fase4_subfase4.3_alarmas.md
+```
+
+A modificar:
+
+```text
+api/app.py
+templates/dashboard.html
+static/js/dashboard.js
+tests/test_dashboard_structure.py
+```
+
+## Restricciones
+
+No crear:
+
+```text
+data/aoki_alerts.db
+```
+
+No implementar:
+
+```text
+ack
+resolve
+suppress
+notificaciones por correo
+notificaciones SMS
+notificaciones push
+webhooks
+```
+
+No modificar:
+
+```text
+samee200.db
+eventos_mantenimiento
+```
+
+No desplegar hacia Raspberry.
+
+## Entrega
+
+Al finalizar presentar:
+
+1. archivos modificados;
+2. reglas activas;
+3. reglas deshabilitadas;
+4. configuración y versión;
+5. conteos brutos;
+6. conteos deduplicados;
+7. correlaciones;
+8. endpoint;
+9. dashboard;
+10. pruebas ejecutadas;
+11. pruebas pendientes;
+12. limitaciones;
+13. confirmación de que no existe persistencia ni notificaciones externas.
+
+Detenerse al finalizar.
+
+
+
+## Subfase 4.4 — Integración final de mantenimiento, confiabilidad y alarmas
+
+La subfase 4.3 se considera implementada y aprobada.
+
+La siguiente subfase autorizada es únicamente la auditoría previa de 4.4.
+
+### Objetivo
+
+Integrar de forma coherente y trazable:
+
+- 4.1 Taxonomía y clasificación de mantenimiento.
+- 4.1B Validaciones humanas y uptime validado.
+- 4.2 MTBF, MTTR y disponibilidad técnica.
+- 4.3 Alarmas operacionales, energéticas y de mantenimiento.
+
+No crear modelos analíticos nuevos.
+
+### Reglas obligatorias
+
+- Todos los módulos históricos deben usar `[inicio, fin)`, `America/Bogota` y jornada 06:00–06:00.
+- `maintenanceEventId` debe ser estable y compartido entre mantenimiento, validaciones, confiabilidad y alarmas.
+- Una alarma no modifica una validación.
+- Una validación humana no reescribe eventos fuente.
+- Los KPI solo se muestran cuando `reliability.status = VALID`.
+- Sin readiness válido, los KPI deben permanecer en `null` con explicación visible.
+- No duplicar alarmas energéticas con Base 100, ni eventos eléctricos con `SOLO_DETECTADA`.
+- No mostrar MTBF=0, MTTR=0, disponibilidad=100 % ni fallas confirmadas desde sugerencias.
+
+### Contrato integrado propuesto
+
+```text
+ranges
+maintenance
+validations
+uptime
+reliability
+alerts
+methodology
+quality
+```
+
+### Endpoint propuesto
+
+```text
+GET /api/fase4/dashboard
+```
+
+Parámetros:
+
+```text
+inicio
+fin
+```
+
+### Dashboard final
+
+Consolidar:
+
+- resumen ejecutivo;
+- eventos pendientes;
+- fallas correctivas confirmadas;
+- uptime validado;
+- downtime correctivo validado;
+- MTBF;
+- MTTR;
+- disponibilidad técnica;
+- alarmas abiertas;
+- advertencias metodológicas.
+
+### Auditoría previa obligatoria
+
+Antes de modificar código, verificar:
+
+1. contratos reales disponibles;
+2. diferencias de nombres y estructuras;
+3. duplicaciones de consultas o cálculos;
+4. inconsistencias de rango;
+5. inconsistencias de IDs;
+6. readiness real;
+7. KPI reales o nulos;
+8. conteos de alarmas;
+9. versiones metodológicas;
+10. trazabilidad completa;
+11. archivos previstos;
+12. criterios de cierre de fase 4.
+
+### Prueba obligatoria de mayo
+
+Usar:
+
+```text
+inicio = 2026-05-01 06:00 America/Bogota
+fin exclusivo = 2026-06-01 06:00 America/Bogota
+```
+
+Verificar:
+
+- mismos eventos de 4.1;
+- mismas validaciones de 4.1B;
+- mismo readiness;
+- mismos KPI de 4.2;
+- mismas alarmas deduplicadas de 4.3;
+- exclusión exacta del fin;
+- ausencia de duplicación entre módulos.
+
+### Archivos previstos
+
+Preferencia:
+
+Nuevos:
+
+```text
+db/fase4_dashboard.py
+tests/test_phase4_dashboard_integration.py
+docs/fase4_subfase4.4_integracion_final.md
+```
+
+Posibles modificaciones:
+
+```text
+api/app.py
+templates/dashboard.html
+static/js/dashboard.js
+tests/test_dashboard_structure.py
+```
+
+### Entrega del diagnóstico previo
+
+Presentar:
+
+1. contratos disponibles;
+2. incompatibilidades;
+3. duplicaciones;
+4. rangos;
+5. IDs;
+6. readiness;
+7. KPI;
+8. alarmas;
+9. archivos previstos;
+10. riesgos;
+11. criterios de cierre;
+12. confirmación de que no se crearon nuevos modelos.
+
+Detenerse antes de implementar.
+
 # Instrucción vigente para continuar
 
-La subfase 4.2 se considera implementada y aprobada.
+La subfase 4.3 se considera implementada y aprobada.
 
 El siguiente trabajo autorizado es únicamente:
 
 ```text
-AUDITORÍA PREVIA DE SUBFASE 4.3 — Alarmas operacionales, energéticas y de mantenimiento
+AUDITORÍA PREVIA DE SUBFASE 4.4 — Integración final de mantenimiento, confiabilidad y alarmas
 ```
 
-No implementar todavía persistencia, reconocimiento, resolución ni notificaciones externas.
+No crear nuevos modelos ni modificar la base histórica.
 
 ---
 

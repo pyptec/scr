@@ -181,7 +181,7 @@ class DashboardStructureTests(unittest.TestCase):
             "filtroMantSugerencia", "filtroMantValidacion",
         ):
             self.assertIn(f'id="{identifier}"', self.html)
-        self.assertIn("/api/mantenimiento/eventos", self.javascript)
+        self.assertIn("/api/fase4/dashboard", self.javascript)
         self.assertIn("PENDING_HUMAN_REVIEW", self.html)
         self.assertIn("Una sugerencia CORRECTIVE_FAILURE tampoco constituye", self.html)
         self.assertIn('moduloActual === "confiabilidad"', self.javascript)
@@ -195,7 +195,7 @@ class DashboardStructureTests(unittest.TestCase):
             "tablaVentanasOperacion", "mantGuardarVentana",
         ):
             self.assertIn(f'id="{identifier}"', self.html)
-        self.assertIn("/api/mantenimiento/preparacion-kpi", self.javascript)
+        self.assertIn("integrado.uptime", self.javascript)
         self.assertIn("/api/mantenimiento/ventanas-operacion", self.javascript)
         self.assertIn('"Authorization": `Bearer ${token}`', self.javascript)
         self.assertIn('"Idempotency-Key": idempotencyKey()', self.javascript)
@@ -210,7 +210,12 @@ class DashboardStructureTests(unittest.TestCase):
             "tablaConfiabilidad",
         ):
             self.assertIn(f'id="{identifier}"', self.html)
-        self.assertIn("/api/mantenimiento/confiabilidad", self.javascript)
+        self.assertIn("integrado.reliability", self.javascript)
+
+    def test_phase4_views_use_integrated_dashboard_contract(self):
+        self.assertIn('/api/fase4/dashboard?inicio=', self.javascript)
+        app_source = (ROOT / "api" / "app.py").read_text(encoding="utf-8")
+        self.assertIn('@app.route("/api/fase4/dashboard")', app_source)
         self.assertIn('data.status === "VALID"', self.javascript)
         self.assertIn("KPI no disponibles", self.javascript)
         self.assertIn("event.includedInMtbf", self.javascript)
@@ -229,7 +234,7 @@ class DashboardStructureTests(unittest.TestCase):
             self.assertIn(f'id="{identifier}"', self.html)
         self.assertIn('data-module-target="alarmas"', self.html)
         self.assertIn('moduloActual === "alarmas"', self.javascript)
-        self.assertIn("/api/alarmas?inicio=", self.javascript)
+        self.assertIn("integrado.alerts", self.javascript)
         self.assertIn("correlatedAlarmTypes", self.javascript)
         self.assertIn("no equivale a una falla", self.html)
         alert_loader = self.javascript.split(

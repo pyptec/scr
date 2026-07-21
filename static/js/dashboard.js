@@ -666,7 +666,8 @@ function renderizarConfiabilidad(data) {
     document.getElementById("relEstado").innerText = data.status || "--";
     document.getElementById("relEstadoDetalle").innerText = valid
         ? `Método ${data.methodology?.reliabilityMethodVersion || "--"}`
-        : `KPI no disponibles · readiness ${data.readinessStatus || "--"}`;
+        : data.kpiExplanation
+            || `KPI no disponibles · readiness ${data.readinessStatus || "--"}`;
     const tbody = document.getElementById("tablaConfiabilidad");
     const events = data.events || [];
     tbody.innerHTML = events.length
@@ -730,9 +731,10 @@ function poblarFiltrosAlarmas() {
 
 async function cargarAlarmas(snapshot = rangoSnapshotActual) {
     snapshot = requerirSnapshot(snapshot);
-    const data = await fetchJsonCacheado(
-        `/api/alarmas?inicio=${snapshot.inicio}&fin=${snapshot.fin}`, snapshot
+    const integrado = await fetchJsonCacheado(
+        `/api/fase4/dashboard?inicio=${snapshot.inicio}&fin=${snapshot.fin}`, snapshot
     );
+    const data = integrado.alerts || {};
     alarmasActuales = data.alarms || [];
     const summary = data.summary || {};
     const severity = summary.bySeverity || {};
@@ -762,24 +764,13 @@ async function cargarAlarmas(snapshot = rangoSnapshotActual) {
 
 async function cargarMantenimiento(snapshot = rangoSnapshotActual) {
     snapshot = requerirSnapshot(snapshot);
-    const [data, uptime, ventanas, confiabilidad] = await Promise.all([
-        fetchJsonCacheado(
-            `/api/mantenimiento/eventos?inicio=${snapshot.inicio}&fin=${snapshot.fin}`,
-            snapshot
-        ),
-        fetchJsonCacheado(
-            `/api/mantenimiento/preparacion-kpi?inicio=${snapshot.inicio}&fin=${snapshot.fin}`,
-            snapshot
-        ),
-        fetchJsonCacheado(
-            `/api/mantenimiento/ventanas-operacion?inicio=${snapshot.inicio}&fin=${snapshot.fin}`,
-            snapshot
-        ),
-        fetchJsonCacheado(
-            `/api/mantenimiento/confiabilidad?inicio=${snapshot.inicio}&fin=${snapshot.fin}`,
-            snapshot
-        )
-    ]);
+    const integrado = await fetchJsonCacheado(
+        `/api/fase4/dashboard?inicio=${snapshot.inicio}&fin=${snapshot.fin}`, snapshot
+    );
+    const data = integrado.maintenance || {};
+    const uptime = integrado.uptime || {};
+    const ventanas = integrado.validations || {};
+    const confiabilidad = integrado.reliability || {};
     const resumen = data.summary || {};
     const sugerencias = resumen.suggestionsByClassification || {};
     document.getElementById("mantPendientes").innerText = formatearEntero(resumen.pendingHumanReview);
@@ -801,7 +792,7 @@ async function cargarMantenimiento(snapshot = rangoSnapshotActual) {
     document.getElementById("mantTaxonomia").innerText =
         `Taxonomía: ${data.taxonomyVersion || "--"} · validaciones humanas separadas y trazables`;
     mantenimientoActual = data.events || [];
-    ventanasOperacionActuales = ventanas.windows || [];
+    ventanasOperacionActuales = ventanas.operatingWindows || [];
     poblarFiltroConciliacion(
         "filtroMantSugerencia",
         mantenimientoActual.map(evento => evento.suggestedClassification)

@@ -52,6 +52,7 @@ from db.aoki_alerts import (
     find_alert,
     load_alert_rules,
 )
+from db.fase4_dashboard import build_phase4_dashboard
 
 load_dotenv("/home/pi/SAMEE200/scr/.env")
 
@@ -374,6 +375,20 @@ def _alert_contract(inicio, fin):
     return build_alert_contract(
         phase2, performance, base100, maintenance, reliability
     )
+
+
+@app.route("/api/fase4/dashboard")
+def api_fase4_dashboard():
+    inicio, fin, error = _maintenance_range()
+    if error:
+        return error
+    conn = get_conn()
+    try:
+        return jsonify(build_phase4_dashboard(
+            conn, inicio, fin, maintenance_store
+        ))
+    finally:
+        conn.close()
 
 
 @app.route("/api/alarmas/reglas")
