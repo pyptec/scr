@@ -18,9 +18,9 @@ medidorsamee100/
 # =========================
 # Variables de entorno / secretos
 # =========================
-#.env
-# *.env
-#*.csv
+.env
+*.env
+
 # =========================
 # Certificados y llaves AWS / TLS
 # =========================
@@ -39,8 +39,15 @@ data/*.db-shm
 *.db
 *.db-wal
 *.db-shm
+
 # Mantener carpeta data vacía en Git
 !data/.gitkeep
+
+# =========================
+# Archivos CSV de datos
+# =========================
+*.csv
+
 # =========================
 # Backups locales
 # =========================
@@ -52,7 +59,6 @@ backups/
 # Reportes generados
 # =========================
 *.xlsx
-#*.csv
 
 # =========================
 # Logs
