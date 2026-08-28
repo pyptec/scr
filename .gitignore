@@ -39,8 +39,18 @@ data/*.db-shm
 *.db
 *.db-wal
 *.db-shm
+
 # Mantener carpeta data vacía en Git
 !data/.gitkeep
+
+# =========================
+# Importaciones / datasets locales
+# =========================
+data/import_mediciones/
+# =========================
+# Capturas RAW locales
+# =========================
+data/j1939_captures/
 # =========================
 # Backups locales
 # =========================
@@ -77,3 +87,5 @@ Thumbs.db
 tmp/
 temp/
 *.tmp
+# Capturas RAW locales (se descargan/gestionan fuera de Git)
+data/j1939_captures/

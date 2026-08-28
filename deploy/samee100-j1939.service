@@ -1,0 +1,15 @@
+[Unit]
+Description=SAMEE100 passive J1939 edge service
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/SAMEE100/scr
+EnvironmentFile=/home/pi/SAMEE100/scr/.env
+ExecStart=/home/pi/SAMEE100/bin/python /home/pi/SAMEE100/scr/services/j1939_can_service.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

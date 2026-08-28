@@ -1322,3 +1322,78 @@ cargarVariablesReporte();
 actualizarTodo();
 
 setInterval(actualizarTodo, 30000);
+
+/* =========================
+   J1939 PASIVO
+========================= */
+let j1939Timer = null;
+
+function j1939Esc(value) {
+    return String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+}
+
+async function j1939Request(path, options = {}) {
+    const response = await fetch(path, {headers: {'Content-Type': 'application/json'}, ...options});
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+    return data;
+}
+
+async function actualizarJ1939() {
+    const section = document.getElementById('j1939Section');
+    if (!section) return;
+    try {
+        const [status, signalsData, framesData, capture, filesData] = await Promise.all([
+            j1939Request('/api/j1939/status'), j1939Request('/api/j1939/signals'),
+            j1939Request('/api/j1939/frames/recent'), j1939Request('/api/j1939/capture/status'),
+            j1939Request('/api/j1939/captures')
+        ]);
+        section.hidden = false;
+        document.getElementById('j1939BusState').textContent = status.connected ? 'ONLINE' : 'OFFLINE';
+        document.getElementById('j1939FrameCount').textContent = status.framesReceived ?? 0;
+        const frames = framesData.frames || [], last = frames[frames.length - 1];
+        document.getElementById('j1939LastFrame').textContent = last?.timestampUtc || '--';
+        document.getElementById('j1939LastPgn').textContent = last?.pgn || '--';
+        document.getElementById('j1939LastSa').textContent = last?.sourceAddress || '--';
+        const signals = signalsData.signals || [];
+        document.getElementById('j1939Signals').innerHTML = signals.length ? signals.map(s => `
+            <article class="j1939-signal">
+                <span>${j1939Esc(s.name)}</span><strong>${s.value === null ? s.quality : j1939Esc(s.value)} ${j1939Esc(s.unit)}</strong>
+                <small>${j1939Esc(s.quality)} · ${j1939Esc(s.confidence)} · PGN ${j1939Esc(s.pgn)} · ${j1939Esc(s.timestampUtc)}</small>
+            </article>`).join('') : '<div class="j1939-empty">NO_DATA</div>';
+        document.getElementById('j1939CaptureStatus').textContent = capture.captureActive
+            ? `CAPTURANDO · ${capture.capturedFrames} frames · ${capture.droppedCaptureFrames} descartados · ${capture.captureElapsedSeconds}s`
+            : `Captura inactiva${capture.captureLimitReason ? ` · ${capture.captureLimitReason}` : ''}`;
+        document.getElementById('j1939CaptureFiles').innerHTML = (filesData.captures || []).map(f =>
+            `<a class="j1939-download" href="/api/j1939/captures/${encodeURIComponent(f.captureId)}/download">Descargar ${j1939Esc(f.fileName)} (${f.sizeBytes} bytes)</a>`
+        ).join('');
+        if (!j1939Timer) j1939Timer = setInterval(actualizarJ1939, 5000);
+    } catch (error) {
+        if (error.message === 'J1939_DISABLED') {
+            section.hidden = true;
+            if (j1939Timer) { clearInterval(j1939Timer); j1939Timer = null; }
+        } else {
+            section.hidden = false;
+            document.getElementById('j1939BusState').textContent = 'UNAVAILABLE';
+        }
+    }
+}
+
+async function j1939CaptureAction(action, body = {}) {
+    try {
+        await j1939Request(`/api/j1939/capture/${action}`, {method: 'POST', body: JSON.stringify(body)});
+        await actualizarJ1939();
+    } catch (error) { alert(`J1939: ${error.message}`); }
+}
+
+function j1939StartCapture() {
+    j1939CaptureAction('start', {note: document.getElementById('j1939CaptureNote').value,
+        durationSeconds: Number(document.getElementById('j1939CaptureDuration').value)});
+}
+function j1939StopCapture() { j1939CaptureAction('stop'); }
+function j1939MarkCapture() {
+    const note = prompt('Descripción del evento observado:');
+    if (note) j1939CaptureAction('marker', {note});
+}
+
+if (document.getElementById('j1939Section')) actualizarJ1939();

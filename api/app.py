@@ -15,6 +15,10 @@ from flask import jsonify
 import os
 from dotenv import load_dotenv
 import util
+import json
+import re
+import urllib.error
+import urllib.request
 
 load_dotenv("/home/pi/SAMEE100/scr/.env")
 
@@ -27,6 +31,90 @@ app = Flask(
 )
 
 init_db()
+
+
+# J1939 es un proceso separado. Este bloque solo hace proxy a localhost y no
+# inicia hilos, abre puertos seriales ni toca SQLite.
+J1939_CAPTURE_ID = re.compile(r"^j1939_capture_\d{8}_\d{6}Z$")
+
+
+def _j1939_enabled():
+    return os.getenv("J1939_ENABLED", "false").strip().lower() in {"1", "true", "yes", "si", "on"}
+
+
+def _j1939_proxy(path, method="GET", body=None):
+    if not _j1939_enabled():
+        return jsonify({"enabled": False, "error": "J1939_DISABLED"}), 503
+    port = int(os.getenv("J1939_LOCAL_API_PORT", "8765"))
+    data = json.dumps(body or {}).encode("utf-8") if method == "POST" else None
+    request_local = urllib.request.Request(
+        f"http://127.0.0.1:{port}{path}", data=data, method=method,
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request_local, timeout=3) as response:
+            return jsonify(json.loads(response.read().decode("utf-8"))), response.status
+    except urllib.error.HTTPError as exc:
+        try:
+            payload = json.loads(exc.read().decode("utf-8"))
+        except Exception:
+            payload = {"error": "J1939_SERVICE_ERROR"}
+        return jsonify(payload), exc.code
+    except (OSError, ValueError) as exc:
+        return jsonify({"enabled": True, "error": "J1939_SERVICE_UNAVAILABLE", "detail": str(exc)}), 503
+
+
+@app.route("/api/j1939/status")
+def api_j1939_status():
+    return _j1939_proxy("/api/j1939/status")
+
+
+@app.route("/api/j1939/signals")
+def api_j1939_signals():
+    return _j1939_proxy("/api/j1939/signals")
+
+
+@app.route("/api/j1939/signals/<key>")
+def api_j1939_signal(key):
+    if not re.fullmatch(r"[a-z0-9_]{1,80}", key):
+        return jsonify({"error": "SIGNAL_NOT_FOUND"}), 404
+    return _j1939_proxy(f"/api/j1939/signals/{key}")
+
+
+@app.route("/api/j1939/frames/recent")
+def api_j1939_frames_recent():
+    return _j1939_proxy("/api/j1939/frames/recent")
+
+
+@app.route("/api/j1939/capture/status")
+def api_j1939_capture_status():
+    return _j1939_proxy("/api/j1939/capture/status")
+
+
+@app.route("/api/j1939/captures")
+def api_j1939_captures():
+    return _j1939_proxy("/api/j1939/captures")
+
+
+@app.route("/api/j1939/capture/<action>", methods=["POST"])
+def api_j1939_capture_action(action):
+    if action not in {"start", "stop", "marker"}:
+        return jsonify({"error": "NOT_FOUND"}), 404
+    body = request.get_json(silent=True) or {}
+    return _j1939_proxy(f"/api/j1939/capture/{action}", "POST", body)
+
+
+@app.route("/api/j1939/captures/<capture_id>/download")
+def api_j1939_capture_download(capture_id):
+    if not _j1939_enabled():
+        return jsonify({"error": "J1939_DISABLED"}), 503
+    if not J1939_CAPTURE_ID.fullmatch(capture_id):
+        return jsonify({"error": "CAPTURE_NOT_FOUND"}), 404
+    base = BASE_DIR / os.getenv("J1939_CAPTURE_DIR", "data/j1939_captures")
+    target = base / f"{capture_id}.txt"
+    if not target.is_file():
+        return jsonify({"error": "CAPTURE_NOT_FOUND"}), 404
+    return send_file(target, as_attachment=True, download_name=target.name, mimetype="text/plain")
 
 
 def obtener_config_dashboard_desde_yml():
@@ -394,7 +482,7 @@ def api_serie(unit_id):
     }
 @app.route("/dashboard")
 def dashboard():
-    return render_template("dashboard.html")    
+    return render_template("dashboard.html", j1939_enabled=_j1939_enabled())
 
 @app.route("/api/energia/dia")
 def api_energia_dia():

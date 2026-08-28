@@ -1,0 +1,115 @@
+version: samee100-j1939-signals-v1
+publish:
+  heartbeat_seconds: 600
+signals:
+  - key: engine_speed
+    name: RPM del motor
+    pgn: F004
+    spn: 190
+    start_byte: 4
+    bit_length: 16
+    byte_order: little
+    signed: false
+    scale: 0.125
+    offset: 0
+    unit: rpm
+    minimum: 0
+    maximum: 3000
+    source: alkosto_reference
+    enabled: true
+    confidence: CONFIRMED
+    change_threshold: 0.125
+    invalid_raw_values: [65535]
+    description: SAE J1939 EEC1; contrato confirmado en la referencia.
+  - key: coolant_temperature
+    name: Temperatura de refrigerante
+    pgn: FEEE
+    spn: 110
+    start_byte: 1
+    bit_length: 8
+    byte_order: little
+    signed: false
+    scale: 1
+    offset: -40
+    unit: "°C"
+    minimum: -40
+    maximum: 210
+    source: alkosto_reference
+    enabled: true
+    confidence: CONFIRMED
+    change_threshold: 1
+    invalid_raw_values: [255]
+    description: SAE J1939 Engine Temperature 1.
+  - key: engine_total_hours
+    name: Horas totales de motor
+    pgn: FEE5
+    spn: 247
+    start_byte: 1
+    bit_length: 32
+    byte_order: little
+    signed: false
+    scale: 0.05
+    offset: 0
+    unit: h
+    minimum: 0
+    maximum: 214748364.75
+    source: alkosto_reference
+    enabled: true
+    confidence: CONFIRMED
+    change_threshold: 0.05
+    invalid_raw_values: [4294967295]
+    description: SAE J1939 Engine Hours/Revolutions.
+  - key: dc_voltage_field_1
+    name: Campo de voltaje DC 1
+    pgn: FEF7
+    spn: null
+    start_byte: 5
+    bit_length: 16
+    byte_order: little
+    signed: false
+    scale: 0.05
+    offset: 0
+    unit: V
+    minimum: 0
+    maximum: 40
+    source: alkosto_reference
+    enabled: true
+    confidence: PROBABLE
+    change_threshold: 0.05
+    invalid_raw_values: [65535]
+    description: Función física pendiente; no se etiqueta como batería.
+  - key: dc_voltage_field_2
+    name: Campo de voltaje DC 2
+    pgn: FEF7
+    spn: null
+    start_byte: 7
+    bit_length: 16
+    byte_order: little
+    signed: false
+    scale: 0.05
+    offset: 0
+    unit: V
+    minimum: 0
+    maximum: 40
+    source: alkosto_reference
+    enabled: false
+    confidence: UNKNOWN
+    change_threshold: 0.05
+    invalid_raw_values: [65535]
+    description: Campo numérico observado, función exacta pendiente.
+  - key: generator_frequency_candidate
+    name: Campo candidato de frecuencia
+    pgn: FE06
+    spn: null
+    start_byte: 1
+    bit_length: 16
+    byte_order: little
+    signed: false
+    scale: 0.2
+    offset: 0
+    unit: Hz
+    source: alkosto_reference
+    enabled: false
+    confidence: PROBABLE
+    invalid_raw_values: [65535]
+    description: Deshabilitada por contratos contradictorios en la referencia.

@@ -268,6 +268,46 @@
         </table>
     </div>
 
+    {% if j1939_enabled %}
+    <section id="j1939Section" class="j1939-panel mt" hidden>
+        <div class="j1939-heading">
+            <div>
+                <h3>Grupo electrógeno / J1939</h3>
+                <p>Recepción pasiva CAN. No hay transmisión ni control remoto.</p>
+            </div>
+            <span id="j1939BusState" class="j1939-badge">SIN DATOS</span>
+        </div>
+        <div class="j1939-summary">
+            <span>Última trama: <strong id="j1939LastFrame">--</strong></span>
+            <span>PGN: <strong id="j1939LastPgn">--</strong></span>
+            <span>Source address: <strong id="j1939LastSa">--</strong></span>
+            <span>Frames: <strong id="j1939FrameCount">0</strong></span>
+        </div>
+        <div id="j1939Signals" class="j1939-signals">
+            <div class="j1939-empty">NO_DATA</div>
+        </div>
+        <div class="j1939-capture">
+            <h4>Captura RAW manual</h4>
+            <div class="j1939-controls">
+                <label>Duración
+                    <select id="j1939CaptureDuration">
+                        <option value="300">5 min</option><option value="600">10 min</option>
+                        <option value="1800">30 min</option><option value="3600">60 min</option>
+                    </select>
+                </label>
+                <label>Nota
+                    <input id="j1939CaptureNote" maxlength="500" placeholder="Evento o condición de la prueba">
+                </label>
+                <button type="button" onclick="j1939StartCapture()">Iniciar captura CAN</button>
+                <button type="button" onclick="j1939StopCapture()">Detener captura</button>
+                <button type="button" onclick="j1939MarkCapture()">Marcar evento</button>
+            </div>
+            <p id="j1939CaptureStatus">Captura inactiva</p>
+            <div id="j1939CaptureFiles"></div>
+        </div>
+    </section>
+    {% endif %}
+
 </div>
 
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
