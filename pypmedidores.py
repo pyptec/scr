@@ -565,30 +565,7 @@ def main_loop():
                 tempHora = TIMECHECK_USB_ETHERNET_TIME
                 util.check_usb_connection()
                 
-        '''
-        with shared.mensaje_lock:
-            if shared.mensaje_recibido:
-                mensaje = shared.mensaje_recibido
-                shared.mensaje_recibido = None
-                try:
-                    data = json.loads(mensaje)
-                    comando_mensaje = data.get("message", "")
-                    util.logging.warning("Msj MQTT: "+ comando_mensaje )
-                    
-                    if comando_mensaje == "disconnect":
-               #         tunel_watcher.cerrar_tunel()
-                        util.logging.info("Túnel cerrado correctamente.")
-                        
-                    elif comando_mensaje.startswith("connect|"):
-                  #      ip = comando_mensaje.split("|")[1]
-                   #     tunel_watcher.set_destino(ip)
-                    #    tunel_watcher.run_ssh()
-                        util.logging.info(f"msj mqtt ...")
-                    else:
-                       util.logging.warning(f"Comando no reconocido: {comando_mensaje}")
-                except Exception as e:
-                    util.logging.error(f"Error al procesar el mensaje MQTT: {e}")
-'''
+        
 # Punto de entrada principal
 if __name__ == '__main__':
     main_loop()

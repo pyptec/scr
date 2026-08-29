@@ -21,7 +21,7 @@ medidores:
       ubicacion: "Gabinete SAMEE100"
       cliente: "PANELES"
       
-    port: "/dev/ttyUSB0"
+    port: "/dev/ttyS0" #"/dev/ttyUSB0"
     debug: False #True #False #
     slave_id: 8
     baudrate: 19200
