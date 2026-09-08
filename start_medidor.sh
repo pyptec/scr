@@ -1,6 +1,6 @@
 #!/bin/bash
 # Activar entorno virtual
-source /home/pi/SAMEE100/bin/activate
+source /home/pi/medidorsamee100/bin/activate
 
 # Esperar 5 segundos antes de ejecutar el script en Python
 sleep 5
