@@ -24,16 +24,27 @@ class J1939Runtime:
         self.settings = settings
         self.decoder = SignalDecoder(config["signals"])
         self.state = SignalState(heartbeat, settings["recent_frame_limit"])
-        self.state.configure_transport(settings["transport"], settings.get("serial_device") or settings.get("replay_file"))
+        device = settings.get("can_interface") if settings["transport"] == "socketcan" else settings.get("serial_device") or settings.get("replay_file")
+        self.state.configure_transport(settings["transport"], device)
+        capture_metadata = {
+            "transport": settings["transport"], "device": device,
+            "can_bitrate": settings["can_bitrate"],
+            "signal_config_version": config.get("version", ""),
+        }
+        if settings["transport"] == "socketcan":
+            capture_metadata["interface"] = settings.get("can_interface")
+        elif settings["transport"] == "serial":
+            capture_metadata["serial_baudrate"] = settings.get("serial_baudrate")
         self.capture = CaptureManager(
             Path(settings["capture_dir"]), max_duration_seconds=settings["capture_max_duration_seconds"],
             max_file_mb=settings["capture_max_file_mb"], max_files=settings["capture_max_files"],
-            queue_size=settings["capture_queue_size"], metadata={
-                "transport": settings["transport"], "device": settings.get("serial_device") or settings.get("replay_file"),
-                "serial_baudrate": settings.get("serial_baudrate"), "can_bitrate": settings["can_bitrate"],
-                "signal_config_version": config.get("version", ""),
-            },
+            queue_size=settings["capture_queue_size"], metadata=capture_metadata,
         )
+
+    def status(self) -> dict[str, Any]:
+        result = self.state.status()
+        result["droppedCaptureFrames"] = self.capture.status()["droppedCaptureFrames"]
+        return result
 
     def process(self, frame) -> list[dict[str, Any]]:
         known = bool(frame.j1939 and frame.j1939.pgn in self.decoder.known_pgns)
@@ -71,7 +82,7 @@ def make_handler(runtime: J1939Runtime):
 
         def do_GET(self):
             path = unquote(self.path.split("?", 1)[0])
-            if path == "/api/j1939/status": return self._json(runtime.state.status())
+            if path == "/api/j1939/status": return self._json(runtime.status())
             if path == "/api/j1939/signals": return self._json({"signals": runtime.state.signals()})
             if path.startswith("/api/j1939/signals/"):
                 key = path.rsplit("/", 1)[-1]; item = next((x for x in runtime.state.signals() if x["key"] == key), None)

@@ -15,21 +15,25 @@ class SignalState:
         self._signals: dict[str, dict[str, Any]] = {}
         self._recent: deque[dict[str, Any]] = deque(maxlen=recent_limit)
         self._status = {
-            "connected": False, "transport": None, "device": None, "lastFrameAt": None,
+            "enabled": True, "connected": False, "transport": None, "device": None,
+            "lastFrameAt": None, "lastFrameTimestamp": None,
             "framesReceived": 0, "framesDecoded": 0, "unknownPgnCount": 0,
-            "decodeErrorCount": 0, "serialReconnectCount": 0, "signalsChanged": 0,
+            "decodeErrorCount": 0, "transportReconnectCount": 0,
+            "serialReconnectCount": 0, "signalsChanged": 0,
             "heartbeatPublishes": 0,
         }
 
     def configure_transport(self, transport: str, device: str | None) -> None:
         with self._lock:
-            self._status.update(transport=transport, device=device)
+            self._status.update(transport=transport, device=device, interface=device if transport == "socketcan" else None)
 
     def set_connected(self, connected: bool, reconnect: bool = False) -> None:
         with self._lock:
             self._status["connected"] = connected
             if reconnect:
-                self._status["serialReconnectCount"] += 1
+                self._status["transportReconnectCount"] += 1
+                if self._status["transport"] == "serial":
+                    self._status["serialReconnectCount"] += 1
 
     def record_frame(self, frame: CanFrame, known: bool) -> None:
         with self._lock:
@@ -37,6 +41,7 @@ class SignalState:
             self._recent.append(item)
             self._status["framesReceived"] += 1
             self._status["lastFrameAt"] = item["timestampUtc"]
+            self._status["lastFrameTimestamp"] = item["timestampUtc"]
             if not known:
                 self._status["unknownPgnCount"] += 1
 

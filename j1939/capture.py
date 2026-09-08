@@ -83,11 +83,16 @@ class CaptureManager:
             f"# operator_note: {self._note}",
             f"# transport: {self.metadata.get('transport', '')}",
             f"# device: {self.metadata.get('device', '')}",
-            f"# serial_baudrate: {self.metadata.get('serial_baudrate', '')}",
+        ]
+        if self.metadata.get("interface"):
+            rows.append(f"# interface: {self.metadata['interface']}")
+        if self.metadata.get("serial_baudrate") is not None:
+            rows.append(f"# serial_baudrate: {self.metadata['serial_baudrate']}")
+        rows.extend([
             f"# can_bitrate: {self.metadata.get('can_bitrate', '')}",
             f"# signal_config_version: {self.metadata.get('signal_config_version', '')}",
             "timestamp_utc,can_id,extended,dlc,data,pgn,source_address",
-        ]
+        ])
         return "\n".join(rows) + "\n"
 
     def offer(self, frame: CanFrame) -> None:

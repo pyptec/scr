@@ -15,6 +15,13 @@ def env_bool(name: str, default: bool = False) -> bool:
     return os.getenv(name, str(default)).strip().lower() in {"1", "true", "yes", "si", "on"}
 
 
+def load_project_env(base_dir: Path) -> bool:
+    """Carga el .env del proyecto sin sobrescribir el entorno del servicio."""
+    from dotenv import load_dotenv
+
+    return bool(load_dotenv(dotenv_path=base_dir / ".env", override=False))
+
+
 def load_yaml(path: str | Path) -> dict[str, Any]:
     try:
         value = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
@@ -43,6 +50,7 @@ def runtime_settings(base_dir: Path) -> dict[str, Any]:
     return {
         "enabled": env_bool("J1939_ENABLED", False),
         "transport": os.getenv("J1939_TRANSPORT", "serial").strip().lower(),
+        "can_interface": os.getenv("J1939_CAN_INTERFACE", "can0").strip(),
         "serial_device": os.getenv("J1939_SERIAL_DEVICE", "").strip(),
         "serial_baudrate": int(os.getenv("J1939_SERIAL_BAUDRATE", "115200")),
         "replay_file": os.getenv("J1939_REPLAY_FILE", "").strip(),
@@ -55,6 +63,6 @@ def runtime_settings(base_dir: Path) -> dict[str, Any]:
         "capture_max_file_mb": float(os.getenv("J1939_CAPTURE_MAX_FILE_MB", "50")),
         "capture_max_files": int(os.getenv("J1939_CAPTURE_MAX_FILES", "20")),
         "capture_queue_size": int(os.getenv("J1939_CAPTURE_QUEUE_SIZE", "2000")),
-        "can_bitrate": int(os.getenv("J1939_BITRATE", "250000")),
+        "can_bitrate": int(os.getenv("J1939_CAN_BITRATE", os.getenv("J1939_BITRATE", "250000"))),
         "signal_file": base_dir / os.getenv("J1939_SIGNAL_CONFIG", "config/j1939_signals.yml"),
     }
