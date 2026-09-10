@@ -364,3 +364,68 @@ medidores:
         readWrite: "R"
         unit: 157
         alias: Angle3
+
+      # =========================
+      # PHASE L1 POWER FACTOR 
+      # =========================
+      - name: Phase L1 power factor
+        address: 30
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 70
+        alias: PowerFactor1
+      - name: Phase L2 power factor
+        address: 32
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 71
+        alias: PowerFactor2
+      - name: Phase L3 power factor
+        address: 34
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 72
+        alias: PowerFactor3
+      - name: Total system power factor
+        address: 62
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 73
+        alias: PowerFactorTotal
+
+      # =========================
+      # PHASE  APPARENT POWER VA
+      # =========================
+      - name: Phase 1 apparent power
+        address: 18
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 66
+        alias: ApparentPower1
+      - name: Phase 2 apparent power
+        address: 20
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 67
+        alias: ApparentPower2   
+      - name: Phase 3 apparent power
+        address: 22
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 68
+        alias: ApparentPower3 
+
+      - name: Total system volt-ampere
+        address: 56
+        fc: 4
+        type: float32
+        readWrite: "R"
+        unit: 69
+        alias: ApparentPowerTotal    
