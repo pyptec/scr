@@ -21,7 +21,7 @@ medidores:
       ubicacion: "Tablero solar"
      
       
-    port: "/dev/ttyUSB0"
+    port: "/dev/ttyS0"
     debug: False
     slave_id: 1
     baudrate: 19200
