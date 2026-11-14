@@ -89,3 +89,13 @@ temp/
 *.tmp
 # Capturas RAW locales (se descargan/gestionan fuera de Git)
 data/j1939_captures/
+
+# Prompt 02: secretos y variantes SQLite locales (sin alterar reglas previas)
+.env
+*.env
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
