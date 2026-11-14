@@ -1,0 +1,54 @@
+{
+  "notice": "REFERENCIA SAMEE100-ALKOSTO. NO ACTIVAR hasta confirmar IDs, calibracion y revision operativa. No es evidencia de activacion.",
+  "gateway_id": "samee100-alkosto",
+  "detector": {
+    "equipment_id": "samee100-alkosto-grupo-01",
+    "source_address": 234,
+    "rpm_start": 600,
+    "rpm_stop": 100,
+    "rpm_max": 3000,
+    "start_samples": 3,
+    "stop_samples": 3,
+    "start_seconds": 2,
+    "stop_seconds": 2,
+    "timeout_seconds": 5,
+    "max_sample_gap_seconds": 2,
+    "max_sample_age_seconds": 1
+  },
+  "database": "/var/lib/samee100-j1939/engine.sqlite",
+  "signal_sources": {
+    "engine_speed": 234
+  },
+  "recorder": {
+    "queue_size": 256,
+    "flush_seconds": 5,
+    "retry_seconds": 0.25,
+    "hourmeter_validated": false
+  },
+  "evidence": {
+    "directory": "/var/lib/samee100-j1939/raw",
+    "pre_seconds": 60,
+    "post_seconds": 60,
+    "max_confirmation_seconds": 30,
+    "max_buffer_frames": 10000,
+    "queue_size": 2048,
+    "max_file_bytes": 52428800,
+    "max_total_bytes": 1073741824,
+    "min_free_bytes": 104857600,
+    "max_files": 200,
+    "segment_seconds": 3600,
+    "retention_enabled": false
+  },
+  "_activation_review": {
+    "identifiers_confirmed": false,
+    "thresholds_calibrated": false,
+    "field_rate_validated": false,
+    "source_evidence": "Prompt06: F004/SPN190/EA y RPM0 reportados por operador; sin validacion fisica START/STOP",
+    "unconfirmed_sources": [
+      "FEEE",
+      "FEF7",
+      "FEE5"
+    ],
+    "status": "REFERENCE_ONLY_PENDING_OPERATOR_REVIEW"
+  }
+}
