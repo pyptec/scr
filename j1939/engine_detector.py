@@ -151,6 +151,18 @@ class EngineDetector:
     def last_confirmed_state(self) -> EngineState:
         return self._last_confirmed
 
+    @property
+    def last_valid_timestamp_utc(self) -> datetime | None:
+        """Evidencia aceptada; permite adaptar persistencia sin repetir validación."""
+        return self._last_stamp
+
+    def require_reconciliation(self) -> None:
+        """Interrumpe evidencia continua sin rejuvenecer el timeout ni borrar historia."""
+        self._baseline = EngineState.UNKNOWN
+        self._clear_candidate()
+        if self._state != EngineState.COMM_LOST:
+            self._state = EngineState.UNKNOWN
+
     def _now(self) -> tuple[float, datetime]:
         now, utc = self.clock.monotonic(), self.clock.utcnow()
         if not _finite(now) or (self._last_tick is not None and now < self._last_tick):

@@ -1327,21 +1327,55 @@ setInterval(actualizarTodo, 30000);
    J1939 PASIVO
 ========================= */
 let j1939Timer = null;
+let j1939Busy = false;
+const j1939Monitor = new J1939Diagnostics.RpmMonitor();
+let j1939SelectedSource = null;
+let j1939LastStatus = null;
+let j1939Unavailable = true;
 
 function j1939Esc(value) {
     return String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 }
 
 async function j1939Request(path, options = {}) {
-    const response = await fetch(path, {headers: {'Content-Type': 'application/json'}, ...options});
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
-    return data;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3500);
+    try {
+        const response = await fetch(path, {headers: {'Content-Type': 'application/json'}, ...options, signal: controller.signal});
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+        return data;
+    } finally { clearTimeout(timeout); }
+}
+
+function j1939RenderDiagnostics() {
+    const section = document.getElementById('j1939Section');
+    if (!section) return;
+    const staleSeconds = Number(section.dataset.staleSeconds) || 15;
+    const now = Date.now();
+    const select = document.getElementById('j1939RpmSource');
+    const sources = [...j1939Monitor.sources.keys()].sort();
+    if (j1939SelectedSource === null && sources.length) j1939SelectedSource = sources[0];
+    select.innerHTML = sources.length ? sources.map(sa =>
+        `<option value="${sa}"${sa === j1939SelectedSource ? ' selected' : ''}>SA ${sa}</option>`
+    ).join('') : '<option value="">Sin origen observado</option>';
+    const view = j1939Monitor.view(j1939SelectedSource, now, staleSeconds, j1939Unavailable);
+    const text = (id, value) => { document.getElementById(id).textContent = value; };
+    text('j1939RpmValue', view.rpm === null ? 'Sin dato válido reciente' : `${view.rpm} rpm`);
+    text('j1939RpmTimestamp', view.timestampUtc ?? '--');
+    text('j1939RpmPgnSpn', `PGN ${view.pgn} / SPN ${view.spn}`);
+    text('j1939RpmAge', view.lastValidAge === null ? 'Sin muestra válida observada' : `${view.lastValidAge.toFixed(1)} s`);
+    text('j1939RpmQuality', view.quality);
+    text('j1939RpmCommunication', view.communication);
+    const bus = j1939Unavailable ? 'API no disponible' : J1939Diagnostics.busState(j1939LastStatus, now, staleSeconds);
+    text('j1939BusState', bus);
+    text('j1939CanCell', bus);
 }
 
 async function actualizarJ1939() {
     const section = document.getElementById('j1939Section');
-    if (!section) return;
+    if (!section || document.hidden || j1939Busy) return;
+    j1939Busy = true;
     try {
         const [status, signalsData, framesData, capture, filesData] = await Promise.all([
             j1939Request('/api/j1939/status'), j1939Request('/api/j1939/signals'),
@@ -1349,17 +1383,19 @@ async function actualizarJ1939() {
             j1939Request('/api/j1939/captures')
         ]);
         section.hidden = false;
-        document.getElementById('j1939BusState').textContent = status.connected ? 'ONLINE' : 'OFFLINE';
+        j1939Unavailable = false;
+        j1939LastStatus = status;
         document.getElementById('j1939FrameCount').textContent = status.framesReceived ?? 0;
         const frames = framesData.frames || [], last = frames[frames.length - 1];
-        document.getElementById('j1939LastFrame').textContent = last?.timestampUtc || '--';
+        document.getElementById('j1939LastFrame').textContent = status.lastFrameAt || last?.timestampUtc || '--';
         document.getElementById('j1939LastPgn').textContent = last?.pgn || '--';
         document.getElementById('j1939LastSa').textContent = last?.sourceAddress || '--';
-        const signals = signalsData.signals || [];
+        const signals = Array.isArray(signalsData.signals) ? signalsData.signals : [];
+        j1939Monitor.observe(signals, Date.now());
         document.getElementById('j1939Signals').innerHTML = signals.length ? signals.map(s => `
             <article class="j1939-signal">
-                <span>${j1939Esc(s.name)}</span><strong>${s.value === null ? s.quality : j1939Esc(s.value)} ${j1939Esc(s.unit)}</strong>
-                <small>${j1939Esc(s.quality)} · ${j1939Esc(s.confidence)} · PGN ${j1939Esc(s.pgn)} · ${j1939Esc(s.timestampUtc)}</small>
+                <span>${j1939Esc(s.name)}</span><strong>${J1939Diagnostics.validNumber(s) ? j1939Esc(s.value) + ' ' + j1939Esc(s.unit) : 'Sin dato válido'}</strong>
+                <small>${j1939Esc(s.quality)} · ${j1939Esc(s.confidence)} · SA ${j1939Esc(s.sourceAddress)} · PGN ${j1939Esc(s.pgn)} · ${j1939Esc(s.timestampUtc)}</small>
             </article>`).join('') : '<div class="j1939-empty">NO_DATA</div>';
         document.getElementById('j1939CaptureStatus').textContent = capture.captureActive
             ? `CAPTURANDO · ${capture.capturedFrames} frames · ${capture.droppedCaptureFrames} descartados · ${capture.captureElapsedSeconds}s`
@@ -1367,15 +1403,19 @@ async function actualizarJ1939() {
         document.getElementById('j1939CaptureFiles').innerHTML = (filesData.captures || []).map(f =>
             `<a class="j1939-download" href="/api/j1939/captures/${encodeURIComponent(f.captureId)}/download">Descargar ${j1939Esc(f.fileName)} (${f.sizeBytes} bytes)</a>`
         ).join('');
-        if (!j1939Timer) j1939Timer = setInterval(actualizarJ1939, 5000);
     } catch (error) {
+        j1939Unavailable = true;
         if (error.message === 'J1939_DISABLED') {
             section.hidden = true;
             if (j1939Timer) { clearInterval(j1939Timer); j1939Timer = null; }
         } else {
             section.hidden = false;
-            document.getElementById('j1939BusState').textContent = 'UNAVAILABLE';
+            document.getElementById('j1939Signals').textContent = 'Datos no actualizados: API no disponible';
+            document.getElementById('j1939CaptureStatus').textContent = 'Estado de captura no actualizado';
         }
+    } finally {
+        j1939Busy = false;
+        j1939RenderDiagnostics();
     }
 }
 
@@ -1396,4 +1436,18 @@ function j1939MarkCapture() {
     if (note) j1939CaptureAction('marker', {note});
 }
 
-if (document.getElementById('j1939Section')) actualizarJ1939();
+function j1939SyncPolling() {
+    if (j1939Timer) { clearInterval(j1939Timer); j1939Timer = null; }
+    if (!document.hidden) {
+        j1939Timer = setInterval(actualizarJ1939, 5000);
+        actualizarJ1939();
+    }
+}
+if (document.getElementById('j1939Section')) {
+    document.getElementById('j1939RpmSource').addEventListener('change', event => {
+        j1939SelectedSource = event.target.value || null;
+        j1939RenderDiagnostics();
+    });
+    document.addEventListener('visibilitychange', j1939SyncPolling);
+    j1939SyncPolling();
+}

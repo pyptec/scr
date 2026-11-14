@@ -269,7 +269,7 @@
     </div>
 
     {% if j1939_enabled %}
-    <section id="j1939Section" class="j1939-panel mt" hidden>
+    <section id="j1939Section" class="j1939-panel mt" data-stale-seconds="15" hidden>
         <div class="j1939-heading">
             <div>
                 <h3>Grupo electrógeno / J1939</h3>
@@ -283,8 +283,34 @@
             <span>Source address: <strong id="j1939LastSa">--</strong></span>
             <span>Frames: <strong id="j1939FrameCount">0</strong></span>
         </div>
+        <h4>Últimas señales decodificadas</h4>
+        <p class="j1939-note">Valores de última adquisición; consulte calidad, origen y fecha. El diagnóstico RPM indica su vigencia.</p>
         <div id="j1939Signals" class="j1939-signals">
             <div class="j1939-empty">NO_DATA</div>
+        </div>
+        <div class="j1939-diagnostics">
+            <h4>Diagnóstico RPM por origen CAN</h4>
+            <label>Origen observado
+                <select id="j1939RpmSource" aria-label="Dirección de origen RPM"><option value="">Sin origen observado</option></select>
+            </label>
+            <p class="j1939-note">Seleccione la ECU observada; su correspondencia con el motor requiere validación física. La lista conserva solo muestras consultadas en esta página.</p>
+            <div class="j1939-signals">
+                <article class="j1939-signal"><span>RPM actual</span><strong id="j1939RpmValue">Sin dato válido reciente</strong><small id="j1939RpmPgnSpn">PGN F004 / SPN 190</small></article>
+                <article class="j1939-signal"><span>Última actualización RPM (UTC)</span><strong id="j1939RpmTimestamp">--</strong><small id="j1939RpmQuality">Sin dato validado</small></article>
+                <article class="j1939-signal"><span>Desde última muestra válida observada</span><strong id="j1939RpmAge">Sin muestra válida observada</strong><small id="j1939RpmCommunication">Sin muestra RPM</small></article>
+                <article class="j1939-signal"><span>Comunicación CAN</span><strong id="j1939CanCell">Sin recepción verificable</strong><small>Recepción general; no confirma funcionamiento del motor.</small></article>
+                <article class="j1939-signal"><span>Estado confirmado del motor</span><strong>Sin dato validado</strong><small>Detector sin integrar; parámetros pendientes de validación física.</small></article>
+                <article class="j1939-signal"><span>Voltaje de batería</span><strong>Sin dato validado</strong><small>El campo DC disponible no está identificado como batería.</small></article>
+                <article class="j1939-signal"><span>Tensión AC L1-L2</span><strong>Sin dato validado</strong></article>
+                <article class="j1939-signal"><span>Tensión AC L2-L3</span><strong>Sin dato validado</strong></article>
+                <article class="j1939-signal"><span>Tensión AC L1-L3</span><strong>Sin dato validado</strong></article>
+                <article class="j1939-signal"><span>Frecuencia del generador</span><strong>Sin dato validado</strong></article>
+                <article class="j1939-signal"><span>Potencia o carga</span><strong>Sin dato validado</strong></article>
+                <article class="j1939-signal"><span>Último arranque</span><strong>Sin dato validado</strong><small>Pendiente de persistencia.</small></article>
+                <article class="j1939-signal"><span>Última parada</span><strong>Sin dato validado</strong><small>Pendiente de persistencia.</small></article>
+                <article class="j1939-signal"><span>Horas por sesiones</span><strong>Sin dato validado</strong><small>Distintas del horómetro ECU; persistencia pendiente.</small></article>
+            </div>
+            <p class="j1939-note">Referencia temporal visual: 15 s, pendiente de calibración. “Sin RX reciente” o “Sin RPM válida reciente” no significa motor detenido. Las RPM no demuestran entrega de energía a la carga.</p>
         </div>
         <div class="j1939-capture">
             <h4>Captura RAW manual</h4>
@@ -310,6 +336,7 @@
 
 </div>
 
+<script src="{{ url_for('static', filename='js/j1939_diagnostics.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 
 </body>

@@ -1,0 +1,19 @@
+{
+  "notice": "SOLO REPLAY SINTETICO: umbrales no calibrados para Caterpillar; no habilita servicios",
+  "enabled": false,
+  "gateway_id": "synthetic-gateway",
+  "detector": {
+    "equipment_id": "synthetic-generator",
+    "source_address": 234,
+    "rpm_start": 600,
+    "rpm_stop": 100,
+    "rpm_max": 3000,
+    "start_samples": 3,
+    "stop_samples": 3,
+    "start_seconds": 2,
+    "stop_seconds": 2,
+    "timeout_seconds": 5,
+    "max_sample_gap_seconds": 2,
+    "max_sample_age_seconds": 1
+  }
+}

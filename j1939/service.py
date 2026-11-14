@@ -41,21 +41,52 @@ class J1939Runtime:
             queue_size=settings["capture_queue_size"], metadata=capture_metadata,
         )
 
+        self.engine_integration = None
+        self.engine_integration_error = None
+        if settings.get("engine_events_enabled") or settings.get("auto_evidence_enabled"):
+            try:
+                from .integration import build_integration
+                self.engine_integration = build_integration(settings)
+            except Exception as exc:
+                self.engine_integration_error = type(exc).__name__
+                LOGGER.error("engine_integration_disabled reason=%s", self.engine_integration_error)
+
+    def _engine_offer(self, method, value):
+        if self.engine_integration is not None:
+            try:
+                getattr(self.engine_integration, method)(value)
+            except Exception as exc:
+                self.engine_integration.errors += 1
+                self.engine_integration_error = type(exc).__name__
+
+    def close_engine_integration(self):
+        if self.engine_integration is not None:
+            try:
+                if not self.engine_integration.close():
+                    LOGGER.warning("engine_integration_shutdown pending_data=true")
+            except Exception as exc:
+                LOGGER.error("engine_integration_shutdown reason=%s", type(exc).__name__)
+
     def status(self) -> dict[str, Any]:
         result = self.state.status()
         result["droppedCaptureFrames"] = self.capture.status()["droppedCaptureFrames"]
+        result["engineIntegration"] = (self.engine_integration.status() if self.engine_integration
+                                       else {"enabled": False})
+        result["engineIntegration"]["initializationOrOfferError"] = self.engine_integration_error
         return result
 
     def process(self, frame) -> list[dict[str, Any]]:
         known = bool(frame.j1939 and frame.j1939.pgn in self.decoder.known_pgns)
         self.state.record_frame(frame, known)
         self.capture.offer(frame)
+        self._engine_offer("offer_frame", frame)
         publications = []
         try:
             decoded = self.decoder.decode(frame)
             if decoded:
                 self.state.record_decoded_frame()
             for signal in decoded:
+                self._engine_offer("offer_decoded", signal)
                 published = self.state.update(signal)
                 if published:
                     publications.append(published)

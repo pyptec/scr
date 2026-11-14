@@ -590,3 +590,9 @@ button:hover,
 .j1939-controls input { min-width: 260px; }
 .j1939-download { display: block; margin-top: 6px; overflow-wrap: anywhere; }
 .j1939-empty { color: #667; padding: 12px; }
+
+/* Diagnóstico incremental J1939; estilos eléctricos existentes conservados. */
+.j1939-diagnostics { margin-top: 18px; border-top: 1px solid #e2e7ec; padding-top: 14px; }
+.j1939-diagnostics select { margin-left: 8px; padding: 6px; }
+.j1939-note { color: #667; font-size: 0.9rem; line-height: 1.5; }
+.j1939-diagnostics strong { overflow-wrap: anywhere; }

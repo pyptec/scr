@@ -49,6 +49,9 @@ def load_yaml(path: str | Path) -> dict[str, Any]:
 def runtime_settings(base_dir: Path) -> dict[str, Any]:
     return {
         "enabled": env_bool("J1939_ENABLED", False),
+        "engine_events_enabled": env_bool("J1939_ENGINE_EVENTS_ENABLED", False),
+        "auto_evidence_enabled": env_bool("J1939_AUTO_EVIDENCE_ENABLED", False),
+        "engine_config": os.getenv("J1939_ENGINE_CONFIG", ""),
         "transport": os.getenv("J1939_TRANSPORT", "serial").strip().lower(),
         "can_interface": os.getenv("J1939_CAN_INTERFACE", "can0").strip(),
         "serial_device": os.getenv("J1939_SERIAL_DEVICE", "").strip(),

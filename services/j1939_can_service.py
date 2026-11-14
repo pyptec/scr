@@ -49,7 +49,11 @@ def main() -> int:
     device = settings["can_interface"] if settings["transport"] == "socketcan" else settings.get("serial_device") or settings.get("replay_file")
     logging.info("J1939 | enabled=true | transport=%s | device=%s", settings["transport"], device)
     runtime = J1939Runtime(settings)
-    server, api_thread = start_local_api(runtime, settings["api_host"], settings["api_port"])
+    try:
+        server, api_thread = start_local_api(runtime, settings["api_host"], settings["api_port"])
+    except Exception:
+        runtime.close_engine_integration()
+        raise
     reconnect = False
     try:
         while not stop.is_set():
@@ -71,6 +75,7 @@ def main() -> int:
             if settings["transport"] == "replay": break
     finally:
         runtime.state.set_connected(False)
+        runtime.close_engine_integration()
         if runtime.capture.status()["captureActive"]: runtime.capture.stop("SERVICE_STOPPED")
         server.shutdown(); server.server_close(); api_thread.join(timeout=2)
     return 0
