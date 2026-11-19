@@ -26,6 +26,74 @@ def detail(path, session_id):
         return _detail(c, row)
 
 
+def _hourmeter_snapshot(event):
+    """Return only a verifiable v2 FEE5/EA reading, retaining its provenance."""
+    try:
+        snap = json.loads(event["evidence_ref"] or "{}")
+        if snap.get("kind") != "j1939_signal_snapshot_v2":
+            return None
+        evaluated = datetime.fromisoformat(snap["evaluatedAtUtc"].replace("Z", "+00:00"))
+        event_time = datetime.fromisoformat(event["timestamp_utc"].replace("Z", "+00:00"))
+        limit = snap["maxSampleAgeSeconds"]
+        if (evaluated.utcoffset() is None or event_time.utcoffset() is None or evaluated > event_time
+                or isinstance(limit, bool) or not isinstance(limit, (int, float))
+                or not math.isfinite(limit) or limit <= 0):
+            return None
+        valid = []
+        for sample in snap.get("signals", []):
+            if not isinstance(sample, dict):
+                continue
+            value = sample.get("value")
+            if (sample.get("key") != "engine_total_hours" or sample.get("pgn") != 0xFEE5
+                    or sample.get("spn") != 247 or sample.get("sourceAddress") != 0xEA
+                    or sample.get("unit") != "h" or sample.get("available") is not True
+                    or sample.get("quality") != "GOOD" or sample.get("confidence") != "CONFIRMED"
+                    or isinstance(value, bool) or not isinstance(value, (int, float))
+                    or not math.isfinite(value) or value < 0):
+                continue
+            stamp = datetime.fromisoformat(sample["timestampUtc"].replace("Z", "+00:00"))
+            if stamp.utcoffset() is not None and 0 <= (evaluated - stamp).total_seconds() <= limit:
+                valid.append((stamp, {"value": value, "timestamp_utc": sample["timestampUtc"],
+                                      "event_id": event["event_id"], "event_type": event["event_type"],
+                                      "source": "event_snapshot_v2"}))
+        return max(valid, key=lambda x: x[0]) if valid else None
+    except (AttributeError, KeyError, TypeError, ValueError, OverflowError):
+        return None
+
+
+def _hourmeter_history(c, row):
+    result = {"start": None, "stop": None, "prior": None, "posterior": None, "delta": None}
+    try:
+        first = datetime.fromisoformat(row["observed_from_utc"].replace("Z", "+00:00"))
+        stop = datetime.fromisoformat(row["ended_at_utc"].replace("Z", "+00:00")) if row["ended_at_utc"] and row["stop_event_id"] else None
+        if first.utcoffset() is None or (stop and (stop.utcoffset() is None or stop < first)):
+            return result
+    except (AttributeError, TypeError, ValueError):
+        return result
+    prior = []; posterior = []
+    for event in c.execute("SELECT * FROM j1939_engine_events WHERE gateway_id=? AND equipment_id=? ORDER BY timestamp_utc, event_id", (row["gateway_id"], row["equipment_id"])):
+        reading = _hourmeter_snapshot(event)
+        if not reading:
+            continue
+        stamp, sample = reading
+        if event["event_id"] == row["start_event_id"] and event["event_type"] == "START":
+            result["start"] = sample
+        if event["event_id"] == row["stop_event_id"] and event["event_type"] == "STOP":
+            result["stop"] = sample
+        if stamp <= first:
+            prior.append(reading)
+        if stop is not None and stamp >= stop:
+            posterior.append(reading)
+    if prior:
+        result["prior"] = max(prior, key=lambda x: x[0])[1]
+    if posterior:
+        result["posterior"] = min(posterior, key=lambda x: x[0])[1]
+    a, b = result["prior"], result["posterior"]
+    if a and b and b["value"] >= a["value"]:
+        result["delta"] = b["value"] - a["value"]
+    return result
+
+
 def _detail(c, row):
     session_id = row["session_id"]
     result = dict(row)
@@ -108,7 +176,8 @@ def _detail(c, row):
         if peak:
             result["rpm_max"] = peak[0]
     a, b = row["initial_hourmeter"], row["final_hourmeter"]
-    result["hourmeter_delta"] = b - a if a is not None and b is not None and b >= a else None
+    result["hourmeter_observations"] = _hourmeter_history(c, row)
+    result["hourmeter_delta"] = result["hourmeter_observations"]["delta"]
     result["warnings"] = []
     if legacy_freshness_unknown:
         result["warnings"].append("legacy_snapshot_freshness_limit_unknown")

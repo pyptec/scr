@@ -32,7 +32,7 @@ class HistoryTests(unittest.TestCase):
                 before = list(c.iterdump())
             item = detail(path, 'synthetic:session')
             self.assertIsNone(item['started_at_utc'])
-            self.assertAlmostEqual(item['hourmeter_delta'], .55)
+            self.assertIsNone(item['hourmeter_delta'])  # Unproven legacy columns are not evidence.
             self.assertIn('unconfirmed_start', item['warnings'])
             self.assertIn('raw_evidence_incomplete_or_missing', item['warnings'])
             self.assertEqual(len(sessions(path, 1, 0)), 1)

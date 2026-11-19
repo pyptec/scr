@@ -9,6 +9,12 @@ setTimeout(() => {
   assert(elements.engineLatest.innerHTML.includes('STALE'));
   assert(elements.engineHistory.innerHTML.includes('Arranque no confirmado'));
   assert(elements.engineHistory.innerHTML.includes('INDETERMINADA'));
+  assert(elements.engineHistory.innerHTML.includes('RPM inicial observada'));
+  assert(elements.engineHistory.innerHTML.includes('RPM final'));
+  assert(elements.engineHistory.innerHTML.includes('Horómetro previo h'));
+  assert(elements.engineHistory.innerHTML.includes('Horómetro posterior h'));
+  assert(elements.engineHistory.innerHTML.includes('1555.125'));
+  assert(elements.engineHistory.innerHTML.includes('Sin dato'));
   assert(elements.engineLastSession.textContent.includes('Arranque no confirmado'));
   assert(elements.engineLastSession.textContent.includes('INCOMPLETE'));
   assert(elements.engineLastSession.textContent.includes('Interrupciones vinculadas: 2'));
