@@ -85,6 +85,17 @@ class DashboardProxyTests(unittest.TestCase):
             self.assertEqual(req.get_method(), "POST")
             self.assertEqual(json.loads(req.data), {"note": "synthetic"})
 
+    def test_engine_verification_proxy_and_invalid_path(self):
+        response = io.BytesIO(b'{"temporal_integrity":"INCOMPLETE"}'); response.status = 200
+        with patch.object(self.module.urllib.request, "urlopen", return_value=response) as proxy:
+            result = self.client.get('/api/j1939/engine/evidence/session:1/segment-1/verify')
+            self.assertEqual(result.status_code, 200)
+            self.assertIn('/engine/evidence/session:1/segment-1/verify', proxy.call_args.args[0].full_url)
+        with patch.object(self.module.urllib.request, "urlopen") as proxy:
+            result = self.client.get('/api/j1939/engine/evidence/session/segment!/verify')
+            self.assertEqual(result.status_code, 404)
+            proxy.assert_not_called()
+
     def test_unsafe_capture_and_signal_paths_rejected(self):
         with patch.object(self.module.urllib.request, "urlopen") as proxy:
             self.assertEqual(self.client.post("/api/j1939/capture/unknown", json={}).status_code, 404)

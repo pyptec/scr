@@ -64,6 +64,14 @@ def _j1939_proxy(path, method="GET", body=None):
         return jsonify({"enabled": True, "error": "J1939_SERVICE_UNAVAILABLE", "detail": str(exc)}), 503
 
 
+@app.route("/api/j1939/engine/<path:resource>")
+def api_j1939_engine(resource):
+    if resource not in {"latest", "sessions"} and not re.fullmatch(r"(?:sessions|evidence)/[A-Za-z0-9:_-]{1,160}", resource) and not re.fullmatch(r"evidence/[A-Za-z0-9:_-]{1,160}/[A-Za-z0-9:_-]{1,160}/verify", resource):
+        return jsonify({"error": "NOT_FOUND"}), 404
+    query = request.query_string.decode("ascii", errors="ignore")
+    return _j1939_proxy("/api/j1939/engine/" + resource + ("?" + query if query else ""))
+
+
 @app.route("/api/j1939/status")
 def api_j1939_status():
     return _j1939_proxy("/api/j1939/status")

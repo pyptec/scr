@@ -13,6 +13,7 @@ class SignalState:
         self.heartbeat_seconds = heartbeat_seconds
         self._lock = threading.RLock()
         self._signals: dict[str, dict[str, Any]] = {}
+        self._signals_by_source: dict[tuple[str, int, int], dict[str, Any]] = {}
         self._recent: deque[dict[str, Any]] = deque(maxlen=recent_limit)
         self._status = {
             "enabled": True, "connected": False, "transport": None, "device": None,
@@ -53,10 +54,17 @@ class SignalState:
         with self._lock:
             self._status["framesDecoded"] += 1
 
-    def update(self, signal: DecodedSignal, now: datetime | None = None) -> dict[str, Any] | None:
+    def update(self, signal: DecodedSignal, now: datetime | None = None, *, received_at: datetime | None = None) -> dict[str, Any] | None:
         now = now or signal.timestamp_utc
+        if (received_at is not None and (signal.timestamp_utc.tzinfo is None
+                or signal.timestamp_utc.utcoffset() is None or signal.timestamp_utc > received_at)):
+            return None
         with self._lock:
-            previous = self._signals.get(signal.key)
+            identity = (signal.key, signal.pgn, signal.source_address)
+            previous = self._signals_by_source.get(identity)
+            # Frames can arrive out of order after reconnect or replay.
+            if previous and signal.timestamp_utc < datetime.fromisoformat(previous["timestampUtc"].replace("Z", "+00:00")):
+                return None
             reason = "initial"
             if previous:
                 if previous["quality"] != signal.quality:
@@ -76,7 +84,10 @@ class SignalState:
                 "confidence": signal.confidence, "lastChangedAt": changed_at.isoformat().replace("+00:00", "Z"),
                 "lastPublishedAt": published_at.isoformat().replace("+00:00", "Z"), "publishReason": reason or previous.get("publishReason"),
             }
-            self._signals[signal.key] = item
+            self._signals_by_source[identity] = item
+            legacy = self._signals.get(signal.key)
+            if legacy is None or signal.timestamp_utc >= datetime.fromisoformat(legacy["timestampUtc"].replace("Z", "+00:00")):
+                self._signals[signal.key] = item
             if reason in {"initial", "changed", "quality_change"}:
                 self._status["signalsChanged"] += 1
             if reason == "heartbeat":
@@ -101,6 +112,11 @@ class SignalState:
 
     def signals(self) -> list[dict[str, Any]]:
         return self.snapshot()["signals"]
+
+    def signals_by_source(self, source_address: int) -> list[dict[str, Any]]:
+        with self._lock:
+            return [dict(item) for (key, pgn, source), item in self._signals_by_source.items()
+                    if source == source_address]
 
     def recent(self) -> list[dict[str, Any]]:
         return self.snapshot()["recentFrames"]

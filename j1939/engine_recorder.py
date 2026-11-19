@@ -53,6 +53,7 @@ class EngineRecorder:
         self.recovered_checkpoint: dict | None = None
         self._sequence = 0
         self._coverage = 0.0
+        self._rpm_peak = None
         self._previous = None
         self._sample: RpmSample | None = None
         self._fresh = False
@@ -83,8 +84,30 @@ class EngineRecorder:
                 and signal.pgn == 0xFEE5 and signal.metadata.get("spn") == 247
                 and signal.unit == "h" and signal.source_address == self.config.detector.source_address):
             with self._lock:
+                stamp = signal.timestamp_utc
+                if (signal.confidence != "CONFIRMED" or not isinstance(stamp, datetime)
+                        or stamp.tzinfo is None or stamp.utcoffset() is None
+                        or stamp > self.clock.utcnow()
+                        or (self._hours is not None and stamp <= self._hours.timestamp_utc)):
+                    return False
                 self._hours = signal
             return True
+        # An invalid confidence from the configured engine ECU breaks observation;
+        # unrelated PGNs or other ECUs cannot disturb this detector.
+        if (signal.key == "engine_speed" and signal.pgn == 0xF004
+                and signal.metadata.get("spn") == 190 and signal.unit == "rpm"
+                and signal.source_address == self.config.detector.source_address
+                and signal.confidence != "CONFIRMED"):
+            with self._lock:
+                if self._full(sample=True):
+                    return False
+                self._reset_if_needed()
+                self._previous = None
+                self._fresh = False
+                self.detector.require_reconciliation()
+                self._discontinuity = "invalid_rpm_confidence"
+                self._submit(evidence_ref=evidence_ref)
+            return False
         try:
             sample = RpmSample.from_decoded(signal, self.config.detector.equipment_id)
         except ValueError:
@@ -115,6 +138,8 @@ class EngineRecorder:
             accepted = self.detector.last_valid_timestamp_utc != previous_stamp
             now = self.clock.monotonic()
             if accepted:
+                if self.detector.state == EngineState.RUNNING:
+                    self._rpm_peak = max(self._rpm_peak, sample.rpm) if self._rpm_peak is not None else sample.rpm
                 if self._previous:
                     old_mono, old_stamp, old_state = self._previous
                     dt = now - old_mono
@@ -167,7 +192,7 @@ class EngineRecorder:
             last_confirmed_state=self.detector.last_confirmed_state,
             events=tuple(events), observed_at_utc=sample.timestamp_utc if sample else None,
             rpm=sample.rpm if sample else None, verified_seconds=self._coverage,
-            discontinuity=self._discontinuity, evidence_ref=evidence_ref, hourmeter=self._hourmeter(),
+            discontinuity=self._discontinuity, evidence_ref=evidence_ref, hourmeter=self._hourmeter(), rpm_peak=self._rpm_peak,
         )
         # lock de productor serializa full/put; el consumidor solo libera espacio.
         self._queue.put_nowait(batch)
@@ -180,6 +205,7 @@ class EngineRecorder:
                 self.observer_errors += 1
         self._fresh = False
         self._coverage = 0
+        self._rpm_peak = None
         self._discontinuity = None
         self._last_state = self.detector.state
         self._last_submit = now
@@ -230,7 +256,16 @@ class EngineRecorder:
             return True
 
     def status(self) -> dict:
-        return {"enabled": self.config.enabled, "queued": self._queue.qsize() + int(self._pending is not None),
+        with self._lock:
+            detector = self.detector
+            stamp = detector.last_valid_timestamp_utc if detector else None
+            age = (self.clock.utcnow() - stamp).total_seconds() if stamp else None
+            fresh = age is not None and 0 <= age <= self.config.detector.timeout_seconds
+            state = detector.state.value if detector and fresh else "UNKNOWN"
+            observation = stamp.isoformat().replace("+00:00", "Z") if stamp else None
+        return {"state": state, "lastObservationUtc": observation,
+                "quality": "GOOD" if fresh else "STALE" if stamp else "NO_DATA",
+                "enabled": self.config.enabled, "queued": self._queue.qsize() + int(self._pending is not None),
                 "droppedSamples": self.dropped_samples, "writeErrors": self.write_errors,
                 "lastError": self.last_error, "batchesWritten": self.batches_written,
                 "observerErrors": self.observer_errors}

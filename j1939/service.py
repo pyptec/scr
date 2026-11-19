@@ -6,6 +6,7 @@ import shutil
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import unquote
 
@@ -87,7 +88,7 @@ class J1939Runtime:
                 self.state.record_decoded_frame()
             for signal in decoded:
                 self._engine_offer("offer_decoded", signal)
-                published = self.state.update(signal)
+                published = self.state.update(signal, received_at=datetime.now(timezone.utc))
                 if published:
                     publications.append(published)
                     LOGGER.info("signal_publish reason=%s key=%s", published["publishReason"], published["key"])
@@ -113,6 +114,45 @@ def make_handler(runtime: J1939Runtime):
 
         def do_GET(self):
             path = unquote(self.path.split("?", 1)[0])
+            if path.startswith("/api/j1939/engine/"):
+                from urllib.parse import parse_qs
+                import sqlite3
+                from .history import sessions, detail, verify_registered_evidence
+                integration = runtime.engine_integration
+                if integration is None:
+                    return self._json({"error": "ENGINE_INTEGRATION_UNAVAILABLE"}, 503)
+                database = integration.recorder.store.path
+                try:
+                    if path == "/api/j1939/engine/latest":
+                        allowed = {"engine_speed": "F004", "coolant_temperature": "FEEE",
+                                   "engine_total_hours": "FEE5", "dc_voltage_field_1": "FEF7"}
+                        return self._json({"signals": [item for item in runtime.state.signals_by_source(0xEA)
+                                                       if allowed.get(item["key"]) == item["pgn"]],
+                                           "engine": integration.recorder.status()})
+                    import re
+                    verify_match = re.fullmatch(r"/api/j1939/engine/evidence/([A-Za-z0-9:_-]{1,160})/([A-Za-z0-9:_-]{1,160})/verify", path)
+                    if verify_match:
+                        if integration.evidence is None:
+                            return self._json({"error": "RAW_VERIFICATION_UNAVAILABLE"}, 503)
+                        result = verify_registered_evidence(database, *verify_match.groups(), integration.evidence.config.directory)
+                        return self._json(result if result is not None else {"error": "SEGMENT_NOT_FOUND"}, 200 if result is not None else 404)
+                    if path == "/api/j1939/engine/sessions":
+                        query = parse_qs(self.path.partition("?")[2])
+                        limit = int(query.get("limit", ["20"])[0]); offset = int(query.get("offset", ["0"])[0])
+                        return self._json({"sessions": sessions(database, limit, offset), "limit": limit, "offset": offset})
+                    prefix = "/api/j1939/engine/sessions/"
+                    evidence_prefix = "/api/j1939/engine/evidence/"
+                    if path.startswith(prefix) or path.startswith(evidence_prefix):
+                        is_evidence = path.startswith(evidence_prefix)
+                        sid = path[len(evidence_prefix if is_evidence else prefix):]
+                        item = detail(database, sid)
+                        if item is None:
+                            return self._json({"error": "SESSION_NOT_FOUND"}, 404)
+                        return self._json({"session_id": sid, "evidence": item["evidence"]} if is_evidence else item)
+                except ValueError:
+                    return self._json({"error": "INVALID_QUERY"}, 400)
+                except sqlite3.Error:
+                    return self._json({"error": "HISTORY_UNAVAILABLE"}, 503)
             if path == "/api/j1939/status": return self._json(runtime.status())
             if path == "/api/j1939/signals": return self._json({"signals": runtime.state.signals()})
             if path.startswith("/api/j1939/signals/"):

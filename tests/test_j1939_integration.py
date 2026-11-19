@@ -82,6 +82,34 @@ class IntegrationTests(unittest.TestCase):
         with closing(sqlite3.connect(self.store.path)) as c:
             return [r[0] for r in c.execute("SELECT event_type FROM j1939_engine_events ORDER BY rowid")]
 
+    def test_summary_peak_survives_restart_and_keeps_existing_rows(self):
+        self.store.migrate_summary()
+        self.store.migrate_summary()
+        self.make(); self.confirm(0); self.confirm(1800)
+        self.feed(1950); self.feed(1800)
+        self.integration.recorder.flush(); self.drain()
+        with closing(sqlite3.connect(self.store.path)) as c:
+            before = c.execute("SELECT session_id,rpm_max FROM j1939_session_summary").fetchone()
+        self.assertEqual(before[1], 1950)
+        self.integration.close(); self.integration = None
+        self.make(); self.confirm(1800); self.feed(1850)
+        self.integration.recorder.flush(); self.drain()
+        with closing(sqlite3.connect(self.store.path)) as c:
+            after = c.execute("SELECT session_id,rpm_max FROM j1939_session_summary").fetchone()
+            self.assertEqual(c.execute("SELECT COUNT(*) FROM j1939_engine_sessions").fetchone()[0], 1)
+        self.assertEqual(after, before)
+
+    def test_status_exposes_observation_and_does_not_infer_stop_on_silence(self):
+        observer = self.make()
+        self.confirm(0); self.confirm(1800)
+        status = observer.recorder.status()
+        self.assertEqual(status['state'], 'RUNNING')
+        self.assertEqual(status['quality'], 'GOOD')
+        self.assertIsNotNone(status['lastObservationUtc'])
+        self.clock.advance(6)
+        self.assertEqual(observer.recorder.status()['state'], 'UNKNOWN')
+        self.assertEqual(observer.recorder.status()['quality'], 'STALE')
+
     def test_defaults_and_disabled_no_observer_io(self):
         with patch.dict(os.environ, {}, clear=True):
             s = runtime_settings(ROOT)
@@ -185,7 +213,11 @@ class IntegrationTests(unittest.TestCase):
         self.confirm(1800)
         with closing(sqlite3.connect(self.store.path)) as c:
             ref = c.execute("SELECT evidence_ref FROM j1939_engine_events WHERE event_type='START'").fetchone()[0]
-        snapshots = {s["key"]:s for s in json.loads(ref)["signals"]}
+        document = json.loads(ref)
+        self.assertEqual(document["kind"], "j1939_signal_snapshot_v2")
+        self.assertEqual(document["maxSampleAgeSeconds"], self.integration.recorder.config.detector.max_sample_age_seconds)
+        self.assertIsNotNone(document["evaluatedAtUtc"])
+        snapshots = {s["key"]:s for s in document["signals"]}
         self.assertEqual(snapshots["coolant_temperature"]["sourceAddress"], 235)
         self.assertFalse(snapshots["coolant_temperature"]["available"])
         self.assertIsNone(snapshots["coolant_temperature"]["value"])

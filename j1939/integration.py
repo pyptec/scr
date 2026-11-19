@@ -66,7 +66,9 @@ class EngineIntegration:
                                   value=s.value if valid else None, available=valid))
         # Existing event evidence_ref stores a versioned bounded JSON snapshot.
         self.recorder.offer_decoded(signal, evidence_ref=json.dumps(
-            {"kind": "j1939_signal_snapshot_v1", "signals": snapshots}, allow_nan=False))
+            {"kind": "j1939_signal_snapshot_v2", "evaluatedAtUtc": now.isoformat(),
+             "maxSampleAgeSeconds": self.recorder.config.detector.max_sample_age_seconds,
+             "signals": snapshots}, allow_nan=False))
 
     def status(self):
         return dict(enabled=True, errors=self.errors, recorder=self.recorder.status(),
@@ -98,8 +100,8 @@ def build_integration(settings, *, clock=None, start=True):
         if any(t != "sqlite_sequence" and not t.startswith("j1939_") for t in tables):
             raise ValueError("dedicated J1939 database required; measurement DB forbidden")
         versions = dict(c.execute("SELECT version,checksum FROM j1939_schema_migrations"))
-        for version, name in ((1, "001_engine_recorder.sql"), (2, "002_auto_evidence.sql")):
-            if version == 2 and not raw_enabled:
+        for version, name in ((1, "001_engine_recorder.sql"), (2, "002_auto_evidence.sql"), (3, "003_session_summary.sql")):
+            if (version == 2 and not raw_enabled) or (version == 3 and version not in versions):
                 continue
             expected = hashlib.sha256((Path(__file__).parent / "migrations" / name).read_text(encoding="utf-8").encode()).hexdigest()
             if versions.get(version) != expected:

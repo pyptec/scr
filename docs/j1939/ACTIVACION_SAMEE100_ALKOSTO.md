@@ -1,3 +1,4 @@
+
 # Prompt 06 — Preparación de activación automática J1939
 
 Estado: procedimiento preparado en Windows; activación y autonomía en Raspberry NO comprobadas por Codex. No ejecutar este documento como un único script. Cada bloque [CAMBIO] exige revisión del operador; reinicios requieren autorización expresa para esa etapa. No arrancar/parar el grupo, no transmitir CAN, no reiniciar medidor/can0/dashboard, no editar código en Raspberry.
@@ -374,3 +375,107 @@ Solo tras esa migración respaldada/revisada, autorizar commit Windows que desin
 ## Registro de ejecución del operador y criterios finales
 
 Anotar por etapa: UTC, host/bootID, commit, PID, autorización, configuración revisada/IDs, versiones/checksums, espacio/permisos, estadoAPI/checkpoint y variación de contadores, archivo/evidenciaSHA cuando exista. Sin credenciales ni copia de .env. Antes de declarar **armado para el próximo arranque**: A validada, B efectiva, RPM/SQL recientes, prebuffer probado y errores/drops bajo control; una sesión real posterior valida START/STOP/evidencia completa. Este documento se entrega **PREPARADO, ACTIVACIÓN PENDIENTE**. Resultados locales en bitácora; ningún comando Raspberry fue ejecutado por Codex.
+
+## Despliegue fase 07 — Historial de funcionamiento y evidencia J1939
+
+### Alcance y puertas de autorización
+
+Origen documentado en PC y reportado instalado en Raspberry: `bb14e3d8fb9c32e59f7cd1bd51fc1ec546bc38b9`. El diagnóstico real aportado por el operador informa servicios activos, CAN0 ERROR-ACTIVE a 250 kbit/s, recepción continua, cero TX durante la muestra y aumento de errores CAN. Este dato exige seguimiento; no demuestra que no haya problemas físicos. La copia de pruebas 07N registró 202 pruebas, 201 aprobadas y una omitida en Windows, con prueba POSIX anterior en Ubuntu. No equivale a aceptación física del nuevo código.
+
+Los cambios revisados agregan control de confianza y frescura, persistencia de RPM máxima por sesión, migración aditiva 003, consultas de historial y de interrupciones vinculadas y contexto previo, verificación RAW bajo demanda, proxy Flask y panel histórico. El integrador emite instantáneas v2 y el historial contempla instantáneas v1/v2; se corrigió el cálculo de cobertura `verified_seconds`. La migración no reconstruye valores históricos ni recalcula tiempos verificados. No se cambian aquí SocketCAN ni CAN0, medición principal, watchdog, GPIO23, umbrales START/STOP, bases históricas, RAW originales, configuración local ni credenciales.
+
+Las cuatro autorizaciones son independientes: (1) inventario y commit/push en PC; (2) ventana y respaldo; (3) actualización, migración y reinicios mínimos, solo tras verificar respaldo y reversión; (4) aceptación después de pruebas. Ningún bloque de escritura siguiente está autorizado por la existencia de esta guía. No detener medidor ni CAN0 sin motivo y autorización separados.
+
+### Inventario para el commit de PC
+
+Incluir: `api/app.py`; `j1939/engine_detector.py`, `engine_recorder.py`, `engine_store.py`, `integration.py`, `service.py`, `state.py`, `history.py` y `migrations/003_session_summary.sql`; `templates/dashboard.html`; `static/js/j1939_history.js`; `tests/test_j1939_dashboard.py`, `test_j1939_integration.py`, `test_j1939_recorder.py`, `test_j1939_abrupt_07i.py`, `test_j1939_context.py`, `test_j1939_history.py`, `test_j1939_history_dom.js`, `test_j1939_history_linux.py`, `test_j1939_migration_003.py`; esta guía y la bitácora central tras revisión de contenido. El cambio previo del usuario en esta guía se conserva. `tests/test_j1939_activation_procedure.py` es preexistente y queda fuera hasta decisión de su propietario. Los auxiliares de auditoría, navegador, compatibilidad y copia real quedan pendientes de revisión para publicación; las pruebas anteriores no dependen de ellos para su ejecución ordinaria.
+
+Conservar fuera del commit las evidencias `docs/j1939/evidencias/prompt07/` hasta su revisión y sanitización, bases SQLite, RAW, logs operativos, credenciales y claves. `.env` y `app.log` ya están versionados: no se incluyen en la propuesta ni se modifica su contenido, pero excluirlos de nuevos cambios no elimina el historial anterior. Revisar la bitácora y los fixtures antes de publicarlos: pueden contener referencias operativas. No usar `git add`, commit ni push hasta la autorización 1 y la revisión final de cada diferencia.
+
+### Diagnóstico y Git en Raspberry
+
+Leer el estado sin mostrar contenidos de `.env` o logs. Confirmar rutas y usuario efectivo; mantener resultados operativos en un lugar privado:
+
+```bash
+cd /home/pi/SAMEE100/scr
+git branch --show-current
+git rev-parse HEAD
+git status --short --branch
+git diff --name-only
+systemctl is-active can0.service medidor.service samee100-dashboard.service samee100-j1939.service
+systemctl show samee100-j1939.service -p User -p ExecStart -p WorkingDirectory
+ip -details -statistics link show dev can0
+curl -fsS --max-time 5 http://127.0.0.1:8765/api/j1939/status
+curl -fsS --max-time 5 http://127.0.0.1:8765/api/j1939/capture/status
+df -h /var/lib/samee100-j1939
+stat -c '%n %s %y' /var/lib/samee100-j1939/engine.sqlite
+du -sh /var/lib/samee100-j1939/raw
+```
+
+Revisar `lastFrameAt`, el estado manual de captura y `engineIntegration.evidence.activeCapture`; verificar además colas, errores de escritura y fin de postcaptura. Identificar cualquier otro escritor con el operador. No abrir otro receptor CAN. Si hay captura activa, escritor desconocido, espacio insuficiente, cambios imprevistos o error de integridad, detener la intervención.
+
+Tras autorización 3, actualizar primero la referencia remota con `git fetch origin feature/samee100-j1939-can` y comparar el hash recibido con el hash autorizado por PC. `fetch` cambia referencias Git y usa red; no es parte del diagnóstico de solo lectura. Sustituir `HASH_AUTORIZADO` por ese hash validado:
+
+```bash
+git rev-parse HEAD
+git rev-parse origin/feature/samee100-j1939-can
+git diff --name-status HEAD HASH_AUTORIZADO
+git diff --name-only HEAD HASH_AUTORIZADO -- .env app.log
+git merge-base --is-ancestor HEAD HASH_AUTORIZADO
+```
+
+Confirmar rama, que la referencia remota coincide exactamente con `HASH_AUTORIZADO`, que el último comando termina con éxito y que el diff no toca `.env` ni `app.log` ni otro archivo local modificado. Si no se cumplen estas condiciones o Git informa conflicto, detenerse y acordar una estrategia específica; no ocultar cambios ni usar reset, clean, restore o stash automático. Tras aprobación del estado exacto, ejecutar `git pull --ff-only origin feature/samee100-j1939-can`, comprobar `git rev-parse HEAD` y `git status --short --branch`, y detenerse si el HEAD final no es el autorizado. Existe riesgo de que la referencia cambie entre comprobación y pull: volver a comprobarla inmediatamente antes y no continuar si cambia; una discrepancia posterior requiere detener la operación, no corregirla destructivamente.
+
+### Respaldo coherente: solamente con autorización 2
+
+Confirmar ventana, hora UTC, ausencia de capturas manuales y automáticas activas o pendientes, cierre de RAW y escritores. Identificar y detener `samee100-j1939.service` solamente con autorización de la ventana; comprobar que no quedan otros escritores ni trabajos de cierre. No detener medidor ni CAN0. Asegurar permisos del usuario, destino privado y espacio suficiente para SQLite, RAW, configuración y margen; seleccionar un directorio de respaldo fuera del repositorio, distinto del respaldo histórico.
+
+El siguiente ejemplo crea un directorio nuevo con permisos privados; requiere que `/var/backups` permita escribir al operador autorizado. Copia SQLite mediante Backup API, verifica su integridad y genera el hash. Antes de ejecutarlo verificar las rutas efectivas y que no existen capturas en curso:
+
+```bash
+umask 077
+BACKUP_07=$(mktemp -d /var/backups/samee100-fase07-XXXXXXXX) || exit 1
+export BACKUP_07
+date -u +%FT%TZ
+/home/pi/medidorsamee100/bin/python -B - <<'PY' || exit 1
+import os, sqlite3
+from pathlib import Path
+src = 'file:/var/lib/samee100-j1939/engine.sqlite?mode=ro'
+dst = Path(os.environ['BACKUP_07']) / 'engine.sqlite'
+with sqlite3.connect(src, uri=True) as source, sqlite3.connect(dst) as target:
+    source.backup(target)
+    result = target.execute('PRAGMA quick_check').fetchall()
+    if result != [('ok',)]:
+        raise SystemExit('Fallo quick_check de respaldo: ' + repr(result))
+    for table in ('j1939_engine_sessions', 'j1939_engine_events',
+                  'j1939_observation_gaps', 'j1939_evidence_segments'):
+        print(table, target.execute('SELECT count(*) FROM ' + table).fetchone()[0])
+    print('migraciones', target.execute('SELECT version FROM j1939_schema_migrations ORDER BY version').fetchall())
+PY
+sha256sum "$BACKUP_07/engine.sqlite" || exit 1
+cp -a -- /var/lib/samee100-j1939/raw "$BACKUP_07/raw" || exit 1
+cp -p -- /home/pi/SAMEE100/scr/.env "$BACKUP_07/project.env" || exit 1
+find "$BACKUP_07/raw" -type f -printf '%P %s %TY-%Tm-%TdT%TH:%TM:%TS\n'
+du -sh "$BACKUP_07"
+```
+
+Comprobar manualmente el código de salida de cada comando y detenerse ante error; no interpretar un respaldo parcial como válido. Copiar también, tras identificarla, cualquier configuración externa necesaria con permisos privados, sin imprimir secretos. Conservar el listado y hashes de RAW cerrados fuera del repositorio y verificar que todos los segmentos y metadatos registrados en la copia tengan su archivo correspondiente o una explicación de ausencia/incompletitud. Registrar hora, ubicación, hash y conteos en registro privado. La copia SQLite incluye WAL mediante Backup API; no copiar solamente el archivo activo ni usar `immutable=1`. Los conteos por sí solos no identifican actualizaciones: conservar identificadores, marcas de tiempo y un nuevo snapshot para comparar cambios posteriores antes de una reversión. Mantener intacto y separado el respaldo histórico.
+
+### Migración 003: solamente con autorización 3
+
+Con backup verificado y escritores excluidos, comprobar que existen 001 y, para evidencia automática, 002, sus checksums y tablas. El estado anterior no tiene `j1939_session_summary`; 003 añade esa tabla y la versión 3. Si ya existe versión 3, comparar checksum con el archivo de migración y confirmar la tabla; una discrepancia es bloqueo, no ejecutar una reparación. El método valida checksum, es idempotente si coincide, no crea la base faltante y llama primero a `migrate()`, que también comprueba 001 y configura WAL. La transacción de 003 revierte ante error, pero la preparación de 001/WAL es una acción previa separada.
+
+```bash
+cd /home/pi/SAMEE100/scr
+/home/pi/medidorsamee100/bin/python -B -c "from j1939.evidence_store import EvidenceStore; EvidenceStore('/var/lib/samee100-j1939/engine.sqlite').migrate_summary()"
+```
+
+Antes y después, consultar con conexión `file:/var/lib/samee100-j1939/engine.sqlite?mode=ro` la tabla `j1939_schema_migrations`, `sqlite_master`, `PRAGMA quick_check` y conteos de `j1939_engine_events`, `j1939_engine_sessions`, `j1939_observation_gaps` y `j1939_evidence_segments`. Comparar con el respaldo y revisar que los registros y RAW coincidan. Ante excepción, checksum incompatible o diferencia inexplicada, detenerse, conservar estado y evidencia; no restaurar ni reintentar automáticamente.
+
+### Aceptación y reversión
+
+Reanudar solo los servicios necesarios tras autorización 3; verificar que `can0`, medidor, dashboard y J1939 siguen activos, que hay recepción continua sin TX ni nuevas pérdidas relevantes y observar la evolución de errores CAN respecto de la muestra reportada. Comprobar errores críticos, integridad SQLite, versión 003, registros y segmentos. En una sesión nueva que ocurra naturalmente, verificar persistencia de RPM máxima; no provocar operación de planta.
+
+Desde SQLite y dashboard comparar dinámicamente la sesión seleccionada con las referencias conservadas en evidencia privada: observación, START/STOP, estado, duración almacenada, RPM, interrupciones, integridad RAW y valores ausentes. Confirmar hora Colombia sin recalcular el histórico. Comprobar últimos valores, historial, detalle y paneles existentes; investigar diferencias antes de la autorización 4.
+
+Si falla una condición crítica, detener el avance y, con autorización, preservar una nueva copia coherente y todos los RAW generados desde el primer respaldo, además de los cambios locales. Priorizar reversión supervisada de código al commit anterior, sin sobrescribir SQLite ni usar Git destructivo; revisar cómo conservar `.env` y `app.log` antes de elegir el mecanismo. La compatibilidad del código anterior con 003 se probó en copia aislada y debe confirmarse para la instalación efectiva: conserva el máximo existente pero no actualiza los nuevos resúmenes. Restaurar una copia anterior sobre la base reciente descartaría datos posteriores; solo contemplarlo tras análisis y reconciliación explícitos y autorización independiente.

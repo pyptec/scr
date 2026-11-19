@@ -97,7 +97,8 @@ class RpmSample:
     def from_decoded(cls, signal: DecodedSignal, equipment_id: str) -> RpmSample:
         """Adaptación explícita del contrato existente; no adivina equipo ni ECU."""
         if (signal.key != "engine_speed" or signal.pgn != 0xF004
-                or signal.unit != "rpm" or signal.metadata.get("spn") != 190):
+                or signal.unit != "rpm" or signal.metadata.get("spn") != 190
+                or signal.confidence != "CONFIRMED"):
             raise ValueError("expected engine_speed / F004 / SPN 190 / rpm")
         return cls(signal.timestamp_utc, signal.value, signal.source_address,
                    equipment_id, quality=signal.quality)

@@ -424,6 +424,40 @@ class RecorderTests(unittest.TestCase):
         session = self.rows("j1939_engine_sessions")[0]
         self.assertEqual((session["initial_hourmeter"], session["final_hourmeter"]), (348, 348))
 
+    def test_decoded_rpm_requires_confirmed_confidence(self):
+        decoder = SignalDecoder(load_yaml(ROOT / "config/j1939_signals.yml")["signals"])
+        rpm = decoder.decode(parse_slcan_line("T0CF004EA8FFFFFF4038FFFFFF", self.clock.utcnow()))[0]
+        self.assertFalse(self.recorder.offer_decoded(replace(rpm, confidence="PROBABLE")))
+        self.assertIsNone(self.recorder.detector.last_valid_timestamp_utc)
+
+    def test_probable_rpm_breaks_coverage_without_false_transition(self):
+        decoder=SignalDecoder(load_yaml(ROOT / 'config/j1939_signals.yml')['signals'])
+        self.running()
+        before=self.rows('j1939_engine_sessions')[0]['verified_seconds']
+        self.clock.advance(1)
+        rpm=decoder.decode(parse_slcan_line('T0CF004EA8FFFFFF4038FFFFFF',self.clock.utcnow()))[0]
+        self.assertFalse(self.recorder.offer_decoded(replace(rpm,confidence='PROBABLE')))
+        self.drain()
+        for _ in range(3): self.feed(1800)
+        session=self.rows('j1939_engine_sessions')[0]
+        self.assertEqual(session['verified_seconds'],before)
+        self.assertEqual(len(self.events('START')),1)
+        self.assertEqual(len(self.events('STOP')),0)
+        self.assertEqual(len(self.rows('j1939_engine_sessions')),1)
+        self.assertTrue(any(g['reason']=='invalid_rpm_confidence' for g in self.rows('j1939_observation_gaps')))
+
+    def test_hourmeter_rejects_future_old_and_unconfirmed(self):
+        decoder = SignalDecoder(load_yaml(ROOT / "config/j1939_signals.yml")["signals"])
+        hours = decoder.decode(parse_slcan_line("T18FEE5EA8301B0000FFFFFFFF", self.clock.utcnow()))[0]
+        self.recorder = EngineRecorder(replace(self.config, hourmeter_validated=True), self.clock, self.store)
+        self.recorder.offer_decoded(hours)
+        self.recorder.offer_decoded(replace(hours, value=999, timestamp_utc=self.clock.utcnow()+timedelta(days=1)))
+        self.assertEqual(self.recorder._hourmeter(),348)
+        self.recorder.offer_decoded(replace(hours, value=999, confidence="PROBABLE", timestamp_utc=self.clock.utcnow()))
+        self.assertEqual(self.recorder._hourmeter(),348)
+        self.clock.advance(3)
+        self.assertIsNone(self.recorder._hourmeter())
+
     def test_sql_constraints_and_migration_checksum_detect_corruption(self):
         self.running()
         with sqlite3.connect(self.path) as c:

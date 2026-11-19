@@ -45,6 +45,7 @@ class RecordingBatch:
     discontinuity: str | None = None
     evidence_ref: str | None = None
     hourmeter: float | None = None
+    rpm_peak: float | None = None
 
 
 class WriterConflict(RuntimeError):
@@ -110,6 +111,31 @@ class EngineStore:
             c.execute("INSERT INTO j1939_schema_migrations VALUES (1,?,?)",
                       (checksum, utc_text(datetime.now(timezone.utc))))
 
+    def migrate_summary(self):
+        """Explicit additive migration, never called by acquisition or HTTP."""
+        self.migrate()
+        sql = (Path(__file__).parent / "migrations/003_session_summary.sql").read_text(encoding="utf-8")
+        checksum = hashlib.sha256(sql.encode()).hexdigest()
+        with self._transaction() as c:
+            row = c.execute("SELECT checksum FROM j1939_schema_migrations WHERE version=3").fetchone()
+            if row:
+                if row[0] != checksum:
+                    raise ValueError("summary migration checksum mismatch")
+                return
+            c.execute(sql)
+            c.execute("INSERT INTO j1939_schema_migrations VALUES(3,?,?)",
+                      (checksum, utc_text(datetime.now(timezone.utc))))
+
+    @staticmethod
+    def _save_peak(c, session, batch):
+        if (not session or batch.rpm_peak is None or batch.source_address != 0xEA
+                or not c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='j1939_session_summary'").fetchone()):
+            return
+        c.execute("""INSERT INTO j1939_session_summary(session_id,rpm_max,source_address,pgn)
+                     VALUES(?,?,?,61444) ON CONFLICT(session_id) DO UPDATE SET
+                     rpm_max=MAX(j1939_session_summary.rpm_max,excluded.rpm_max)""",
+                  (session, batch.rpm_peak, batch.source_address))
+
     def checkpoint(self, gateway: str, equipment: str) -> dict | None:
         with self._transaction() as c:
             row = c.execute("SELECT * FROM j1939_recorder_checkpoint WHERE gateway_id=? AND equipment_id=?", (gateway, equipment)).fetchone()
@@ -149,7 +175,7 @@ class EngineStore:
             raise ValueError("invalid batch")
         if observed and observed > stamp:
             raise ValueError("future observation")
-        for value in (batch.rpm, batch.hourmeter):
+        for value in (batch.rpm, batch.hourmeter, batch.rpm_peak):
             if value is not None and (isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0):
                 raise ValueError("invalid reading")
         for event in batch.events:
@@ -170,6 +196,7 @@ class EngineStore:
                 raise ValueError("observation timestamp regressed")
             session = row["session_id"]
             reconcile = bool(row["needs_reconcile"])
+            self._save_peak(c, session, batch)
             if batch.verified_seconds and session:
                 c.execute("UPDATE j1939_engine_sessions SET verified_seconds=verified_seconds+? WHERE session_id=?", (batch.verified_seconds, session))
             if batch.discontinuity:
@@ -217,6 +244,7 @@ class EngineStore:
                     c.execute("UPDATE j1939_engine_sessions SET active=0,status='INDETERMINADA',quality='INCOMPLETE',duration_seconds=NULL,close_reason='reconciled_stopped_unknown_stop',observed_until_utc=? WHERE session_id=?", (observed, session))
                     session = None
                 reconcile = False
+            self._save_peak(c, session, batch)
             if session and observed:
                 c.execute("UPDATE j1939_engine_sessions SET observed_until_utc=? WHERE session_id=?", (observed, session))
             # NULL si queda un hueco abierto; no confundir con cero segundos perdidos.

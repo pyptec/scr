@@ -289,6 +289,16 @@
             <div class="j1939-empty">NO_DATA</div>
         </div>
         <div class="j1939-diagnostics">
+            <h3>GRUPO ELECTRÓGENO — ÚLTIMOS VALORES REPORTADOS</h3>
+            <div id="engineLatest" class="j1939-signals">Sin datos</div>
+            <h3>Último funcionamiento</h3>
+            <div id="engineLastSession">Sin datos</div>
+            <h3>HISTORIAL DE FUNCIONAMIENTO DEL GRUPO ELECTRÓGENO</h3>
+            <div id="engineHistory">Sin datos</div>
+            <button type="button" id="engineMore">Más sesiones</button>
+            <pre id="engineDetail"></pre>
+        </div>
+        <div class="j1939-diagnostics">
             <h4>Diagnóstico RPM por origen CAN</h4>
             <label>Origen observado
                 <select id="j1939RpmSource" aria-label="Dirección de origen RPM"><option value="">Sin origen observado</option></select>
@@ -337,6 +347,7 @@
 </div>
 
 <script src="{{ url_for('static', filename='js/j1939_diagnostics.js') }}"></script>
+<script src="{{ url_for('static', filename='js/j1939_history.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 
 </body>
